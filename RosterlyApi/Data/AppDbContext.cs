@@ -47,6 +47,7 @@ public class AppDbContext : DbContext
                 .WithMany(o => o.TimeSlots)
                 .HasForeignKey(s => s.EventId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.Property(e => e.AllowWaitlist).HasDefaultValue(true).IsRequired();
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
         });
 

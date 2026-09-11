@@ -230,6 +230,8 @@ export function createPublicApi() {
         volunteerName: string
         email: string
         createdAt: string
+        status: string
+        waitlistPosition: number | null
       }>(res)
     },
 

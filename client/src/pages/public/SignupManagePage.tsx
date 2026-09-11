@@ -42,9 +42,10 @@ export function SignupManagePage() {
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
           Links stop working when a newer one is issued &mdash; for example, if
-          you re-sent your confirmation or received a reminder email (sent about
-          24 hours before your shift). Please open the newest email from us and
-          use the link inside it.
+          you re-sent your confirmation, received a reminder email (sent about
+          24 hours before your shift), or were promoted from the waitlist
+          (which sends a new &ldquo;You&rsquo;re in!&rdquo; email). Please open
+          the newest email from us and use the link inside it.
         </p>
       </div>
     )
@@ -52,6 +53,9 @@ export function SignupManagePage() {
 
   const isCancelled = cancelled || data.status === "Cancelled"
   const isRemoved = !cancelled && data.status === "Removed"
+  const isWaitlisted = !cancelled && data.status === "Waitlisted"
+  const waitlistPosition =
+    typeof data.waitlistPosition === "number" ? data.waitlistPosition : null
 
   const handleCancel = async () => {
     setCancelling(true)
@@ -59,7 +63,9 @@ export function SignupManagePage() {
       await api.cancelSignup(token!)
       setCancelled(true)
       setConfirmOpen(false)
-      toast.success("Your signup has been cancelled.")
+      toast.success(
+        isWaitlisted ? "You've left the waitlist." : "Your signup has been cancelled."
+      )
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to cancel signup"
@@ -116,12 +122,39 @@ export function SignupManagePage() {
                   ? "destructive"
                   : isRemoved
                     ? "secondary"
-                    : "default"
+                    : isWaitlisted
+                      ? "outline"
+                      : "default"
+              }
+              className={
+                isWaitlisted
+                  ? "border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400"
+                  : undefined
               }
             >
-              {isCancelled ? "Cancelled" : isRemoved ? "Removed" : "Confirmed"}
+              {isCancelled
+                ? "Cancelled"
+                : isRemoved
+                  ? "Removed"
+                  : isWaitlisted
+                    ? "Waitlisted"
+                    : "Confirmed"}
             </Badge>
           </div>
+
+          {isWaitlisted && !isCancelled && !isRemoved && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300">
+              You&apos;re{" "}
+              {waitlistPosition !== null ? (
+                <>
+                  <strong>#{waitlistPosition}</strong> in line
+                </>
+              ) : (
+                "in line"
+              )}
+              . We&apos;ll email you automatically if a spot opens up.
+            </div>
+          )}
 
           {isRemoved ? (
             <div className="flex items-center gap-2 rounded-md border p-3 text-sm text-muted-foreground">
@@ -142,14 +175,20 @@ export function SignupManagePage() {
                 disabled={cancelling}
                 onClick={() => setConfirmOpen(true)}
               >
-                Cancel signup
+                {isWaitlisted ? "Leave waitlist" : "Cancel signup"}
               </Button>
               <ConfirmDialog
                 open={confirmOpen}
                 onOpenChange={setConfirmOpen}
-                title="Cancel signup?"
-                description="This will release your spot for this shift. This action cannot be undone."
-                confirmLabel="Yes, cancel signup"
+                title={isWaitlisted ? "Leave waitlist?" : "Cancel signup?"}
+                description={
+                  isWaitlisted
+                    ? "This will remove you from the waitlist. This action cannot be undone."
+                    : "This will release your spot for this shift. This action cannot be undone."
+                }
+                confirmLabel={
+                  isWaitlisted ? "Yes, leave waitlist" : "Yes, cancel signup"
+                }
                 cancelLabel="Keep my spot"
                 variant="destructive"
                 isLoading={cancelling}

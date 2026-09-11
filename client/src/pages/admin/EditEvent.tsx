@@ -21,6 +21,7 @@ interface SlotRow {
   startTime: string
   endTime: string
   capacity: number
+  allowWaitlist: boolean
   signupCount: number
   deleted: boolean
 }
@@ -78,6 +79,7 @@ function EventForm({ event, eventId }: EventFormProps) {
       startTime: toTimeInputValue(slot.startTime),
       endTime: toTimeInputValue(slot.endTime),
       capacity: slot.capacity,
+      allowWaitlist: slot.allowWaitlist ?? true,
       signupCount: activeSignupCount(slot.signups),
       deleted: false,
     }))
@@ -98,6 +100,7 @@ function EventForm({ event, eventId }: EventFormProps) {
         startTime: "08:00",
         endTime: "09:00",
         capacity: 1,
+        allowWaitlist: true,
         signupCount: 0,
         deleted: false,
       },
@@ -107,7 +110,7 @@ function EventForm({ event, eventId }: EventFormProps) {
   const updateSlot = (
     key: number,
     field: keyof Omit<SlotRow, "key" | "id" | "signupCount" | "deleted">,
-    value: string | number
+    value: string | number | boolean
   ) => {
     setSlots((prev) =>
       prev.map((s) => (s.key === key ? { ...s, [field]: value } : s))
@@ -179,6 +182,7 @@ function EventForm({ event, eventId }: EventFormProps) {
             startTime: s.startTime,
             endTime: s.endTime,
             capacity: s.capacity,
+            allowWaitlist: s.allowWaitlist,
           })),
       })
       await invalidateEvent()
@@ -370,6 +374,17 @@ function EventForm({ event, eventId }: EventFormProps) {
                     {slotErrors[slot.key]}
                   </p>
                 )}
+                <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={slot.allowWaitlist}
+                    onChange={(e) =>
+                      updateSlot(slot.key, "allowWaitlist", e.target.checked)
+                    }
+                    className="h-3.5 w-3.5 accent-primary"
+                  />
+                  Allow waitlist when full
+                </label>
                 {slot.id && slot.signupCount > 0 && !slotErrors[slot.key] && (
                   <p className="text-xs text-muted-foreground">
                     {slot.signupCount} active signup(s) on this slot.

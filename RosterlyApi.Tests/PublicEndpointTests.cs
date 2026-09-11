@@ -263,7 +263,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IClassFixture
     }
 
     [Fact]
-    public async Task CreateSignup_SlotFull_Returns409()
+    public async Task CreateSignup_SlotFull_JoinsWaitlist()
     {
         var (_, _, code) = await SeedInviteLinkAsync("Full Slot Org");
 
@@ -285,7 +285,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IClassFixture
             Assert.Equal(HttpStatusCode.Created, signupResp.StatusCode);
         }
 
-        // One more should fail
+        // One more joins the waitlist instead of failing
         var response = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
         {
             slotId,
@@ -293,7 +293,409 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IClassFixture
             email = "extra@example.com"
         });
 
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("WaitlistPending", body.GetProperty("status").GetString());
+        Assert.Equal(1, body.GetProperty("waitlistPosition").GetInt32());
+
+        using var verifyScope = factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var signup = await verifyDb.Signups.SingleAsync(s => s.Email == "extra@example.com");
+        Assert.Equal(SignupStatus.WaitlistPending, signup.Status);
+
+        // Pending waitlist signups don't consume capacity
+        var refreshed = await _publicClient.GetAsync($"/api/invite/{code}");
+        var refreshedPage = await refreshed.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var refreshedSlot = refreshedPage.GetProperty("event").GetProperty("slots").EnumerateArray().First();
+        Assert.Equal(capacity, refreshedSlot.GetProperty("signupCount").GetInt32());
+        Assert.True(refreshedSlot.GetProperty("isFull").GetBoolean());
+
+        // Waitlist confirmation email is worded differently
+        var email = await verifyDb.EmailMessages.SingleAsync(m => m.To == "extra@example.com");
+        Assert.StartsWith("You're on the waitlist:", email.Subject);
+    }
+
+    [Fact]
+    public async Task CreateSignup_SlotFullWaitlistDisabled_Returns409WithCode()
+    {
+        var (_, eventId, code) = await SeedInviteLinkAsync("No Waitlist Org");
+
+        var page = await GetInvitePageJsonAsync(code);
+        var slotId = page.Slots.First().Id;
+
+        // Disable the waitlist via the admin slot endpoint
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var slotEntityId = await db.TimeSlots
+                .Where(s => s.EventId == eventId)
+                .Select(s => s.Id)
+                .SingleAsync();
+            slotId = slotEntityId;
+        }
+
+        var disableResp = await _adminClient.PutAsJsonAsync(
+            $"/api/events/{eventId}/slots/{slotId}", new { allowWaitlist = false });
+        Assert.Equal(HttpStatusCode.OK, disableResp.StatusCode);
+
+        for (int i = 0; i < 3; i++)
+        {
+            var signupResp = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+            {
+                slotId,
+                volunteerName = $"Volunteer {i + 1}",
+                email = $"nowait{i + 1}@example.com"
+            });
+            Assert.Equal(HttpStatusCode.Created, signupResp.StatusCode);
+        }
+
+        var response = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+        {
+            slotId,
+            volunteerName = "Extra Person",
+            email = "nowait-extra@example.com"
+        });
+
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("waitlist_disabled", body.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Waitlist_CancelPromotesOldestFirst()
+    {
+        var (_, _, code) = await SeedInviteLinkAsync("Promote Org");
+        var page = await GetInvitePageJsonAsync(code);
+        var slotId = page.Slots.First().Id;
+
+        // A takes the only... (capacity 3: fill with A, B, C then waitlist D, E)
+        foreach (var (name, email) in new[] { ("A", "wl-a@example.com"), ("B", "wl-b@example.com"), ("C", "wl-c@example.com") })
+        {
+            var r = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+            {
+                slotId,
+                volunteerName = name,
+                email
+            });
+            Assert.Equal(HttpStatusCode.Created, r.StatusCode);
+        }
+        foreach (var (name, email) in new[] { ("A", "wl-a@example.com"), ("B", "wl-b@example.com"), ("C", "wl-c@example.com") })
+        {
+            string token;
+            using (var scope = factory.Services.CreateScope())
+                token = ExtractManageToken(scope.ServiceProvider.GetRequiredService<AppDbContext>(), email);
+            var confirm = await _publicClient.GetAsync($"/api/signup/manage/{token}");
+            Assert.Equal(HttpStatusCode.OK, confirm.StatusCode);
+        }
+
+        // D and E join the waitlist (D first)
+        foreach (var (name, email) in new[] { ("D", "wl-d@example.com"), ("E", "wl-e@example.com") })
+        {
+            var r = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+            {
+                slotId,
+                volunteerName = name,
+                email
+            });
+            Assert.Equal(HttpStatusCode.Created, r.StatusCode);
+        }
+        string tokenD, tokenE;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            tokenD = ExtractManageToken(db, "wl-d@example.com");
+        }
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            // E confirms after D so D is ahead in the queue
+            var confirmD = await _publicClient.GetAsync($"/api/signup/manage/{tokenD}");
+            Assert.Equal(HttpStatusCode.OK, confirmD.StatusCode);
+        }
+        using (var scope = factory.Services.CreateScope())
+            tokenE = ExtractManageToken(scope.ServiceProvider.GetRequiredService<AppDbContext>(), "wl-e@example.com");
+        var confirmE = await _publicClient.GetAsync($"/api/signup/manage/{tokenE}");
+        Assert.Equal(HttpStatusCode.OK, confirmE.StatusCode);
+
+        // A cancels -> D (oldest waitlisted) auto-promotes, E stays queued
+        string tokenA;
+        using (var scope = factory.Services.CreateScope())
+            tokenA = ExtractManageToken(scope.ServiceProvider.GetRequiredService<AppDbContext>(), "wl-a@example.com");
+        var cancel = await _publicClient.PostAsync($"/api/signup/manage/{tokenA}/cancel", null);
+        Assert.Equal(HttpStatusCode.OK, cancel.StatusCode);
+
+        using var verifyScope = factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(SignupStatus.Confirmed,
+            (await verifyDb.Signups.SingleAsync(s => s.Email == "wl-d@example.com")).Status);
+        Assert.Equal(SignupStatus.Waitlisted,
+            (await verifyDb.Signups.SingleAsync(s => s.Email == "wl-e@example.com")).Status);
+
+        var promo = await verifyDb.EmailMessages
+            .Where(m => m.To == "wl-d@example.com")
+            .OrderByDescending(m => m.CreatedAt)
+            .FirstAsync();
+        Assert.StartsWith("You're in:", promo.Subject);
+    }
+
+    [Fact]
+    public async Task Waitlist_LateConfirmerStaysBehindQueue()
+    {
+        var (_, _, code) = await SeedInviteLinkAsync("Late Confirm Org");
+        var page = await GetInvitePageJsonAsync(code);
+        var slotId = page.Slots.First().Id;
+
+        foreach (var (name, email) in new[] { ("A", "late-a@example.com"), ("B", "late-b@example.com"), ("C", "late-c@example.com") })
+        {
+            var r = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+            {
+                slotId,
+                volunteerName = name,
+                email
+            });
+            Assert.Equal(HttpStatusCode.Created, r.StatusCode);
+        }
+
+        // F joins waitlist but doesn't confirm yet; G joins and confirms first
+        var f = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+        {
+            slotId,
+            volunteerName = "F",
+            email = "late-f@example.com"
+        });
+        Assert.Equal(HttpStatusCode.Created, f.StatusCode);
+        var g = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+        {
+            slotId,
+            volunteerName = "G",
+            email = "late-g@example.com"
+        });
+        Assert.Equal(HttpStatusCode.Created, g.StatusCode);
+
+        string tokenG;
+        using (var scope = factory.Services.CreateScope())
+            tokenG = ExtractManageToken(scope.ServiceProvider.GetRequiredService<AppDbContext>(), "late-g@example.com");
+        Assert.Equal(HttpStatusCode.OK, (await _publicClient.GetAsync($"/api/signup/manage/{tokenG}")).StatusCode);
+
+        string tokenF;
+        using (var scope = factory.Services.CreateScope())
+            tokenF = ExtractManageToken(scope.ServiceProvider.GetRequiredService<AppDbContext>(), "late-f@example.com");
+        var confirmF = await _publicClient.GetAsync($"/api/signup/manage/{tokenF}");
+        Assert.Equal(HttpStatusCode.OK, confirmF.StatusCode);
+        var bodyF = await confirmF.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("Waitlisted", bodyF.GetProperty("status").GetString());
+        Assert.Equal(2, bodyF.GetProperty("waitlistPosition").GetInt32());
+    }
+
+    [Fact]
+    public async Task Waitlist_DuplicateWaitlisted_Returns409WithCode()
+    {
+        var (_, _, code) = await SeedInviteLinkAsync("Dup Waitlist Org");
+        var page = await GetInvitePageJsonAsync(code);
+        var slotId = page.Slots.First().Id;
+
+        for (int i = 0; i < 3; i++)
+        {
+            var r = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+            {
+                slotId,
+                volunteerName = $"V{i}",
+                email = $"dup-wl-{i}@example.com"
+            });
+            Assert.Equal(HttpStatusCode.Created, r.StatusCode);
+        }
+
+        var join = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+        {
+            slotId,
+            volunteerName = "W",
+            email = "dup-wl@example.com"
+        });
+        Assert.Equal(HttpStatusCode.Created, join.StatusCode);
+
+        string token;
+        using (var scope = factory.Services.CreateScope())
+            token = ExtractManageToken(scope.ServiceProvider.GetRequiredService<AppDbContext>(), "dup-wl@example.com");
+        Assert.Equal(HttpStatusCode.OK, (await _publicClient.GetAsync($"/api/signup/manage/{token}")).StatusCode);
+
+        var again = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+        {
+            slotId,
+            volunteerName = "W",
+            email = "dup-wl@example.com"
+        });
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+        var body = await again.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("duplicate_waitlisted", body.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Waitlist_CapacityIncrease_PromotesInOrder()
+    {
+        var (_, eventId, code) = await SeedInviteLinkAsync("Capacity Bump Org");
+        var page = await GetInvitePageJsonAsync(code);
+        var slotId = page.Slots.First().Id;
+
+        foreach (var (name, email) in new[] { ("A", "cap-a@example.com"), ("B", "cap-b@example.com"), ("C", "cap-c@example.com") })
+        {
+            var r = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+            {
+                slotId,
+                volunteerName = name,
+                email
+            });
+            Assert.Equal(HttpStatusCode.Created, r.StatusCode);
+        }
+
+        foreach (var email in new[] { "cap-d@example.com", "cap-e@example.com" })
+        {
+            var r = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+            {
+                slotId,
+                volunteerName = email,
+                email
+            });
+            Assert.Equal(HttpStatusCode.Created, r.StatusCode);
+            string token;
+            using (var scope = factory.Services.CreateScope())
+                token = ExtractManageToken(scope.ServiceProvider.GetRequiredService<AppDbContext>(), email);
+            Assert.Equal(HttpStatusCode.OK, (await _publicClient.GetAsync($"/api/signup/manage/{token}")).StatusCode);
+        }
+
+        // +2 capacity promotes both D and E
+        var bump = await _adminClient.PutAsJsonAsync(
+            $"/api/events/{eventId}/slots/{slotId}", new { capacity = 5 });
+        Assert.Equal(HttpStatusCode.OK, bump.StatusCode);
+
+        using var verifyScope = factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(SignupStatus.Confirmed,
+            (await verifyDb.Signups.SingleAsync(s => s.Email == "cap-d@example.com")).Status);
+        Assert.Equal(SignupStatus.Confirmed,
+            (await verifyDb.Signups.SingleAsync(s => s.Email == "cap-e@example.com")).Status);
+    }
+
+    [Fact]
+    public async Task Waitlist_OrganizerRemove_PromotesNext()
+    {
+        var (_, _, code) = await SeedInviteLinkAsync("Remove Promote Org");
+        var page = await GetInvitePageJsonAsync(code);
+        var slotId = page.Slots.First().Id;
+
+        foreach (var (name, email) in new[] { ("A", "rm-a@example.com"), ("B", "rm-b@example.com"), ("C", "rm-c@example.com") })
+        {
+            var r = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+            {
+                slotId,
+                volunteerName = name,
+                email
+            });
+            Assert.Equal(HttpStatusCode.Created, r.StatusCode);
+            string token;
+            using (var scope = factory.Services.CreateScope())
+                token = ExtractManageToken(scope.ServiceProvider.GetRequiredService<AppDbContext>(), email);
+            await _publicClient.GetAsync($"/api/signup/manage/{token}");
+        }
+
+        var join = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+        {
+            slotId,
+            volunteerName = "W",
+            email = "rm-w@example.com"
+        });
+        Assert.Equal(HttpStatusCode.Created, join.StatusCode);
+        string tokenW;
+        using (var scope = factory.Services.CreateScope())
+            tokenW = ExtractManageToken(scope.ServiceProvider.GetRequiredService<AppDbContext>(), "rm-w@example.com");
+        Assert.Equal(HttpStatusCode.OK, (await _publicClient.GetAsync($"/api/signup/manage/{tokenW}")).StatusCode);
+
+        Guid signupIdA;
+        using (var scope = factory.Services.CreateScope())
+            signupIdA = (await scope.ServiceProvider.GetRequiredService<AppDbContext>().Signups
+                .SingleAsync(s => s.Email == "rm-a@example.com")).Id;
+
+        var remove = await _adminClient.DeleteAsync($"/api/signups/{signupIdA}");
+        Assert.Equal(HttpStatusCode.NoContent, remove.StatusCode);
+
+        using var verifyScope = factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(SignupStatus.Confirmed,
+            (await verifyDb.Signups.SingleAsync(s => s.Email == "rm-w@example.com")).Status);
+    }
+
+    [Fact]
+    public async Task CancelSignup_AfterOrganizerRemoval_Returns409WithCode()
+    {
+        var (_, _, code) = await SeedInviteLinkAsync("Cancel Removed Org");
+        var page = await GetInvitePageJsonAsync(code);
+        var slotId = page.Slots.First().Id;
+
+        var join = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+        {
+            slotId,
+            volunteerName = "Removed User",
+            email = "cancel-removed@example.com"
+        });
+        Assert.Equal(HttpStatusCode.Created, join.StatusCode);
+
+        string rawToken;
+        Guid signupId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var signup = await db.Signups.SingleAsync(s => s.Email == "cancel-removed@example.com");
+            signupId = signup.Id;
+            rawToken = ExtractManageToken(db, "cancel-removed@example.com");
+        }
+
+        var remove = await _adminClient.DeleteAsync($"/api/signups/{signupId}");
+        Assert.Equal(HttpStatusCode.NoContent, remove.StatusCode);
+
+        var cancel = await _publicClient.PostAsync($"/api/signup/manage/{rawToken}/cancel", null);
+        Assert.Equal(HttpStatusCode.Conflict, cancel.StatusCode);
+        var body = await cancel.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("removed_by_organization", body.GetProperty("code").GetString());
+
+        using var verifyScope = factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(SignupStatus.Removed,
+            (await verifyDb.Signups.SingleAsync(s => s.Id == signupId)).Status);
+    }
+
+    [Fact]
+    public async Task Waitlist_ManagePage_ShowsPosition()
+    {
+        var (_, _, code) = await SeedInviteLinkAsync("Position Org");
+        var page = await GetInvitePageJsonAsync(code);
+        var slotId = page.Slots.First().Id;
+
+        for (int i = 0; i < 3; i++)
+        {
+            var r = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+            {
+                slotId,
+                volunteerName = $"V{i}",
+                email = $"pos-{i}@example.com"
+            });
+            Assert.Equal(HttpStatusCode.Created, r.StatusCode);
+        }
+
+        var join = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+        {
+            slotId,
+            volunteerName = "W",
+            email = "pos-w@example.com"
+        });
+        Assert.Equal(HttpStatusCode.Created, join.StatusCode);
+
+        string token;
+        using (var scope = factory.Services.CreateScope())
+            token = ExtractManageToken(scope.ServiceProvider.GetRequiredService<AppDbContext>(), "pos-w@example.com");
+        var details = await _publicClient.GetAsync($"/api/signup/manage/{token}");
+        Assert.Equal(HttpStatusCode.OK, details.StatusCode);
+        var body = await details.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("Waitlisted", body.GetProperty("status").GetString());
+        Assert.Equal(1, body.GetProperty("waitlistPosition").GetInt32());
     }
 
     [Fact]
@@ -621,6 +1023,53 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IClassFixture
             email = "rc@example.com"
         });
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("already_confirmed", body.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task ResendSignup_Waitlisted_Returns409WithCode()
+    {
+        var (_, _, code) = await SeedInviteLinkAsync("Resend Waitlisted Org");
+        var page = await GetInvitePageJsonAsync(code);
+        var slotId = page.Slots.First().Id;
+
+        for (int i = 0; i < 3; i++)
+        {
+            var r = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+            {
+                slotId,
+                volunteerName = $"V{i}",
+                email = $"rw-{i}@example.com"
+            });
+            Assert.Equal(HttpStatusCode.Created, r.StatusCode);
+        }
+
+        var join = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+        {
+            slotId,
+            volunteerName = "W",
+            email = "rw-w@example.com"
+        });
+        Assert.Equal(HttpStatusCode.Created, join.StatusCode);
+
+        string rawToken;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            rawToken = ExtractManageToken(db, "rw-w@example.com");
+        }
+        var confirm = await _publicClient.GetAsync($"/api/signup/manage/{rawToken}");
+        Assert.Equal(HttpStatusCode.OK, confirm.StatusCode);
+
+        var response = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups/resend", new
+        {
+            slotId,
+            email = "rw-w@example.com"
+        });
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("already_waitlisted", body.GetProperty("code").GetString());
     }
 
     [Fact]

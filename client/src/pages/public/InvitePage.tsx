@@ -113,11 +113,17 @@ function SignupForm({ slots, code }: { slots: PublicSlot[]; code: string }) {
   const [email, setEmail] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [sentEmail, setSentEmail] = useState<string | null>(null)
+  const [sentWaitlistPosition, setSentWaitlistPosition] = useState<number | null>(
+    null
+  )
   const [emailError, setEmailError] = useState<string | null>(null)
   const [duplicatePending, setDuplicatePending] = useState(false)
+  const [duplicateWaitlistPending, setDuplicateWaitlistPending] = useState(false)
   const [resending, setResending] = useState(false)
 
   const canSubmit = !!selectedSlotId && !!name.trim() && !!email.trim()
+  const selectedSlot = slots.find((s) => s.id === selectedSlotId)
+  const selectedIsWaitlist = !!selectedSlot?.isFull
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -143,12 +149,17 @@ function SignupForm({ slots, code }: { slots: PublicSlot[]; code: string }) {
 
     setSubmitting(true)
     try {
-      await api.createSignup(code, {
+      const result = await api.createSignup(code, {
         slotId: selectedSlotId,
         volunteerName: trimmedName,
         email: trimmedEmail,
       })
       setSentEmail(trimmedEmail)
+      setSentWaitlistPosition(
+        typeof result.waitlistPosition === "number"
+          ? result.waitlistPosition
+          : null
+      )
       await queryClient.invalidateQueries({ queryKey: ["invite", code] })
     } catch (err) {
       if (err instanceof ApiError) {
@@ -156,8 +167,21 @@ function SignupForm({ slots, code }: { slots: PublicSlot[]; code: string }) {
           setDuplicatePending(true)
           return
         }
+        if (err.code === "duplicate_waitlist_pending") {
+          setDuplicateWaitlistPending(true)
+          return
+        }
         if (err.code === "duplicate_confirmed") {
           toast.error("You're already confirmed for this slot.")
+          return
+        }
+        if (err.code === "duplicate_waitlisted") {
+          toast.error("You're already on the waitlist for this slot.")
+          return
+        }
+        if (err.code === "waitlist_disabled") {
+          toast.error("That slot is full and isn't accepting a waitlist.")
+          await queryClient.invalidateQueries({ queryKey: ["invite", code] })
           return
         }
         if (err.code === "event_in_past") {
@@ -166,12 +190,7 @@ function SignupForm({ slots, code }: { slots: PublicSlot[]; code: string }) {
           return
         }
       }
-      if (err instanceof Error && err.message.toLowerCase().includes("full")) {
-        toast.error("That slot just filled up — please pick another.")
-        await queryClient.invalidateQueries({ queryKey: ["invite", code] })
-      } else {
-        toast.error(err instanceof Error ? err.message : "Sign up failed")
-      }
+      toast.error(err instanceof Error ? err.message : "Sign up failed")
     } finally {
       setSubmitting(false)
     }
@@ -186,6 +205,7 @@ function SignupForm({ slots, code }: { slots: PublicSlot[]; code: string }) {
         email: trimmedEmail,
       })
       setDuplicatePending(false)
+      setDuplicateWaitlistPending(false)
       setSentEmail(trimmedEmail)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to resend email")
@@ -196,6 +216,7 @@ function SignupForm({ slots, code }: { slots: PublicSlot[]; code: string }) {
 
   const resetForAnother = () => {
     setSentEmail(null)
+    setSentWaitlistPosition(null)
     setSelectedSlotId("")
   }
 
@@ -204,10 +225,19 @@ function SignupForm({ slots, code }: { slots: PublicSlot[]; code: string }) {
       <Card>
         <CardContent className="flex flex-col items-center gap-3 p-6 text-center">
           <MailCheck className="h-8 w-8 text-green-600 dark:text-green-400" />
-          <p className="text-sm text-green-700 dark:text-green-300">
-            Check your email! We sent a confirmation link to{" "}
-            <strong>{sentEmail}</strong>. Click it to confirm your signup.
-          </p>
+          {sentWaitlistPosition !== null ? (
+            <p className="text-sm text-green-700 dark:text-green-300">
+              You&apos;re on the waitlist! We sent a confirmation link to{" "}
+              <strong>{sentEmail}</strong>. Click it to secure position{" "}
+              <strong>#{sentWaitlistPosition}</strong>. We&apos;ll email you
+              automatically if a spot opens up.
+            </p>
+          ) : (
+            <p className="text-sm text-green-700 dark:text-green-300">
+              Check your email! We sent a confirmation link to{" "}
+              <strong>{sentEmail}</strong>. Click it to confirm your signup.
+            </p>
+          )}
           <Button variant="outline" size="sm" onClick={resetForAnother}>
             Sign up for another slot
           </Button>
@@ -227,17 +257,19 @@ function SignupForm({ slots, code }: { slots: PublicSlot[]; code: string }) {
           onValueChange={(value) => {
             setSelectedSlotId(value)
             setDuplicatePending(false)
+            setDuplicateWaitlistPending(false)
           }}
           className="gap-2"
         >
           {slots.map((slot) => {
+            const fullWithoutWaitlist = slot.isFull && !slot.allowWaitlist
             return (
               <Label
                 key={slot.id}
                 htmlFor={`slot-${slot.id}`}
                 className={cn(
                   "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50",
-                  slot.isFull &&
+                  fullWithoutWaitlist &&
                     "cursor-not-allowed opacity-60 hover:bg-transparent",
                   selectedSlotId === slot.id && "border-primary bg-primary/5"
                 )}
@@ -245,7 +277,7 @@ function SignupForm({ slots, code }: { slots: PublicSlot[]; code: string }) {
                 <RadioGroupItem
                   id={`slot-${slot.id}`}
                   value={slot.id}
-                  disabled={slot.isFull}
+                  disabled={fullWithoutWaitlist}
                   className="mt-0.5"
                 />
                 <div className="min-w-0 flex-1">
@@ -257,7 +289,9 @@ function SignupForm({ slots, code }: { slots: PublicSlot[]; code: string }) {
                         {formatTime(slot.endTime)}
                       </span>
                     </span>
-                    <Badge variant={slot.isFull ? "destructive" : "secondary"}>
+                    <Badge
+                      variant={slot.isFull ? "destructive" : "secondary"}
+                    >
                       {`${slot.signupCount}/${slot.capacity}`}
                     </Badge>
                   </div>
@@ -267,17 +301,31 @@ function SignupForm({ slots, code }: { slots: PublicSlot[]; code: string }) {
                       capacity={slot.capacity}
                     />
                   </div>
+                  {slot.isFull && slot.allowWaitlist && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Full — joining the waitlist
+                      {slot.waitlistCount > 0 &&
+                        ` (${slot.waitlistCount} waiting)`}
+                      .
+                    </p>
+                  )}
+                  {slot.isFull && !slot.allowWaitlist && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Full — no waitlist for this slot.
+                    </p>
+                  )}
                 </div>
               </Label>
             )
           })}
         </RadioGroup>
 
-        {duplicatePending ? (
+        {duplicatePending || duplicateWaitlistPending ? (
           <div className="space-y-3 rounded-md border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950">
             <p className="text-sm text-amber-800 dark:text-amber-300">
-              You already have a pending signup for this slot. Check your email
-              to confirm it.
+              {duplicateWaitlistPending
+                ? "You already have a pending waitlist signup for this slot. Check your email to confirm it and secure your place in line."
+                : "You already have a pending signup for this slot. Check your email to confirm it."}
             </p>
             <div className="flex gap-2">
               <Button size="sm" onClick={handleResend} disabled={resending}>
@@ -286,7 +334,10 @@ function SignupForm({ slots, code }: { slots: PublicSlot[]; code: string }) {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setDuplicatePending(false)}
+                onClick={() => {
+                  setDuplicatePending(false)
+                  setDuplicateWaitlistPending(false)
+                }}
               >
                 Choose another slot
               </Button>
@@ -323,7 +374,13 @@ function SignupForm({ slots, code }: { slots: PublicSlot[]; code: string }) {
               className="w-full"
               disabled={!canSubmit || submitting}
             >
-              {submitting ? "Signing up..." : "Sign up"}
+              {submitting
+                ? selectedIsWaitlist
+                  ? "Joining waitlist..."
+                  : "Signing up..."
+                : selectedIsWaitlist
+                  ? "Join Waitlist"
+                  : "Sign up"}
             </Button>
             <p className="text-center text-xs text-muted-foreground">
               By signing up you agree to our{" "}

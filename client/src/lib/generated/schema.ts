@@ -1086,6 +1086,7 @@ export interface components {
             endTime: string;
             /** Format: int32 */
             capacity: number | string;
+            allowWaitlist: null | boolean;
         };
         EventPublicResponse: {
             /** Format: uuid */
@@ -1165,6 +1166,9 @@ export interface components {
             email: string;
             /** Format: date-time */
             createdAt: string;
+            status: string;
+            /** Format: int32 */
+            waitlistPosition: null | number | string;
         };
         ResendSignupRequest: {
             /** Format: uuid */
@@ -1191,6 +1195,7 @@ export interface components {
             endTime: string;
             /** Format: int32 */
             capacity: number | string;
+            allowWaitlist: boolean;
             signups: components["schemas"]["SignupResponse"][];
         };
         SignupManageResponse: {
@@ -1211,6 +1216,8 @@ export interface components {
             startTime: string;
             /** Format: time */
             endTime: string;
+            /** Format: int32 */
+            waitlistPosition: null | number | string;
         };
         SignupResponse: {
             /** Format: uuid */
@@ -1236,6 +1243,9 @@ export interface components {
             /** Format: int32 */
             signupCount: number | string;
             isFull: boolean;
+            allowWaitlist: boolean;
+            /** Format: int32 */
+            waitlistCount: number | string;
         };
         TimeSlotResponse: {
             /** Format: uuid */
@@ -1251,6 +1261,7 @@ export interface components {
             capacity: number | string;
             /** Format: int32 */
             signupCount: number | string;
+            allowWaitlist: boolean;
         };
         UpdateEventRequest: {
             title: null | string;
@@ -1270,6 +1281,7 @@ export interface components {
             endTime: string;
             /** Format: int32 */
             capacity: number | string;
+            allowWaitlist: null | boolean;
         };
         UpdateSlotRequest: {
             label: null | string;
@@ -1279,6 +1291,7 @@ export interface components {
             endTime: null | string;
             /** Format: int32 */
             capacity: null | number | string;
+            allowWaitlist: null | boolean;
         };
         UserMeOrganization: {
             /** Format: uuid */

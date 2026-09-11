@@ -16,6 +16,7 @@ interface SlotRow {
   startTime: string
   endTime: string
   capacity: number
+  allowWaitlist: boolean
 }
 
 export function CreateEvent() {
@@ -57,6 +58,7 @@ export function CreateEvent() {
         startTime: "08:00",
         endTime: "09:00",
         capacity: 1,
+        allowWaitlist: true,
       },
     ])
   }
@@ -68,7 +70,7 @@ export function CreateEvent() {
   const updateSlot = (
     key: number,
     field: keyof SlotRow,
-    value: string | number
+    value: string | number | boolean
   ) => {
     setSlots((prev) =>
       prev.map((s) => (s.key === key ? { ...s, [field]: value } : s))
@@ -98,6 +100,7 @@ export function CreateEvent() {
               startTime: s.startTime,
               endTime: s.endTime,
               capacity: s.capacity,
+              allowWaitlist: s.allowWaitlist,
             }))
             : null,
       })
@@ -172,62 +175,75 @@ export function CreateEvent() {
           {slots.map((slot) => (
             <div
               key={slot.key}
-              className="flex flex-wrap items-end gap-2 rounded-md border p-3"
+              className="space-y-2 rounded-md border p-3"
             >
-              <div className="flex-1 space-y-1">
-                <Label className="text-xs">Label</Label>
-                <Input
-                  value={slot.label}
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="flex-1 space-y-1">
+                  <Label className="text-xs">Label</Label>
+                  <Input
+                    value={slot.label}
+                    onChange={(e) =>
+                      updateSlot(slot.key, "label", e.target.value)
+                    }
+                    placeholder="Morning"
+                    required
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Start</Label>
+                  <TimeInput
+                    value={slot.startTime}
+                    onChange={(val) => updateSlot(slot.key, "startTime", val)}
+                    size="sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">End</Label>
+                  <TimeInput
+                    value={slot.endTime}
+                    onChange={(val) => updateSlot(slot.key, "endTime", val)}
+                    size="sm"
+                  />
+                </div>
+                <div className="w-16 space-y-1">
+                  <Label className="text-xs">Cap</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={slot.capacity}
+                    onChange={(e) =>
+                      updateSlot(
+                        slot.key,
+                        "capacity",
+                        parseInt(e.target.value) || 1
+                      )
+                    }
+                    required
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  onClick={() => removeSlot(slot.key)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={slot.allowWaitlist}
                   onChange={(e) =>
-                    updateSlot(slot.key, "label", e.target.value)
+                    updateSlot(slot.key, "allowWaitlist", e.target.checked)
                   }
-                  placeholder="Morning"
-                  required
-                  className="h-8 text-sm"
+                  className="h-3.5 w-3.5 accent-primary"
                 />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Start</Label>
-                <TimeInput
-                  value={slot.startTime}
-                  onChange={(val) => updateSlot(slot.key, "startTime", val)}
-                  size="sm"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">End</Label>
-                <TimeInput
-                  value={slot.endTime}
-                  onChange={(val) => updateSlot(slot.key, "endTime", val)}
-                  size="sm"
-                />
-              </div>
-              <div className="w-16 space-y-1">
-                <Label className="text-xs">Cap</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={slot.capacity}
-                  onChange={(e) =>
-                    updateSlot(
-                      slot.key,
-                      "capacity",
-                      parseInt(e.target.value) || 1
-                    )
-                  }
-                  required
-                  className="h-8 text-sm"
-                />
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                onClick={() => removeSlot(slot.key)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
+                Allow waitlist when full
+              </label>
             </div>
           ))}
 

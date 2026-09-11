@@ -16,7 +16,12 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { CapacityBar } from "@/components/ui/capacity-bar"
-import { activeSignupCount, formatTime } from "@/lib/utils"
+import {
+  activeSignupCount,
+  compareSignupsByStatus,
+  formatTime,
+  waitlistCount,
+} from "@/lib/utils"
 import {
   buildEventVolunteersCsv,
   buildVolunteersFilename,
@@ -220,15 +225,29 @@ export function EventDetail() {
                     {formatTime(slot.endTime)}
                   </span>
                 </span>
-                <Badge
-                  variant={
-                    activeSignupCount(slot.signups) >= slot.capacity
-                      ? "destructive"
-                      : "secondary"
-                  }
-                >
-                  {activeSignupCount(slot.signups)}/{slot.capacity}
-                </Badge>
+                <span className="flex items-center gap-2">
+                  <Badge
+                    variant={
+                      activeSignupCount(slot.signups) >= slot.capacity
+                        ? "destructive"
+                        : "secondary"
+                    }
+                  >
+                    {activeSignupCount(slot.signups)}/{slot.capacity}
+                    {waitlistCount(slot.signups) > 0 &&
+                      ` · ${waitlistCount(slot.signups)} waiting`}
+                  </Badge>
+                  <Badge
+                    variant={slot.allowWaitlist ? "outline" : "secondary"}
+                    title={
+                      slot.allowWaitlist
+                        ? "Volunteers can join the waitlist when this slot is full"
+                        : "Waitlist disabled — full slots reject new signups"
+                    }
+                  >
+                    {slot.allowWaitlist ? "Waitlist on" : "No waitlist"}
+                  </Badge>
+                </span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 p-4 pt-3">
@@ -249,31 +268,33 @@ export function EventDetail() {
                     </tr>
                   </thead>
                   <tbody>
-                    {slot.signups.map((s) => (
-                      <tr key={s.id} className="border-b last:border-0">
-                        <td className="py-1">{s.volunteerName}</td>
-                        <td className="py-1 break-all text-muted-foreground">
-                          {s.email}
-                        </td>
-                        <td className="py-1 text-muted-foreground">
-                          {new Date(s.createdAt).toLocaleString()}
-                        </td>
-                        <td className="py-1">
-                          <SignupStatusBadge status={s.status} />
-                        </td>
-                        <td className="py-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                            onClick={() => setPendingSignupId(s.id)}
-                            disabled={s.status === "Cancelled" || s.status === "Removed"}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
+                    {[...slot.signups]
+                      .sort(compareSignupsByStatus)
+                      .map((s) => (
+                        <tr key={s.id} className="border-b last:border-0">
+                          <td className="py-1">{s.volunteerName}</td>
+                          <td className="py-1 break-all text-muted-foreground">
+                            {s.email}
+                          </td>
+                          <td className="py-1 text-muted-foreground">
+                            {new Date(s.createdAt).toLocaleString()}
+                          </td>
+                          <td className="py-1">
+                            <SignupStatusBadge status={s.status} />
+                          </td>
+                          <td className="py-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                              onClick={() => setPendingSignupId(s.id)}
+                              disabled={s.status === "Cancelled" || s.status === "Removed"}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               )}
@@ -425,6 +446,18 @@ const STATUS_CONFIG: Record<
   Confirmed: { label: "Confirmed", variant: "default" },
   Pending: {
     label: "Pending",
+    variant: "outline",
+    className:
+      "border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400",
+  },
+  Waitlisted: {
+    label: "Waitlisted",
+    variant: "outline",
+    className:
+      "border-sky-300 text-sky-700 dark:border-sky-700 dark:text-sky-400",
+  },
+  WaitlistPending: {
+    label: "Waitlist pending",
     variant: "outline",
     className:
       "border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400",
