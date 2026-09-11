@@ -94,7 +94,7 @@ export function CreateEvent() {
     setSubmitting(true)
 
     try {
-      await api.createEvent(org.id, {
+      const { id } = await api.createEvent(org.id, {
         title: title.trim(),
         description: description.trim() || null,
         location: location.trim() || null,
@@ -112,7 +112,7 @@ export function CreateEvent() {
       })
       toast.success("Event created")
       await queryClient.invalidateQueries({ queryKey: ["roster"] })
-      navigate("/dashboard")
+      navigate(`/events/${id}`)
     } catch (e) {
       toast.error(formatApiError(e, "Failed to create event"))
     } finally {
