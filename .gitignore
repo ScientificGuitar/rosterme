@@ -34,3 +34,6 @@ dist-ssr
 
 ### Environment/Secrets ###
 .env
+
+### Personal notes ###
+TODO.md
