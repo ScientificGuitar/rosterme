@@ -90,6 +90,27 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IClassFixture
     }
 
     [Fact]
+    public async Task CreateSignup_TrimsVolunteerName()
+    {
+        var (_, _, code) = await SeedInviteLinkAsync("Trim Name Org");
+
+        var getPage = await _publicClient.GetAsync($"/api/invite/{code}");
+        var page = await getPage.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var slotId = page.GetProperty("event").GetProperty("slots").EnumerateArray().First().GetProperty("id").GetGuid();
+
+        var response = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+        {
+            slotId,
+            volunteerName = "  Alice  ",
+            email = "alice@example.com"
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("Alice", body.GetProperty("volunteerName").GetString());
+    }
+
+    [Fact]
     public async Task CreateSignup_MissingEmail_Returns400()
     {
         var (_, _, code) = await SeedInviteLinkAsync("Missing Email Org");

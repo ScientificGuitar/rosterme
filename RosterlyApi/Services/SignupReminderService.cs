@@ -104,6 +104,7 @@ public class SignupReminderService
                 signup.VolunteerName,
                 evt.Organization.Name,
                 evt.Title,
+                slot.Label,
                 evt.Date,
                 slot.StartTime,
                 slot.EndTime,

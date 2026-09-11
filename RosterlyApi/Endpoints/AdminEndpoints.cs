@@ -98,6 +98,11 @@ public static class AdminEndpoints
     private static string GetUserId(HttpContext http) =>
         http.User.FindFirstValue("sub") ?? throw new UnauthorizedAccessException();
 
+    private static string Norm(string value) => value.Trim();
+
+    private static string? NormNull(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
     private static async Task<Organization?> GetOwnedOrganization(AppDbContext db, Guid orgId, string userId, CancellationToken ct)
     {
         return await db.Organizations
@@ -113,7 +118,7 @@ public static class AdminEndpoints
         var org = new Organization
         {
             Id = Guid.NewGuid(),
-            Name = request.Name,
+            Name = Norm(request.Name),
             ClerkUserId = userId,
             CreatedAt = DateTime.UtcNow
         };
@@ -160,9 +165,9 @@ public static class AdminEndpoints
         {
             Id = Guid.NewGuid(),
             OrganizationId = orgId,
-            Title = request.Title,
-            Description = request.Description,
-            Location = request.Location,
+            Title = Norm(request.Title),
+            Description = NormNull(request.Description),
+            Location = NormNull(request.Location),
             Date = request.Date,
             CreatedAt = DateTime.UtcNow
         };
@@ -177,7 +182,7 @@ public static class AdminEndpoints
                 {
                     Id = Guid.NewGuid(),
                     EventId = evt.Id,
-                    Label = s.Label,
+                    Label = Norm(s.Label),
                     StartTime = s.StartTime,
                     EndTime = s.EndTime,
                     Capacity = s.Capacity,
@@ -224,11 +229,11 @@ public static class AdminEndpoints
         if (evt is null) return Results.NotFound();
 
         if (request.Title is not null)
-            evt.Title = request.Title;
+            evt.Title = Norm(request.Title);
         if (request.Description is not null)
-            evt.Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description;
+            evt.Description = NormNull(request.Description);
         if (request.Location is not null)
-            evt.Location = string.IsNullOrWhiteSpace(request.Location) ? null : request.Location;
+            evt.Location = NormNull(request.Location);
         if (request.Date is not null) evt.Date = request.Date.Value;
 
         var increasedSlotIds = new List<Guid>();
@@ -285,7 +290,7 @@ public static class AdminEndpoints
                     }
 
                     var oldCapacity = slot.Capacity;
-                    slot.Label = s.Label;
+                    slot.Label = Norm(s.Label);
                     slot.StartTime = s.StartTime;
                     slot.EndTime = s.EndTime;
                     slot.Capacity = s.Capacity;
@@ -299,7 +304,7 @@ public static class AdminEndpoints
                     {
                         Id = Guid.NewGuid(),
                         EventId = evt.Id,
-                        Label = s.Label,
+                        Label = Norm(s.Label),
                         StartTime = s.StartTime,
                         EndTime = s.EndTime,
                         Capacity = s.Capacity,
@@ -367,7 +372,7 @@ public static class AdminEndpoints
         {
             Id = Guid.NewGuid(),
             EventId = eventId,
-            Label = request.Label,
+            Label = Norm(request.Label),
             StartTime = request.StartTime,
             EndTime = request.EndTime,
             Capacity = request.Capacity,
@@ -413,7 +418,7 @@ public static class AdminEndpoints
                 });
             }
 
-            if (request.Label is not null) slot.Label = request.Label;
+            if (request.Label is not null) slot.Label = Norm(request.Label);
             if (request.StartTime is not null) slot.StartTime = request.StartTime.Value;
             if (request.EndTime is not null) slot.EndTime = request.EndTime.Value;
             if (request.Capacity is not null) slot.Capacity = request.Capacity.Value;
@@ -527,6 +532,7 @@ public static class AdminEndpoints
                 signup.VolunteerName,
                 evt.Organization.Name,
                 evt.Title,
+                slot.Label,
                 evt.Date,
                 slot.StartTime,
                 slot.EndTime,

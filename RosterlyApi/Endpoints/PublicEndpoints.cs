@@ -201,7 +201,7 @@ public static class PublicEndpoints
             {
                 Id = Guid.NewGuid(),
                 TimeSlotId = request.SlotId,
-                VolunteerName = request.VolunteerName,
+                VolunteerName = Norm(request.VolunteerName),
                 Email = email,
                 Status = isWaitlist ? SignupStatus.WaitlistPending : SignupStatus.Pending,
                 ManagementTokenHash = TokenService.HashToken(rawToken),
@@ -456,6 +456,7 @@ public static class PublicEndpoints
             signup.VolunteerName,
             slot.Event.Organization.Name,
             slot.Event.Title,
+            slot.Label,
             slot.Event.Date,
             slot.StartTime,
             slot.EndTime,
@@ -489,6 +490,7 @@ public static class PublicEndpoints
             signup.VolunteerName,
             evt.Organization.Name,
             evt.Title,
+            slot.Label,
             evt.Date,
             slot.StartTime,
             slot.EndTime,
@@ -498,6 +500,11 @@ public static class PublicEndpoints
 
         await outbox.EnqueueAsync(signup.Email, subject, html, text, ct: ct);
     }
+
+    private static string Norm(string value) => value.Trim();
+
+    private static string? NormNull(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
 }

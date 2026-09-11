@@ -8,6 +8,7 @@ public static class EmailTemplates
         string volunteerName,
         string organizationName,
         string eventTitle,
+        string slotLabel,
         DateOnly eventDate,
         TimeOnly startTime,
         TimeOnly endTime,
@@ -17,9 +18,10 @@ public static class EmailTemplates
         bool hasCalendarAttachment = false)
     {
         var subject = $"Confirm your signup: {eventTitle}";
+        var encodedSlotLabel = HttpUtility.HtmlEncode(slotLabel);
         var encodedLocation = string.IsNullOrWhiteSpace(location)
             ? null
-            : HttpUtility.HtmlEncode(location.Trim());
+            : HttpUtility.HtmlEncode(location);
 
         var locationHtml = encodedLocation is null
             ? ""
@@ -66,7 +68,8 @@ public static class EmailTemplates
                           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fafafa;border-radius:8px;">
                             <tr>
                               <td style="padding:16px;">
-                                <p style="margin:0 0 4px;font-size:14px;color:#18181b;"><strong>{eventDate:dddd d MMMM yyyy}</strong></p>
+                                <p style="margin:0 0 4px;font-size:14px;color:#18181b;"><strong>{encodedSlotLabel}</strong></p>
+                                <p style="margin:0 0 4px;font-size:14px;color:#18181b;">{eventDate:dddd d MMMM yyyy}</p>
                                 <p style="margin:0;font-size:14px;color:#3f3f46;">{startTime:HH:mm}&ndash;{endTime:HH:mm}</p>
                                 {locationHtml}
                                 <p style="margin:12px 0 0;font-size:14px;color:#3f3f46;">Name: <strong>{HttpUtility.HtmlEncode(volunteerName)}</strong></p>
@@ -92,7 +95,7 @@ public static class EmailTemplates
             </html>
             """;
 
-        var textLocation = string.IsNullOrWhiteSpace(location) ? "" : $"\nLocation: {location.Trim()}";
+        var textLocation = string.IsNullOrWhiteSpace(location) ? "" : $"\nLocation: {location}";
         var textCalendar = calendarLinks is null ? "" : $"""
 
             Add it to your calendar:
@@ -105,6 +108,7 @@ public static class EmailTemplates
             {organizationName}
 
             Confirm your signup for: {eventTitle}
+            Shift: {slotLabel}
             {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}–{endTime:HH:mm}{textLocation}
             Name: {volunteerName}
 
@@ -122,6 +126,7 @@ public static class EmailTemplates
         string volunteerName,
         string organizationName,
         string eventTitle,
+        string slotLabel,
         DateOnly eventDate,
         TimeOnly startTime,
         TimeOnly endTime,
@@ -130,9 +135,10 @@ public static class EmailTemplates
         string? location = null)
     {
         var subject = $"You're on the waitlist: {eventTitle}";
+        var encodedSlotLabel = HttpUtility.HtmlEncode(slotLabel);
         var encodedLocation = string.IsNullOrWhiteSpace(location)
             ? null
-            : HttpUtility.HtmlEncode(location.Trim());
+            : HttpUtility.HtmlEncode(location);
 
         var locationHtml = encodedLocation is null
             ? ""
@@ -161,7 +167,8 @@ public static class EmailTemplates
                           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fafafa;border-radius:8px;">
                             <tr>
                               <td style="padding:16px;">
-                                <p style="margin:0 0 4px;font-size:14px;color:#18181b;"><strong>{eventDate:dddd d MMMM yyyy}</strong></p>
+                                <p style="margin:0 0 4px;font-size:14px;color:#18181b;"><strong>{encodedSlotLabel}</strong></p>
+                                <p style="margin:0 0 4px;font-size:14px;color:#18181b;">{eventDate:dddd d MMMM yyyy}</p>
                                 <p style="margin:0;font-size:14px;color:#3f3f46;">{startTime:HH:mm}&ndash;{endTime:HH:mm}</p>
                                 {locationHtml}
                                 <p style="margin:12px 0 0;font-size:14px;color:#3f3f46;">Name: <strong>{HttpUtility.HtmlEncode(volunteerName)}</strong></p>
@@ -187,12 +194,13 @@ public static class EmailTemplates
             </html>
             """;
 
-        var textLocation = string.IsNullOrWhiteSpace(location) ? "" : $"\nLocation: {location.Trim()}";
+        var textLocation = string.IsNullOrWhiteSpace(location) ? "" : $"\nLocation: {location}";
 
         var text = $"""
             {organizationName}
 
             Confirm to join the waitlist for: {eventTitle}
+            Shift: {slotLabel}
             {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}–{endTime:HH:mm}{textLocation}
             Name: {volunteerName}
             Current waitlist position: #{waitlistPosition} (may change as others confirm)
@@ -212,6 +220,7 @@ public static class EmailTemplates
         string volunteerName,
         string organizationName,
         string eventTitle,
+        string slotLabel,
         DateOnly eventDate,
         TimeOnly startTime,
         TimeOnly endTime,
@@ -221,9 +230,10 @@ public static class EmailTemplates
         bool hasCalendarAttachment = false)
     {
         var subject = $"You're in: {eventTitle}";
+        var encodedSlotLabel = HttpUtility.HtmlEncode(slotLabel);
         var encodedLocation = string.IsNullOrWhiteSpace(location)
             ? null
-            : HttpUtility.HtmlEncode(location.Trim());
+            : HttpUtility.HtmlEncode(location);
 
         var locationHtml = encodedLocation is null
             ? ""
@@ -270,7 +280,8 @@ public static class EmailTemplates
                           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fafafa;border-radius:8px;">
                             <tr>
                               <td style="padding:16px;">
-                                <p style="margin:0 0 4px;font-size:14px;color:#18181b;"><strong>{eventDate:dddd d MMMM yyyy}</strong></p>
+                                <p style="margin:0 0 4px;font-size:14px;color:#18181b;"><strong>{encodedSlotLabel}</strong></p>
+                                <p style="margin:0 0 4px;font-size:14px;color:#18181b;">{eventDate:dddd d MMMM yyyy}</p>
                                 <p style="margin:0;font-size:14px;color:#3f3f46;">{startTime:HH:mm}&ndash;{endTime:HH:mm}</p>
                                 {locationHtml}
                                 <p style="margin:12px 0 0;font-size:14px;color:#3f3f46;">Name: <strong>{HttpUtility.HtmlEncode(volunteerName)}</strong></p>
@@ -297,7 +308,7 @@ public static class EmailTemplates
             </html>
             """;
 
-        var textLocation = string.IsNullOrWhiteSpace(location) ? "" : $"\nLocation: {location.Trim()}";
+        var textLocation = string.IsNullOrWhiteSpace(location) ? "" : $"\nLocation: {location}";
         var textCalendar = calendarLinks is null ? "" : $"""
 
             Add it to your calendar:
@@ -310,6 +321,7 @@ public static class EmailTemplates
             {organizationName}
 
             You're in: {eventTitle}
+            Shift: {slotLabel}
             {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}–{endTime:HH:mm}{textLocation}
             Name: {volunteerName}
 
@@ -328,6 +340,7 @@ public static class EmailTemplates
         string volunteerName,
         string organizationName,
         string eventTitle,
+        string slotLabel,
         DateOnly eventDate,
         TimeOnly startTime,
         TimeOnly endTime,
@@ -335,9 +348,10 @@ public static class EmailTemplates
         string? location = null)
     {
         var subject = $"Reminder: {eventTitle} is tomorrow";
+        var encodedSlotLabel = HttpUtility.HtmlEncode(slotLabel);
         var encodedLocation = string.IsNullOrWhiteSpace(location)
             ? null
-            : HttpUtility.HtmlEncode(location.Trim());
+            : HttpUtility.HtmlEncode(location);
 
         var locationHtml = encodedLocation is null
             ? ""
@@ -366,7 +380,8 @@ public static class EmailTemplates
                           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fafafa;border-radius:8px;">
                             <tr>
                               <td style="padding:16px;">
-                                <p style="margin:0 0 4px;font-size:14px;color:#18181b;"><strong>{eventDate:dddd d MMMM yyyy}</strong></p>
+                                <p style="margin:0 0 4px;font-size:14px;color:#18181b;"><strong>{encodedSlotLabel}</strong></p>
+                                <p style="margin:0 0 4px;font-size:14px;color:#18181b;">{eventDate:dddd d MMMM yyyy}</p>
                                 <p style="margin:0;font-size:14px;color:#3f3f46;">{startTime:HH:mm}&ndash;{endTime:HH:mm}</p>
                                 {locationHtml}
                                 <p style="margin:12px 0 0;font-size:14px;color:#3f3f46;">Name: <strong>{HttpUtility.HtmlEncode(volunteerName)}</strong></p>
@@ -392,12 +407,13 @@ public static class EmailTemplates
             </html>
             """;
 
-        var textLocation = string.IsNullOrWhiteSpace(location) ? "" : $"\nLocation: {location.Trim()}";
+        var textLocation = string.IsNullOrWhiteSpace(location) ? "" : $"\nLocation: {location}";
 
         var text = $"""
             {organizationName}
 
             Reminder: {eventTitle} is tomorrow
+            Shift: {slotLabel}
             {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}–{endTime:HH:mm}{textLocation}
             Name: {volunteerName}
 
@@ -416,6 +432,7 @@ public static class EmailTemplates
         string volunteerName,
         string organizationName,
         string eventTitle,
+        string slotLabel,
         DateOnly eventDate,
         TimeOnly startTime,
         TimeOnly endTime,
@@ -423,9 +440,10 @@ public static class EmailTemplates
         bool wasWaitlisted = false)
     {
         var subject = $"Update on your signup: {eventTitle}";
+        var encodedSlotLabel = HttpUtility.HtmlEncode(slotLabel);
         var encodedLocation = string.IsNullOrWhiteSpace(location)
             ? null
-            : HttpUtility.HtmlEncode(location.Trim());
+            : HttpUtility.HtmlEncode(location);
 
         var locationHtml = encodedLocation is null
             ? ""
@@ -454,7 +472,8 @@ public static class EmailTemplates
                           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fafafa;border-radius:8px;">
                             <tr>
                               <td style="padding:16px;">
-                                <p style="margin:0 0 4px;font-size:14px;color:#18181b;"><strong>{eventDate:dddd d MMMM yyyy}</strong></p>
+                                <p style="margin:0 0 4px;font-size:14px;color:#18181b;"><strong>{encodedSlotLabel}</strong></p>
+                                <p style="margin:0 0 4px;font-size:14px;color:#18181b;">{eventDate:dddd d MMMM yyyy}</p>
                                 <p style="margin:0;font-size:14px;color:#3f3f46;">{startTime:HH:mm}&ndash;{endTime:HH:mm}</p>
                                 {locationHtml}
                                 <p style="margin:12px 0 0;font-size:14px;color:#3f3f46;">Name: <strong>{HttpUtility.HtmlEncode(volunteerName)}</strong></p>
@@ -478,12 +497,13 @@ public static class EmailTemplates
             </html>
             """;
 
-        var textLocation = string.IsNullOrWhiteSpace(location) ? "" : $"\nLocation: {location.Trim()}";
+        var textLocation = string.IsNullOrWhiteSpace(location) ? "" : $"\nLocation: {location}";
 
         var text = $"""
             {organizationName}
 
             You've been removed from: {eventTitle}
+            Shift: {slotLabel}
             {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}–{endTime:HH:mm}{textLocation}
             Name: {volunteerName}
 

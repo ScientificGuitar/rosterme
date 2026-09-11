@@ -33,7 +33,7 @@ public static class CalendarInviteBuilder
 
         var textDescription = new StringBuilder();
         if (!string.IsNullOrWhiteSpace(description))
-            textDescription.AppendLine(description.Trim());
+            textDescription.AppendLine(description);
         textDescription.AppendLine($"Shift: {slotLabel} ({startTime:HH:mm}–{endTime:HH:mm})");
         textDescription.Append("View or cancel your signup: ");
         textDescription.Append(manageUrl);
@@ -50,7 +50,7 @@ public static class CalendarInviteBuilder
         AppendProperty(sb, "DTEND", FormatFloating(end));
         AppendProperty(sb, "SUMMARY", eventTitle);
         if (!string.IsNullOrWhiteSpace(location))
-            AppendProperty(sb, "LOCATION", location.Trim());
+            AppendProperty(sb, "LOCATION", location);
         AppendProperty(sb, "DESCRIPTION", textDescription.ToString());
         sb.AppendLine("STATUS:CONFIRMED");
         sb.AppendLine("END:VEVENT");
@@ -73,27 +73,27 @@ public static class CalendarInviteBuilder
         var dates = $"{FormatFloating(start)}/{FormatFloating(end)}";
         var details = string.IsNullOrWhiteSpace(description)
             ? $"Shift: {slotLabel}. View or cancel: {manageUrl}"
-            : $"{description.Trim()} Shift: {slotLabel}. View or cancel: {manageUrl}";
+            : $"{description} Shift: {slotLabel}. View or cancel: {manageUrl}";
 
         var google = "https://calendar.google.com/calendar/render?action=TEMPLATE"
             + $"&text={Uri.EscapeDataString(eventTitle)}"
             + $"&dates={dates}"
             + $"&details={Uri.EscapeDataString(details)}"
-            + (string.IsNullOrWhiteSpace(location) ? "" : $"&location={Uri.EscapeDataString(location.Trim())}");
+            + (string.IsNullOrWhiteSpace(location) ? "" : $"&location={Uri.EscapeDataString(location)}");
 
         var outlook = "https://outlook.live.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent"
             + $"&subject={Uri.EscapeDataString(eventTitle)}"
             + $"&startdt={FormatFloating(start)}"
             + $"&enddt={FormatFloating(end)}"
             + $"&body={Uri.EscapeDataString(details)}"
-            + (string.IsNullOrWhiteSpace(location) ? "" : $"&location={Uri.EscapeDataString(location.Trim())}");
+            + (string.IsNullOrWhiteSpace(location) ? "" : $"&location={Uri.EscapeDataString(location)}");
 
         var yahoo = "https://calendar.yahoo.com/?v=60&view=d&type=20"
             + $"&title={Uri.EscapeDataString(eventTitle)}"
             + $"&st={FormatFloating(start)}"
             + $"&et={FormatFloating(end)}"
             + $"&desc={Uri.EscapeDataString(details)}"
-            + (string.IsNullOrWhiteSpace(location) ? "" : $"&in_loc={Uri.EscapeDataString(location.Trim())}");
+            + (string.IsNullOrWhiteSpace(location) ? "" : $"&in_loc={Uri.EscapeDataString(location)}");
 
         return new CalendarLinks(google, outlook, yahoo);
     }

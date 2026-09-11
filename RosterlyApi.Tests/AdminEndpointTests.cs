@@ -37,6 +37,44 @@ public class AdminEndpointTests : IClassFixture<IntegrationTestFactory>
     }
 
     [Fact]
+    public async Task CreateOrganization_TrimsName()
+    {
+        var response = await _client.PostAsJsonAsync("/api/organizations", new { name = "  Padded Church  " });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("Padded Church", body.GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task CreateEvent_TrimsTitleAndSlotLabel()
+    {
+        var orgId = await SeedOrgAsync("Trim Org");
+
+        var response = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
+        {
+            title = "  Sunday Service  ",
+            description = "  Morning gathering  ",
+            location = "  123 Main St  ",
+            date = FutureDate(),
+            slots = new[]
+            {
+                new { label = "  Morning  ", startTime = "08:00", endTime = "09:00", capacity = 3 }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var created = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var eventId = created.GetProperty("id").GetGuid();
+
+        var evt = await _client.GetFromJsonAsync<JsonElement>($"/api/events/{eventId}", _jsonOptions);
+        Assert.Equal("Sunday Service", evt.GetProperty("title").GetString());
+        Assert.Equal("Morning gathering", evt.GetProperty("description").GetString());
+        Assert.Equal("123 Main St", evt.GetProperty("location").GetString());
+        Assert.Equal("Morning", evt.GetProperty("slots").EnumerateArray().First().GetProperty("label").GetString());
+    }
+
+    [Fact]
     public async Task GetOrganization_ReturnsOrg()
     {
         var orgId = await SeedOrgAsync("Simple Org");
