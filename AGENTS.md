@@ -18,7 +18,7 @@ Roster signup app: orgs create events with time slots, share invite links, volun
 ## Patterns (must follow)
 
 - **Auth**: every admin endpoint must verify ownership through entity chain via `ClerkUserId`; validate `azp` claim against allowlist. Public (no auth): fetch invite page, create/resend/get/cancel signup.
-- **Validation/errors**: use `ValidateDtoFilter` (recursive DataAnnotations) — don't hand-roll. Errors → RFC 7807 ProblemDetails with optional `code` (e.g. `duplicate_pending`) for client branching. `DbConflictDetector`: 23505→409, 23503→400.
+- **Validation/errors**: use `ValidateDtoFilter` (recursive DataAnnotations) — don't hand-roll. Errors → RFC 9457 ProblemDetails with optional `code` (e.g. `duplicate_pending`) for client branching. `DbConflictDetector`: 23505→409, 23503→400.
 - **Signup invariants**: capacity check with `SELECT ... FOR UPDATE`; unique `(Email, TimeSlotId)` excl. cancelled, case-insensitive email; management tokens stored SHA256-hashed (raw token only in email link); signup + `EmailMessage` outbox row in same transaction (`EmailBackgroundService` sends via Resend).
 - **Frontend API**: use `createAdminApi(getToken)` / `createPublicApi()`, shared error parsing via `ApiError`.
 

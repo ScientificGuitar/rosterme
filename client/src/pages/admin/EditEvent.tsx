@@ -4,24 +4,24 @@ import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Plus, Trash2, Undo2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { TimeInput } from "@/components/ui/time-input"
+import { EventDetailsFields } from "@/components/admin/EventDetailsFields"
+import { SlotRowCard } from "@/components/admin/SlotRowCard"
 import { useEvent } from "@/hooks/useEvent"
 import { useApi } from "@/hooks/useApi"
-import { ApiError } from "@/lib/api"
 import { activeSignupCount, toTimeInputValue } from "@/lib/utils"
+import {
+  createEmptySlot,
+  formatApiError,
+  todayLocal,
+  validateSlotBasics,
+  type SlotDraft,
+} from "@/lib/eventSlots"
 import type { RosterEvent } from "@/lib/types"
 
-interface SlotRow {
-  key: number
+interface SlotRow extends SlotDraft {
   id?: string
-  label: string
-  startTime: string
-  endTime: string
-  capacity: number
-  allowWaitlist: boolean
   signupCount: number
   deleted: boolean
 }
@@ -92,18 +92,10 @@ function EventForm({ event, eventId }: EventFormProps) {
     ])
 
   const addSlot = () => {
+    const key = nextKey.current++
     setSlots((prev) => [
       ...prev,
-      {
-        key: nextKey.current++,
-        label: "",
-        startTime: "08:00",
-        endTime: "09:00",
-        capacity: 1,
-        allowWaitlist: true,
-        signupCount: 0,
-        deleted: false,
-      },
+      { ...createEmptySlot(key), signupCount: 0, deleted: false },
     ])
   }
 
@@ -142,12 +134,9 @@ function EventForm({ event, eventId }: EventFormProps) {
     const errors: Record<number, string> = {}
     for (const slot of slots) {
       if (slot.deleted) continue
-      if (!slot.label.trim()) {
-        errors[slot.key] = "Label is required."
-      } else if (slot.endTime <= slot.startTime) {
-        errors[slot.key] = "End time must be after start time."
-      } else if (slot.capacity < 1) {
-        errors[slot.key] = "Capacity must be at least 1."
+      const basic = validateSlotBasics(slot)
+      if (basic) {
+        errors[slot.key] = basic
       } else if (slot.capacity < slot.signupCount) {
         errors[slot.key] =
           `Capacity cannot be below the current signup count (${slot.signupCount}).`
@@ -163,12 +152,16 @@ function EventForm({ event, eventId }: EventFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (date < todayLocal()) {
+      toast.error("Event date cannot be in the past")
+      return
+    }
     if (!validateSlots()) return
     setSubmitting(true)
 
     try {
       await api.updateEvent(eventId, {
-        title,
+        title: title.trim(),
         // Empty string clears the description; the backend normalizes it to null.
         description: description.trim(),
         // Empty string clears the location; the backend normalizes it to null.
@@ -189,68 +182,36 @@ function EventForm({ event, eventId }: EventFormProps) {
       toast.success("Event updated")
       navigate(`/events/${eventId}`)
     } catch (e) {
-      if (e instanceof ApiError && e.fields) {
-        const messages = Object.entries(e.fields).flatMap(([field, msgs]) =>
-          msgs.map((m) => `${field}: ${m}`)
-        )
-        toast.error(messages.join("\n") || e.message)
-      } else {
-        toast.error(e instanceof Error ? e.message : "Failed to update event")
-      }
+      toast.error(formatApiError(e, "Failed to update event"))
     } finally {
       setSubmitting(false)
     }
   }
 
   const deletedCount = slots.filter((s) => s.deleted).length
+  const isPast = event.date < todayLocal()
 
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="mb-6 text-2xl font-bold">Edit Event</h1>
+      {isPast && (
+        <p className="mb-6 rounded-md border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
+          This event has already taken place and can no longer be edited.
+        </p>
+      )}
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="space-y-2">
-          <Label htmlFor="title">Event Title</Label>
-          <Input
-            id="title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-            placeholder="Sunday Service"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="description">Description (optional)</Label>
-          <Input
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Weekly Sunday service"
-            maxLength={2000}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="location">Location (optional)</Label>
-          <Input
-            id="location"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="123 Main St, Springfield"
-            maxLength={500}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="date">Date</Label>
-          <Input
-            id="date"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            required
-          />
-        </div>
+        <EventDetailsFields
+          title={title}
+          description={description}
+          location={location}
+          date={date}
+          onTitleChange={setTitle}
+          onDescriptionChange={setDescription}
+          onLocationChange={setLocation}
+          onDateChange={setDate}
+          dateMin={isPast ? undefined : todayLocal()}
+          disabled={isPast}
+        />
 
         <div className="space-y-3">
           <Label>Time Slots</Label>
@@ -289,108 +250,41 @@ function EventForm({ event, eventId }: EventFormProps) {
                 </Button>
               </div>
             ) : (
-              <div
+              <SlotRowCard
                 key={slot.key}
-                className="space-y-2 rounded-md border p-3"
-              >
-                <div className="flex flex-wrap items-end gap-2">
-                  <div className="flex-1 space-y-1">
-                    <Label className="text-xs">Label</Label>
-                    <Input
-                      value={slot.label}
-                      onChange={(e) =>
-                        updateSlot(slot.key, "label", e.target.value)
-                      }
-                      placeholder="Morning"
-                      required
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Start</Label>
-                    <TimeInput
-                      value={slot.startTime}
-                      onChange={(val) =>
-                        updateSlot(slot.key, "startTime", val)
-                      }
-                      size="sm"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">End</Label>
-                    <TimeInput
-                      value={slot.endTime}
-                      onChange={(val) => updateSlot(slot.key, "endTime", val)}
-                      size="sm"
-                    />
-                  </div>
-                  <div className="w-16 space-y-1">
-                    <Label className="text-xs">Cap</Label>
-                    <Input
-                      type="number"
-                      min={slot.signupCount > 0 ? slot.signupCount : 1}
-                      value={slot.capacity}
-                      onChange={(e) =>
-                        updateSlot(
-                          slot.key,
-                          "capacity",
-                          parseInt(e.target.value) || 1
-                        )
-                      }
-                      required
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {slot.id && (
-                      <Badge
-                        variant={
-                          slot.signupCount >= slot.capacity
-                            ? "destructive"
-                            : "secondary"
-                        }
-                      >
-                        {slot.signupCount}/{slot.capacity}
-                      </Badge>
-                    )}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      onClick={() => markSlotDeleted(slot.key)}
-                      title={
-                        slot.signupCount > 0
-                          ? `Mark for deletion (${slot.signupCount} signup(s) will be removed on save)`
-                          : "Remove slot"
+                slot={slot}
+                error={slotErrors[slot.key]}
+                capacityMin={slot.signupCount > 0 ? slot.signupCount : 1}
+                badge={
+                  slot.id && (
+                    <Badge
+                      variant={
+                        slot.signupCount >= slot.capacity
+                          ? "destructive"
+                          : "secondary"
                       }
                     >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                {slotErrors[slot.key] && (
-                  <p className="text-sm text-destructive">
-                    {slotErrors[slot.key]}
-                  </p>
-                )}
-                <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    checked={slot.allowWaitlist}
-                    onChange={(e) =>
-                      updateSlot(slot.key, "allowWaitlist", e.target.checked)
-                    }
-                    className="h-3.5 w-3.5 accent-primary"
-                  />
-                  Allow waitlist when full
-                </label>
-                {slot.id && slot.signupCount > 0 && !slotErrors[slot.key] && (
-                  <p className="text-xs text-muted-foreground">
-                    {slot.signupCount} active signup(s) on this slot.
-                  </p>
-                )}
-              </div>
+                      {slot.signupCount}/{slot.capacity}
+                    </Badge>
+                  )
+                }
+                hint={
+                  slot.id && slot.signupCount > 0
+                    ? `${slot.signupCount} active signup(s) on this slot.`
+                    : undefined
+                }
+                onUpdate={(field, value) =>
+                  updateSlot(slot.key, field, value)
+                }
+                onRemove={() => markSlotDeleted(slot.key)}
+                removeLabel={
+                  slot.signupCount > 0
+                    ? `Mark for deletion (${slot.signupCount} signup(s) will be removed on save)`
+                    : "Remove slot"
+                }
+                removeIcon={<Trash2 className="h-4 w-4" />}
+                disabled={isPast}
+              />
             )
           )}
 
@@ -401,13 +295,19 @@ function EventForm({ event, eventId }: EventFormProps) {
             </p>
           )}
 
-          <Button type="button" variant="outline" size="sm" onClick={addSlot}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addSlot}
+            disabled={isPast}
+          >
             <Plus className="mr-1 h-4 w-4" /> Add Slot
           </Button>
         </div>
 
         <div className="flex gap-2">
-          <Button type="submit" disabled={submitting}>
+          <Button type="submit" disabled={submitting || isPast}>
             {submitting ? "Saving..." : "Save Changes"}
           </Button>
           <Button
