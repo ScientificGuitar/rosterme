@@ -119,17 +119,26 @@ builder.Services.AddHealthChecks()
 
 builder.Services.AddProblemDetails();
 
-builder.Services.AddRateLimiter(options =>
+// Integration tests set Testing:DisableRateLimiting=true (via environment
+// variable from the test factory) so the suite isn't throttled by the signup
+// policy — no test asserts 429, and sequential signup-heavy tests would
+// otherwise stall minutes in the limiter queue. Production default: enabled.
+var disableRateLimiting = builder.Configuration.GetValue<bool>("Testing:DisableRateLimiting");
+
+if (!disableRateLimiting)
 {
-    options.AddFixedWindowLimiter("signup", cfg =>
+    builder.Services.AddRateLimiter(options =>
     {
-        cfg.PermitLimit = 10;
-        cfg.Window = TimeSpan.FromMinutes(1);
-        cfg.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        cfg.QueueLimit = 2;
+        options.AddFixedWindowLimiter("signup", cfg =>
+        {
+            cfg.PermitLimit = 10;
+            cfg.Window = TimeSpan.FromMinutes(1);
+            cfg.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+            cfg.QueueLimit = 2;
+        });
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     });
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-});
+}
 
 builder.Services.AddCors(options =>
 {
@@ -214,7 +223,10 @@ app.UseExceptionHandler(eh => eh.Run(async ctx =>
 
 app.MapHealthChecks("/health");
 
-app.UseRateLimiter();
+if (!disableRateLimiting)
+{
+    app.UseRateLimiter();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();

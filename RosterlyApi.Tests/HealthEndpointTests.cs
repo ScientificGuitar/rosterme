@@ -3,7 +3,8 @@ using Xunit;
 
 namespace RosterlyApi.Tests;
 
-public class HealthEndpointTests : IClassFixture<IntegrationTestFactory>
+[Collection(IntegrationTestCollection.Name)]
+public class HealthEndpointTests : IDisposable
 {
     private readonly HttpClient _client;
 
@@ -19,4 +20,6 @@ public class HealthEndpointTests : IClassFixture<IntegrationTestFactory>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
+
+    public void Dispose() => _client.Dispose();
 }

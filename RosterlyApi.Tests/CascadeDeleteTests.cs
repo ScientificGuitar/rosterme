@@ -8,7 +8,8 @@ using Xunit;
 
 namespace RosterlyApi.Tests;
 
-public class CascadeDeleteTests(IntegrationTestFactory factory) : IClassFixture<IntegrationTestFactory>
+[Collection(IntegrationTestCollection.Name)]
+public class CascadeDeleteTests(IntegrationTestFactory factory) : IDisposable
 {
     private readonly HttpClient _client = factory.CreateClient();
     private readonly JsonSerializerOptions _jsonOptions = new()
@@ -146,4 +147,6 @@ public class CascadeDeleteTests(IntegrationTestFactory factory) : IClassFixture<
         await db.SaveChangesAsync();
         return org.Id;
     }
+
+    public void Dispose() => _client.Dispose();
 }

@@ -9,7 +9,8 @@ using Xunit;
 
 namespace RosterlyApi.Tests;
 
-public class ValidationTests(IntegrationTestFactory factory) : IClassFixture<IntegrationTestFactory>
+[Collection(IntegrationTestCollection.Name)]
+public class ValidationTests(IntegrationTestFactory factory) : IDisposable
 {
     private readonly HttpClient _admin = factory.CreateClient();
     private readonly HttpClient _public = factory.CreateClient();
@@ -579,5 +580,11 @@ public class ValidationTests(IntegrationTestFactory factory) : IClassFixture<Int
         var link = await linkResp.Content.ReadFromJsonAsync<JsonElement>(_json);
         var code = link.GetProperty("code").GetString()!;
         return (orgId, eventId, code);
+    }
+
+    public void Dispose()
+    {
+        _admin.Dispose();
+        _public.Dispose();
     }
 }

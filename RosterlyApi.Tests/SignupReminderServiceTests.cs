@@ -7,7 +7,8 @@ using Xunit;
 
 namespace RosterlyApi.Tests;
 
-public class SignupReminderServiceTests : IClassFixture<IntegrationTestFactory>
+[Collection(IntegrationTestCollection.Name)]
+public class SignupReminderServiceTests
 {
     private readonly IntegrationTestFactory _factory;
 

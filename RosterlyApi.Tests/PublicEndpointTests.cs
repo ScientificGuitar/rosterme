@@ -8,7 +8,8 @@ using Xunit;
 
 namespace RosterlyApi.Tests;
 
-public class PublicEndpointTests(IntegrationTestFactory factory) : IClassFixture<IntegrationTestFactory>
+[Collection(IntegrationTestCollection.Name)]
+public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
 {
     private readonly HttpClient _adminClient = factory.CreateClient();
     private readonly HttpClient _publicClient = factory.CreateClient();
@@ -1564,5 +1565,11 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IClassFixture
         var code = link.GetProperty("code").GetString()!;
 
         return (orgId, eventId, code);
+    }
+
+    public void Dispose()
+    {
+        _adminClient.Dispose();
+        _publicClient.Dispose();
     }
 }
