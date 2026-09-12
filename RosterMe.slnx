@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="RosterMeApi.Tests/RosterMeApi.Tests.csproj" />
+  <Project Path="RosterMeApi/RosterMeApi.csproj" />
+</Solution>

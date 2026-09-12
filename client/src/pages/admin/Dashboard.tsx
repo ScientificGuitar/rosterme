@@ -42,7 +42,7 @@ export function Dashboard() {
     if (!showCreateOrg) {
       return (
         <div className="mx-auto max-w-md py-12 text-center">
-          <h2 className="mb-2 text-xl font-bold">Welcome to Rosterly</h2>
+          <h2 className="mb-2 text-xl font-bold">Welcome to RosterMe</h2>
           <p className="mb-6 text-muted-foreground">
             Create an organization to get started with volunteer scheduling.
           </p>

@@ -1,38 +1,38 @@
 services:
   db:
     image: postgres:17-alpine
-    container_name: rosterly-db
+    container_name: rosterme-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: rosterly
-      POSTGRES_PASSWORD: rosterly
-      POSTGRES_DB: rosterly
+      POSTGRES_USER: rosterme
+      POSTGRES_PASSWORD: rosterme
+      POSTGRES_DB: rosterme
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rosterly"]
+      test: ["CMD-SHELL", "pg_isready -U rosterme"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   backend:
     build:
-      context: ./RosterlyApi
+      context: ./RosterMeApi
       dockerfile: Dockerfile
-    container_name: rosterly-api
+    container_name: rosterme-api
     restart: unless-stopped
     expose:
       - "8080"
     environment:
       ASPNETCORE_URLS: http://+:8080
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__DefaultConnection: "Host=db;Database=rosterly;Username=rosterly;Password=rosterly"
+      ConnectionStrings__DefaultConnection: "Host=db;Database=rosterme;Username=rosterme;Password=rosterme"
       Clerk__Issuer: "${CLERK_ISSUER}"
       Clerk__AuthorizedParties: "${CLERK_AUTHORIZED_PARTIES}"
       Cors__Origins: "${CORS_ORIGINS}"
       Resend__ApiKey: "${RESEND_API_KEY}"
       Email__FromEmail: "${EMAIL_FROM_EMAIL}"
-      Email__FromName: "${EMAIL_FROM_NAME:-Rosterly}"
+      Email__FromName: "${EMAIL_FROM_NAME:-RosterMe}"
       Email__BaseUrl: "${EMAIL_BASE_URL}"
     depends_on:
       db:
@@ -50,7 +50,7 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_CLERK_PUBLISHABLE_KEY: "${VITE_CLERK_PUBLISHABLE_KEY}"
-    container_name: rosterly-client
+    container_name: rosterme-client
     restart: unless-stopped
     # Uncomment for local debug without Cloudflare:
     # ports:
@@ -61,7 +61,7 @@ services:
 
   cloudflared:
     image: cloudflare/cloudflared:latest
-    container_name: rosterly-tunnel
+    container_name: rosterme-tunnel
     restart: unless-stopped
     environment:
       TUNNEL_TOKEN: "${CLOUDFLARE_TUNNEL_TOKEN}"

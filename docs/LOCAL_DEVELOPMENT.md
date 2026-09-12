@@ -14,7 +14,7 @@ Run the database in Docker, backend and frontend on the host.
 docker compose -f compose.yaml -f compose.dev.yaml up -d db
 
 # 2. Backend (http://localhost:5000)
-dotnet run --project RosterlyApi
+dotnet run --project RosterMeApi
 
 # 3. Frontend (http://localhost:5173, proxies /api to :5000)
 npm run dev --prefix client

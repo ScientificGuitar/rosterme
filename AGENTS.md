@@ -1,4 +1,4 @@
-# Rosterly
+# RosterMe
 
 Roster signup app: orgs create events with time slots, share invite links, volunteers self-signup via public page.
 
@@ -11,8 +11,8 @@ Roster signup app: orgs create events with time slots, share invite links, volun
 
 ## Project layout
 
-- `RosterlyApi/` — .NET API project
-- `RosterlyApi.Tests/` — integration tests (Testcontainers) + unit tests
+- `RosterMeApi/` — .NET API project
+- `RosterMeApi.Tests/` — integration tests (Testcontainers) + unit tests
 - `client/` — React frontend (`src/components/ui/` for shadcn)
 
 ## Patterns (must follow)
@@ -37,7 +37,7 @@ Roster signup app: orgs create events with time slots, share invite links, volun
 - Generate API types from OpenAPI spec (backend must be running): `npm run generate:types`
 - Add shadcn component: `npx shadcn@latest add <component>`
 
-**Backend** (`RosterlyApi/`):
+**Backend** (`RosterMeApi/`):
 - `dotnet restore` / `dotnet build` / `dotnet run`
 - Migrations: `dotnet ef migrations add <name>`, `dotnet ef database update` (auto-applied at startup via `MigrateAsync()`)
 - Scalar API docs: `http://localhost:5000/scalar/v1` (when running)

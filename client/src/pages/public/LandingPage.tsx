@@ -78,7 +78,7 @@ const flowSteps = [
 function FlowStrip() {
   return (
     <div
-      aria-label="How Rosterly works at a glance"
+      aria-label="How RosterMe works at a glance"
       className="mt-10 flex flex-col gap-2 sm:flex-row sm:items-stretch"
     >
       {flowSteps.map((step, i) => (
@@ -145,7 +145,7 @@ function OrganizerMockup() {
           <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/30" />
         </span>
         <span className="ml-2 truncate text-xs font-medium text-muted-foreground">
-          Rosterly · Community Food Bank · Mar 9 – Mar 15
+          RosterMe · Community Food Bank · Mar 9 – Mar 15
         </span>
       </div>
       <div className="space-y-3 p-4">
@@ -471,7 +471,7 @@ export function LandingPage() {
             Volunteer scheduling, without the spreadsheet chase.
           </h1>
           <p className="mt-5 max-w-xl text-lg text-muted-foreground">
-            Rosterly makes it easy for community organizations to create
+            RosterMe makes it easy for community organizations to create
             volunteer shifts, share a signup link, and see who&rsquo;s covering
             what.
           </p>
@@ -555,7 +555,7 @@ export function LandingPage() {
             <CardHeader>
               <CardTitle>For organizers</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Rosterly gives you the tools you actually need to run your
+                RosterMe gives you the tools you actually need to run your
                 volunteer schedule. Create events and shifts, share signup
                 links, manage signups, and see your coverage at a glance.
               </p>
@@ -610,7 +610,7 @@ export function LandingPage() {
         </h2>
         <p className="mt-4 text-muted-foreground">
           Volunteer coordination shouldn&rsquo;t require chasing people down or
-          keeping five different spreadsheets up to date. Rosterly gives your
+          keeping five different spreadsheets up to date. RosterMe gives your
           team one clear view of every event and every shift.
         </p>
         <div className="mt-6 space-y-1 text-lg font-semibold">
@@ -630,7 +630,7 @@ export function LandingPage() {
           Simple on the outside. Reliable underneath.
         </h2>
         <p className="mx-auto mt-3 max-w-2xl text-center text-muted-foreground">
-          Rosterly is designed to make signup easy without sacrificing the
+          RosterMe is designed to make signup easy without sacrificing the
           things organizers need to trust their roster.
         </p>
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -650,7 +650,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* 7. Why Rosterly */}
+      {/* 7. Why RosterMe */}
       <section className="mx-auto max-w-3xl py-16 text-center">
         <h2 className="text-3xl font-bold tracking-tight">
           Built for community organizations.
@@ -663,11 +663,11 @@ export function LandingPage() {
             features you don&rsquo;t need.
           </p>
           <p className="text-xl font-semibold text-foreground">
-            Or you could use Rosterly.
+            Or you could use RosterMe.
           </p>
         </div>
         <p className="mt-4 text-muted-foreground">
-          Rosterly is focused on one thing: volunteer scheduling.
+          RosterMe is focused on one thing: volunteer scheduling.
         </p>
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
           {[
@@ -715,7 +715,7 @@ export function LandingPage() {
           >
             <CardContent>
               <p className="text-center text-sm text-muted-foreground">
-                Running something else with shifts to fill? Rosterly will
+                Running something else with shifts to fill? RosterMe will
                 probably fit.
               </p>
             </CardContent>
@@ -729,7 +729,7 @@ export function LandingPage() {
           Start free. Keep it simple.
         </h2>
         <p className="mt-3 text-muted-foreground">
-          Rosterly&rsquo;s MVP is free for small organizations.
+          RosterMe&rsquo;s MVP is free for small organizations.
         </p>
         <Card className="mt-8 text-left">
           <CardHeader className="text-center">
@@ -757,7 +757,7 @@ export function LandingPage() {
           Spend less time organizing volunteers.
         </h2>
         <p className="mx-auto mt-4 max-w-2xl opacity-90">
-          Create your first event, share the signup link, and let Rosterly
+          Create your first event, share the signup link, and let RosterMe
           handle the rest. Your volunteers know where to be. You know
           who&rsquo;s coming. Everyone&rsquo;s on the same page.
         </p>

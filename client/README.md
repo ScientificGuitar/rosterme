@@ -1,4 +1,4 @@
-# Rosterly — Frontend
+# RosterMe — Frontend
 
 React 19 + TypeScript + Vite + Tailwind CSS v4 + shadcn/ui.
 

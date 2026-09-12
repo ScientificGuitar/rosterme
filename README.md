@@ -1,10 +1,10 @@
-# Rosterly
+# RosterMe
 *A simple volunteer scheduling platform for community organizations.*
 
 ## Overview
-Rosterly is a volunteer scheduling application built for organizations that coordinate people across events, recurring shifts, and day-to-day operations.  
+RosterMe is a volunteer scheduling application built for organizations that coordinate people across events, recurring shifts, and day-to-day operations.  
 The goal is to make volunteer coordination simple.  
-Many organizations still rely on spreadsheets, group chats, and email chains to organize volunteers. Rosterly replaces that with a focused scheduling tool designed specifically for volunteer teams.
+Many organizations still rely on spreadsheets, group chats, and email chains to organize volunteers. RosterMe replaces that with a focused scheduling tool designed specifically for volunteer teams.
 
 ### Potential users
 - Charities
@@ -16,9 +16,9 @@ Many organizations still rely on spreadsheets, group chats, and email chains to 
 - Local nonprofits
 
 # Product Vision
-The core problem Rosterly solves:  
+The core problem RosterMe solves:  
 > Coordinators need to create shifts. Volunteers need to sign up. Everyone needs visibility into who is covering what.  
-Rosterly should make this easy for both sides.
+RosterMe should make this easy for both sides.
 
 ### Organizers
 - Create events
@@ -135,7 +135,7 @@ Examples:
 Paid feature:
 - custom logo
 - custom email branding
-- remove Rosterly branding
+- remove RosterMe branding
 
 ## Multi-Location Support
 For organizations operating across multiple:
@@ -313,4 +313,4 @@ Success means an organizer can:
 - fill volunteer slots without chasing people manually
 - keep everyone informed with minimal effort
 
-If Rosterly removes the need for spreadsheets, endless group messages, and manual follow-up, it is doing its job.
+If RosterMe removes the need for spreadsheets, endless group messages, and manual follow-up, it is doing its job.

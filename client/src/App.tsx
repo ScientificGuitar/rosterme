@@ -46,7 +46,7 @@ function Header() {
     <header className="flex items-center justify-between border-b px-6 py-3">
       <div className="flex items-center gap-6">
         <Link to="/" className="text-lg font-semibold hover:underline">
-          Rosterly
+          RosterMe
         </Link>
         <Show when="signed-in">
           <nav className="flex items-center gap-1">

@@ -1,4 +1,4 @@
-export const OPERATOR_NAME = "Rosterly"
+export const OPERATOR_NAME = "RosterMe"
 
 export const LEGAL_LAST_UPDATED = "7 September, 2026"
 

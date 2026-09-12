@@ -5,7 +5,7 @@ export function Footer() {
   return (
     <footer className="border-t">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-2 px-6 py-4 text-sm text-muted-foreground">
-        <span>&copy; {year} Rosterly</span>
+        <span>&copy; {year} RosterMe</span>
         <nav className="flex items-center gap-4" aria-label="Legal">
           <Link
             to="/terms-of-service"
