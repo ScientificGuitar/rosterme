@@ -99,7 +99,7 @@ function AppLayout() {
             <Menu className="h-5 w-5" />
           </Button>
         </div>
-        <main className="flex-1 p-4 md:p-6">
+        <main className="flex-1 bg-muted/60 p-4 md:p-6 dark:bg-muted/40">
           <Outlet />
         </main>
       </div>

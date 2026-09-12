@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge"
 import { CapacityBar } from "@/components/ui/capacity-bar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { formatTime } from "@/lib/utils"
 import type { EventWithSlots } from "@/lib/types"
 
 interface EventListProps {
@@ -111,7 +110,7 @@ export function EventList({ orgId }: EventListProps) {
   }, [events, search, statusFilter, sortBy, today])
 
   return (
-    <div>
+    <div className="mx-auto w-full max-w-5xl">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -186,6 +185,8 @@ export function EventList({ orgId }: EventListProps) {
 
 function EventListItem({ event, today }: { event: EventWithSlots; today: string }) {
   const status = getEventStatus(event.date, today)
+  const filled = event.slots.reduce((sum, s) => sum + Number(s.signupCount), 0)
+  const capacity = event.slots.reduce((sum, s) => sum + Number(s.capacity), 0)
   return (
     <Card>
       <CardHeader className="pb-0">
@@ -213,36 +214,25 @@ function EventListItem({ event, today }: { event: EventWithSlots; today: string 
             <span className="truncate">{event.location}</span>
           </p>
         )}
-        {event.slots.length === 0 && (
+        {event.slots.length === 0 ? (
           <p className="text-xs text-muted-foreground">No slots</p>
-        )}
-        {event.slots.map((slot) => {
-          const filled = Number(slot.signupCount)
-          const capacity = Number(slot.capacity)
-          return (
-            <div key={slot.id} className="rounded-md border p-2 text-xs">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="font-medium">{slot.label}</div>
-                  <div className="text-muted-foreground">
-                    {formatTime(slot.startTime)}–{formatTime(slot.endTime)}
-                  </div>
-                </div>
-                <Badge
-                  variant={filled >= capacity ? "destructive" : "secondary"}
-                  className="text-[10px]"
-                >
-                  {filled}/{capacity}
-                </Badge>
-              </div>
-              <CapacityBar
-                filled={filled}
-                capacity={capacity}
-                className="mt-1.5 h-1.5"
-              />
+        ) : (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span className="text-muted-foreground">
+                {event.slots.length}{" "}
+                {event.slots.length === 1 ? "slot" : "slots"}
+              </span>
+              <Badge
+                variant={filled >= capacity ? "destructive" : "secondary"}
+                className="text-[10px]"
+              >
+                {filled}/{capacity} volunteers
+              </Badge>
             </div>
-          )
-        })}
+            <CapacityBar filled={filled} capacity={capacity} className="h-1.5" />
+          </div>
+        )}
       </CardContent>
     </Card>
   )

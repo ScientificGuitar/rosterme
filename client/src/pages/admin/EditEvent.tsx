@@ -4,6 +4,8 @@ import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Plus, Trash2, Undo2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { EventDetailsFields } from "@/components/admin/EventDetailsFields"
@@ -202,196 +204,201 @@ function EventForm({ event, eventId }: EventFormProps) {
   const isPast = event.date < todayLocal()
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <h1 className="mb-6 text-2xl font-bold">Edit Event</h1>
-      {isPast && (
-        <p className="mb-6 rounded-md border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
-          This event has already taken place and can no longer be edited.
-        </p>
-      )}
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <EventDetailsFields
-          title={title}
-          description={description}
-          location={location}
-          date={date}
-          onTitleChange={setTitle}
-          onDescriptionChange={setDescription}
-          onLocationChange={setLocation}
-          onDateChange={setDate}
-          dateMin={isPast ? undefined : todayLocal()}
-          disabled={isPast}
-        />
-
-        <div className="space-y-3">
-          <Label>Time Slots</Label>
-
-          {activeSlotCount === 0 && (
-            <p className="text-sm text-muted-foreground">
-              No time slots yet. Add time slots that volunteers can sign up for.
-            </p>
-          )}
-
-          {slots.map((slot) =>
-            slot.deleted ? (
-              <div
-                key={slot.key}
-                className="flex items-center justify-between gap-2 rounded-md border border-dashed p-3 opacity-70"
-              >
-                <p className="text-sm text-muted-foreground">
-                  <span className="font-medium line-through">
-                    {slot.label || "Untitled slot"}
-                  </span>{" "}
-                  will be deleted on save.
-                  {slot.signupCount > 0 && (
-                    <span className="font-medium text-destructive">
-                      {" "}
-                      {slot.signupCount} signup(s) will be removed.
-                    </span>
-                  )}
-                </p>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => undoDeleteSlot(slot.key)}
-                >
-                  <Undo2 className="mr-1 h-4 w-4" /> Undo
-                </Button>
-              </div>
-            ) : (
-              <SlotRowCard
-                key={slot.key}
-                slot={slot}
-                error={slotErrors[slot.key]}
-                capacityMin={slot.signupCount > 0 ? slot.signupCount : 1}
-                badge={
-                  slot.id && (
-                    <Badge
-                      variant={
-                        slot.signupCount >= slot.capacity
-                          ? "destructive"
-                          : "secondary"
-                      }
-                    >
-                      {slot.signupCount}/{slot.capacity}
-                    </Badge>
-                  )
-                }
-                hint={
-                  slot.id && slot.signupCount > 0
-                    ? `${slot.signupCount} active signup(s) on this slot.`
-                    : undefined
-                }
-                onUpdate={(field, value) => updateSlot(slot.key, field, value)}
-                onRemove={() => markSlotDeleted(slot.key)}
-                removeLabel={
-                  slot.signupCount > 0
-                    ? `Mark for deletion (${slot.signupCount} signup(s) will be removed on save)`
-                    : "Remove slot"
-                }
-                removeIcon={<Trash2 className="h-4 w-4" />}
-                disabled={isPast}
-              />
-            )
-          )}
-
-          {deletedCount > 0 && (
-            <p className="text-sm text-muted-foreground">
-              {deletedCount} slot(s) marked for deletion — they will be removed
-              when you save.
-            </p>
-          )}
-
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={addSlot}
+    <Card className="mx-auto w-full max-w-5xl">
+      <CardHeader>
+        <h1 className="text-2xl font-bold">Edit Event</h1>
+      </CardHeader>
+      <Separator />
+      <CardContent>
+        {isPast && (
+          <p className="mb-6 rounded-md border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
+            This event has already taken place and can no longer be edited.
+          </p>
+        )}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <EventDetailsFields
+            title={title}
+            description={description}
+            location={location}
+            date={date}
+            onTitleChange={setTitle}
+            onDescriptionChange={setDescription}
+            onLocationChange={setLocation}
+            onDateChange={setDate}
+            dateMin={isPast ? undefined : todayLocal()}
             disabled={isPast}
-          >
-            <Plus className="mr-1 h-4 w-4" /> Add Slot
-          </Button>
-        </div>
+          />
 
-        <div className="space-y-3">
-          <Label>Signup Questions</Label>
+          <div className="space-y-3">
+            <Label>Time Slots</Label>
 
-          {activeQuestionCount === 0 && (
-            <p className="text-sm text-muted-foreground">
-              No questions yet. Add optional questions volunteers answer when
-              signing up.
-            </p>
-          )}
+            {activeSlotCount === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No time slots yet. Add time slots that volunteers can sign up for.
+              </p>
+            )}
 
-          {questions.map((question) =>
-            question.deleted ? (
-              <div
-                key={question.key}
-                className="flex items-center justify-between gap-2 rounded-md border border-dashed p-3 opacity-70"
-              >
-                <p className="text-sm text-muted-foreground">
-                  <span className="font-medium line-through">
-                    {question.label || "Untitled question"}
-                  </span>{" "}
-                  will be deleted on save.
-                  {question.hasAnswers && (
-                    <span className="font-medium">
-                      {" "}
-                      Existing answers will be kept and shown in the roster.
-                    </span>
-                  )}
-                </p>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => undoDeleteQuestion(question.key)}
+            {slots.map((slot) =>
+              slot.deleted ? (
+                <div
+                  key={slot.key}
+                  className="flex items-center justify-between gap-2 rounded-md border border-dashed p-3 opacity-70"
                 >
-                  <Undo2 className="mr-1 h-4 w-4" /> Undo
-                </Button>
-              </div>
-            ) : (
-              <QuestionRowCard
-                key={question.key}
-                question={question}
-                error={questionErrors[question.key]}
-                disableTypeChange={question.hasAnswers}
-                onUpdate={(field, value) =>
-                  updateQuestion(question.key, field, value)
-                }
-                onRemove={() => markQuestionDeleted(question.key)}
-                removeLabel="Remove question"
-                removeIcon={<Trash2 className="h-4 w-4" />}
-                disabled={isPast}
-              />
-            )
-          )}
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-medium line-through">
+                      {slot.label || "Untitled slot"}
+                    </span>{" "}
+                    will be deleted on save.
+                    {slot.signupCount > 0 && (
+                      <span className="font-medium text-destructive">
+                        {" "}
+                        {slot.signupCount} signup(s) will be removed.
+                      </span>
+                    )}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => undoDeleteSlot(slot.key)}
+                  >
+                    <Undo2 className="mr-1 h-4 w-4" /> Undo
+                  </Button>
+                </div>
+              ) : (
+                <SlotRowCard
+                  key={slot.key}
+                  slot={slot}
+                  error={slotErrors[slot.key]}
+                  capacityMin={slot.signupCount > 0 ? slot.signupCount : 1}
+                  badge={
+                    slot.id && (
+                      <Badge
+                        variant={
+                          slot.signupCount >= slot.capacity
+                            ? "destructive"
+                            : "secondary"
+                        }
+                      >
+                        {slot.signupCount}/{slot.capacity}
+                      </Badge>
+                    )
+                  }
+                  hint={
+                    slot.id && slot.signupCount > 0
+                      ? `${slot.signupCount} active signup(s) on this slot.`
+                      : undefined
+                  }
+                  onUpdate={(field, value) => updateSlot(slot.key, field, value)}
+                  onRemove={() => markSlotDeleted(slot.key)}
+                  removeLabel={
+                    slot.signupCount > 0
+                      ? `Mark for deletion (${slot.signupCount} signup(s) will be removed on save)`
+                      : "Remove slot"
+                  }
+                  removeIcon={<Trash2 className="h-4 w-4" />}
+                  disabled={isPast}
+                />
+              )
+            )}
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={addQuestion}
-            disabled={isPast || activeQuestionCount >= MAX_QUESTIONS}
-          >
-            <Plus className="mr-1 h-4 w-4" /> Add Question
-          </Button>
-        </div>
+            {deletedCount > 0 && (
+              <p className="text-sm text-muted-foreground">
+                {deletedCount} slot(s) marked for deletion — they will be removed
+                when you save.
+              </p>
+            )}
 
-        <div className="flex gap-2">
-          <Button type="submit" disabled={submitting || isPast}>
-            {submitting ? "Saving..." : "Save Changes"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate(`/events/${eventId}`)}
-          >
-            Cancel
-          </Button>
-        </div>
-      </form>
-    </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addSlot}
+              disabled={isPast}
+            >
+              <Plus className="mr-1 h-4 w-4" /> Add Slot
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            <Label>Signup Questions</Label>
+
+            {activeQuestionCount === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No questions yet. Add optional questions volunteers answer when
+                signing up.
+              </p>
+            )}
+
+            {questions.map((question) =>
+              question.deleted ? (
+                <div
+                  key={question.key}
+                  className="flex items-center justify-between gap-2 rounded-md border border-dashed p-3 opacity-70"
+                >
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-medium line-through">
+                      {question.label || "Untitled question"}
+                    </span>{" "}
+                    will be deleted on save.
+                    {question.hasAnswers && (
+                      <span className="font-medium">
+                        {" "}
+                        Existing answers will be kept and shown in the roster.
+                      </span>
+                    )}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => undoDeleteQuestion(question.key)}
+                  >
+                    <Undo2 className="mr-1 h-4 w-4" /> Undo
+                  </Button>
+                </div>
+              ) : (
+                <QuestionRowCard
+                  key={question.key}
+                  question={question}
+                  error={questionErrors[question.key]}
+                  disableTypeChange={question.hasAnswers}
+                  onUpdate={(field, value) =>
+                    updateQuestion(question.key, field, value)
+                  }
+                  onRemove={() => markQuestionDeleted(question.key)}
+                  removeLabel="Remove question"
+                  removeIcon={<Trash2 className="h-4 w-4" />}
+                  disabled={isPast}
+                />
+              )
+            )}
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addQuestion}
+              disabled={isPast || activeQuestionCount >= MAX_QUESTIONS}
+            >
+              <Plus className="mr-1 h-4 w-4" /> Add Question
+            </Button>
+          </div>
+
+          <div className="flex gap-2">
+            <Button type="submit" disabled={submitting || isPast}>
+              {submitting ? "Saving..." : "Save Changes"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate(`/events/${eventId}`)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   )
 }

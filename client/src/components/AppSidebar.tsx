@@ -2,10 +2,10 @@ import { Link, useLocation } from "react-router-dom"
 import { UserButton, useClerk, useUser } from "@clerk/react"
 import {
   BarChart3,
-  CalendarPlus,
   LayoutDashboard,
   LogOut,
   Moon,
+  Plus,
   Sun,
   X,
 } from "lucide-react"
@@ -57,9 +57,9 @@ export function AppSidebar({
         </Button>
       </div>
       <div className="px-3 pb-2">
-        <Button asChild className="w-full" size="sm">
+        <Button asChild className="w-full justify-start" size="sm">
           <Link to="/events/new" onClick={onClose}>
-            <CalendarPlus className="h-4 w-4" />
+            <Plus className="h-4 w-4" />
             Create Event
           </Link>
         </Button>
@@ -133,7 +133,7 @@ export function AppSidebar({
   return (
     <>
       {/* Desktop */}
-      <aside className="sticky top-0 hidden h-svh w-60 shrink-0 border-r md:block">
+      <aside className="sticky top-0 hidden h-svh w-60 shrink-0 border-r bg-card text-card-foreground md:block">
         {sidebar}
       </aside>
       {/* Mobile drawer */}
@@ -144,7 +144,7 @@ export function AppSidebar({
             onClick={onClose}
             aria-hidden
           />
-          <aside className="absolute inset-y-0 left-0 w-64 bg-background shadow-lg">
+          <aside className="absolute inset-y-0 left-0 w-64 bg-card text-card-foreground shadow-lg">
             {sidebar}
           </aside>
         </div>

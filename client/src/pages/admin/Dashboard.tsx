@@ -8,7 +8,9 @@ import { useApi } from "@/hooks/useApi"
 import { EventList } from "@/components/admin/EventList"
 import { WeeklyGrid } from "@/components/admin/WeeklyGrid"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { Separator } from "@/components/ui/separator"
 
 export function Dashboard() {
   const { org, loading, error: orgError } = useOrg()
@@ -133,65 +135,72 @@ export function Dashboard() {
   }
 
   return (
-    <div>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">{org.name}</h1>
-        <div className="flex flex-wrap items-center gap-2">
-          <div
-            role="group"
-            aria-label="View mode"
-            className="inline-flex rounded-lg border p-1"
-          >
-            <Button
-              variant={view === "list" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setView("list")}
-              aria-pressed={view === "list"}
-            >
-              <LayoutList className="h-4 w-4" />
-              List
-            </Button>
-            <Button
-              variant={view === "calendar" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setView("calendar")}
-              aria-pressed={view === "calendar"}
-            >
-              <CalendarDays className="h-4 w-4" />
-              Calendar
-            </Button>
+    <>
+      <Card className="mx-auto w-full max-w-5xl">
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-2xl font-bold">{org.name}</h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <div
+                role="group"
+                aria-label="View mode"
+                className="inline-flex rounded-lg border p-1"
+              >
+                <Button
+                  variant={view === "list" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setView("list")}
+                  aria-pressed={view === "list"}
+                >
+                  <LayoutList className="h-4 w-4" />
+                  List
+                </Button>
+                <Button
+                  variant={view === "calendar" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setView("calendar")}
+                  aria-pressed={view === "calendar"}
+                >
+                  <CalendarDays className="h-4 w-4" />
+                  Calendar
+                </Button>
+              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                Delete Organization
+              </Button>
+            </div>
           </div>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => setDeleteDialogOpen(true)}
-          >
-            Delete Organization
-          </Button>
-        </div>
-        <ConfirmDialog
-          open={deleteDialogOpen}
-          onOpenChange={setDeleteDialogOpen}
-          title="Delete organization?"
-          description={
-            <>
-              This will permanently delete &ldquo;{org.name}&rdquo; and all
-              associated events, slots, and signups. This action cannot be
-              undone.
-            </>
-          }
-          confirmLabel="Delete"
-          variant="destructive"
-          isLoading={deleting}
-          loadingLabel="Deleting..."
-          onConfirm={handleDeleteOrganization}
-        />
-      </div>
-      {view === "list" ? (
-        <EventList orgId={org.id} />
-      ) : (
-        <WeeklyGrid orgId={org.id} />
-      )}
-    </div>
+        </CardHeader>
+        <Separator />
+        <CardContent>
+          {view === "list" ? (
+            <EventList orgId={org.id} />
+          ) : (
+            <WeeklyGrid orgId={org.id} />
+          )}
+        </CardContent>
+      </Card>
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete organization?"
+        description={
+          <>
+            This will permanently delete &ldquo;{org.name}&rdquo; and all
+            associated events, slots, and signups. This action cannot be
+            undone.
+          </>
+        }
+        confirmLabel="Delete"
+        variant="destructive"
+        isLoading={deleting}
+        loadingLabel="Deleting..."
+        onConfirm={handleDeleteOrganization}
+      />
+    </>
   )
 }

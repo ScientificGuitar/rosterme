@@ -4,6 +4,8 @@ import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
 import { Label } from "@/components/ui/label"
 import { EventDetailsFields } from "@/components/admin/EventDetailsFields"
 import { SlotRowCard } from "@/components/admin/SlotRowCard"
@@ -148,95 +150,100 @@ export function CreateEvent() {
   }
 
   return (
-    <div className="mx-auto max-w-lg">
-      <h1 className="mb-6 text-2xl font-bold">Create Event</h1>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <EventDetailsFields
-          title={title}
-          description={description}
-          location={location}
-          date={date}
-          onTitleChange={setTitle}
-          onDescriptionChange={setDescription}
-          onLocationChange={setLocation}
-          onDateChange={setDate}
-          dateMin={todayLocal()}
-        />
+    <Card className="mx-auto w-full max-w-5xl">
+      <CardHeader>
+        <h1 className="text-2xl font-bold">Create Event</h1>
+      </CardHeader>
+      <Separator />
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <EventDetailsFields
+            title={title}
+            description={description}
+            location={location}
+            date={date}
+            onTitleChange={setTitle}
+            onDescriptionChange={setDescription}
+            onLocationChange={setLocation}
+            onDateChange={setDate}
+            dateMin={todayLocal()}
+          />
 
-        <div className="space-y-3">
-          <Label>Time Slots</Label>
+          <div className="space-y-3">
+            <Label>Time Slots</Label>
 
-          {slots.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              No slots yet. Add time slots that volunteers can sign up for.
-            </p>
-          )}
+            {slots.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No slots yet. Add time slots that volunteers can sign up for.
+              </p>
+            )}
 
-          {slots.map((slot) => (
-            <SlotRowCard
-              key={slot.key}
-              slot={slot}
-              error={slotErrors[slot.key]}
-              onUpdate={(field, value) => updateSlot(slot.key, field, value)}
-              onRemove={() => removeSlot(slot.key)}
-              removeLabel="Remove slot"
-              removeIcon={<X className="h-4 w-4" />}
-            />
-          ))}
+            {slots.map((slot) => (
+              <SlotRowCard
+                key={slot.key}
+                slot={slot}
+                error={slotErrors[slot.key]}
+                onUpdate={(field, value) => updateSlot(slot.key, field, value)}
+                onRemove={() => removeSlot(slot.key)}
+                removeLabel="Remove slot"
+                removeIcon={<X className="h-4 w-4" />}
+              />
+            ))}
 
-          <Button type="button" variant="outline" size="sm" onClick={addSlot}>
-            <Plus className="mr-1 h-4 w-4" /> Add Slot
-          </Button>
-        </div>
+            <Button type="button" variant="outline" size="sm" onClick={addSlot}>
+              <Plus className="mr-1 h-4 w-4" /> Add Slot
+            </Button>
+          </div>
 
-        <div className="space-y-3">
-          <Label>Signup Questions</Label>
+          <div className="space-y-3">
+            <Label>Signup Questions</Label>
 
-          {questions.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              No questions yet. Add optional questions volunteers answer when
-              signing up.
-            </p>
-          )}
+            {questions.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No questions yet. Add optional questions volunteers answer when
+                signing up.
+              </p>
+            )}
 
-          {questions.map((question) => (
-            <QuestionRowCard
-              key={question.key}
-              question={question}
-              error={questionErrors[question.key]}
-              onUpdate={(field, value) =>
-                updateQuestion(question.key, field, value)
-              }
-              onRemove={() => removeQuestion(question.key)}
-              removeLabel="Remove question"
-              removeIcon={<X className="h-4 w-4" />}
-            />
-          ))}
+            {questions.map((question) => (
+              <QuestionRowCard
+                key={question.key}
+                question={question}
+                error={questionErrors[question.key]}
+                onUpdate={(field, value) =>
+                  updateQuestion(question.key, field, value)
+                }
+                onRemove={() => removeQuestion(question.key)}
+                removeLabel="Remove question"
+                removeIcon={<X className="h-4 w-4" />}
+              />
+            ))}
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={addQuestion}
-            disabled={questions.length >= MAX_QUESTIONS}
-          >
-            <Plus className="mr-1 h-4 w-4" /> Add Question
-          </Button>
-        </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addQuestion}
+              disabled={questions.length >= MAX_QUESTIONS}
+            >
+              <Plus className="mr-1 h-4 w-4" /> Add Question
+            </Button>
+          </div>
 
-        <div className="flex gap-2">
-          <Button type="submit" disabled={submitting}>
-            {submitting ? "Creating..." : "Create Event"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate("/dashboard")}
-          >
-            Cancel
-          </Button>
-        </div>
-      </form>
-    </div>
+          <div className="flex gap-2">
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Creating..." : "Create Event"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate("/dashboard")}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   )
 }

@@ -31,6 +31,7 @@ import {
 } from "@/lib/csv"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { useOrg } from "@/hooks/useOrg"
 import { useEvent } from "@/hooks/useEvent"
@@ -129,178 +130,183 @@ export function EventDetail() {
   )
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate("/dashboard")}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">{event.title}</h1>
-          <p className="text-sm text-muted-foreground">{event.date}</p>
-          {event.location && (
-            <p className="flex items-center gap-1 text-sm text-muted-foreground">
-              <MapPin className="h-3.5 w-3.5" />
-              {event.location}
+    <Card className="mx-auto w-full max-w-5xl">
+      <CardHeader>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/dashboard")}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold">{event.title}</h1>
+            <p className="text-sm text-muted-foreground">{event.date}</p>
+            {event.location && (
+              <p className="flex items-center gap-1 text-sm text-muted-foreground">
+                <MapPin className="h-3.5 w-3.5" />
+                {event.location}
+              </p>
+            )}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportCsv}
+            disabled={totalSignups === 0}
+            title={
+              totalSignups === 0 ? "No volunteers to export" : "Export as CSV"
+            }
+          >
+            <Download className="mr-1 h-3 w-3" />
+            Export CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/events/${event.id}/edit`)}
+          >
+            <Pencil className="mr-1 h-3 w-3" />
+            Edit
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setDeleteDialogOpen(true)}
+          >
+            Delete Event
+          </Button>
+          <ConfirmDialog
+            open={deleteDialogOpen}
+            onOpenChange={setDeleteDialogOpen}
+            title="Delete event?"
+            description={
+              <>
+                This will permanently delete &ldquo;{event.title}&rdquo; and all
+                associated signups. This action cannot be undone.
+              </>
+            }
+            confirmLabel="Delete"
+            variant="destructive"
+            isLoading={deletingEvent}
+            loadingLabel="Deleting..."
+            onConfirm={handleDeleteEvent}
+          />
+        </div>
+      </CardHeader>
+      <Separator />
+      <CardContent className="space-y-6">
+
+        <ConfirmDialog
+          open={pendingSignupId !== null}
+          onOpenChange={(open) => {
+            if (!open) setPendingSignupId(null)
+          }}
+          title="Remove signup?"
+          description="This will remove the volunteer from this slot and notify them by email. This action cannot be undone."
+          confirmLabel="Remove"
+          variant="destructive"
+          isLoading={deleteSignup.isPending}
+          loadingLabel="Removing..."
+          onConfirm={() => {
+            if (pendingSignupId) handleDeleteSignup(pendingSignupId)
+          }}
+        />
+
+        <InviteLinkSection eventId={event.id} />
+
+        <div className="space-y-4">
+          {event.slots.length === 0 && (
+            <p className="text-center text-muted-foreground">
+              No time slots for this event.
             </p>
           )}
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleExportCsv}
-          disabled={totalSignups === 0}
-          title={
-            totalSignups === 0 ? "No volunteers to export" : "Export as CSV"
-          }
-        >
-          <Download className="mr-1 h-3 w-3" />
-          Export CSV
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => navigate(`/events/${event.id}/edit`)}
-        >
-          <Pencil className="mr-1 h-3 w-3" />
-          Edit
-        </Button>
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={() => setDeleteDialogOpen(true)}
-        >
-          Delete Event
-        </Button>
-        <ConfirmDialog
-          open={deleteDialogOpen}
-          onOpenChange={setDeleteDialogOpen}
-          title="Delete event?"
-          description={
-            <>
-              This will permanently delete &ldquo;{event.title}&rdquo; and all
-              associated signups. This action cannot be undone.
-            </>
-          }
-          confirmLabel="Delete"
-          variant="destructive"
-          isLoading={deletingEvent}
-          loadingLabel="Deleting..."
-          onConfirm={handleDeleteEvent}
-        />
-      </div>
-
-      <ConfirmDialog
-        open={pendingSignupId !== null}
-        onOpenChange={(open) => {
-          if (!open) setPendingSignupId(null)
-        }}
-        title="Remove signup?"
-        description="This will remove the volunteer from this slot and notify them by email. This action cannot be undone."
-        confirmLabel="Remove"
-        variant="destructive"
-        isLoading={deleteSignup.isPending}
-        loadingLabel="Removing..."
-        onConfirm={() => {
-          if (pendingSignupId) handleDeleteSignup(pendingSignupId)
-        }}
-      />
-
-      <InviteLinkSection eventId={event.id} />
-
-      <div className="space-y-4">
-        {event.slots.length === 0 && (
-          <p className="text-center text-muted-foreground">
-            No time slots for this event.
-          </p>
-        )}
-        {event.slots.map((slot) => (
-          <Card key={slot.id}>
-            <CardHeader className="p-4 pb-0">
-              <CardTitle className="flex items-center justify-between text-sm">
-                <span>
-                  {slot.label}
-                  <span className="ml-2 font-normal text-muted-foreground">
-                    {formatTime(slot.startTime)}&ndash;
-                    {formatTime(slot.endTime)}
+          {event.slots.map((slot) => (
+            <Card key={slot.id}>
+              <CardHeader className="p-4 pb-0">
+                <CardTitle className="flex items-center justify-between text-sm">
+                  <span>
+                    {slot.label}
+                    <span className="ml-2 font-normal text-muted-foreground">
+                      {formatTime(slot.startTime)}&ndash;
+                      {formatTime(slot.endTime)}
+                    </span>
                   </span>
-                </span>
-                <span className="flex items-center gap-2">
-                  <Badge
-                    variant={
-                      activeSignupCount(slot.signups) >= slot.capacity
-                        ? "destructive"
-                        : "secondary"
-                    }
-                  >
-                    {activeSignupCount(slot.signups)}/{slot.capacity}
-                    {waitlistCount(slot.signups) > 0 &&
+                  <span className="flex items-center gap-2">
+                    <Badge
+                      variant={
+                        activeSignupCount(slot.signups) >= slot.capacity
+                          ? "destructive"
+                          : "secondary"
+                      }
+                    >
+                      {activeSignupCount(slot.signups)}/{slot.capacity}
+                      {waitlistCount(slot.signups) > 0 &&
                       ` · ${waitlistCount(slot.signups)} waiting`}
-                  </Badge>
-                  <Badge
-                    variant={slot.allowWaitlist ? "outline" : "secondary"}
-                    title={
-                      slot.allowWaitlist
-                        ? "Volunteers can join the waitlist when this slot is full"
-                        : "Waitlist disabled — full slots reject new signups"
-                    }
-                  >
-                    {slot.allowWaitlist ? "Waitlist on" : "No waitlist"}
-                  </Badge>
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 p-4 pt-3">
-              <CapacityBar
-                filled={activeSignupCount(slot.signups)}
-                capacity={slot.capacity}
-              />
+                    </Badge>
+                    <Badge
+                      variant={slot.allowWaitlist ? "outline" : "secondary"}
+                      title={
+                        slot.allowWaitlist
+                          ? "Volunteers can join the waitlist when this slot is full"
+                          : "Waitlist disabled — full slots reject new signups"
+                      }
+                    >
+                      {slot.allowWaitlist ? "Waitlist on" : "No waitlist"}
+                    </Badge>
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 p-4 pt-3">
+                <CapacityBar
+                  filled={activeSignupCount(slot.signups)}
+                  capacity={slot.capacity}
+                />
 
-              {slot.signups.length > 0 && (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-muted-foreground">
-                      <th className="w-8 pb-1" />
-                      <th className="pb-1 font-medium">Volunteer</th>
-                      <th className="pb-1 font-medium">Email</th>
-                      <th className="pb-1 font-medium">Signed up</th>
-                      <th className="pb-1 font-medium">Status</th>
-                      <th className="w-10 pb-1" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...slot.signups]
-                      .sort(compareSignupsByStatus)
-                      .map((s) => {
-                        const answers = s.answers ?? []
-                        const hasAnswers = answers.length > 0
-                        const expanded = expandedSignupId === s.id
-                        return (
-                          <SignupRow
-                            key={s.id}
-                            signup={s}
-                            answers={answers}
-                            questions={event.questions}
-                            hasAnswers={hasAnswers}
-                            expanded={expanded}
-                            onToggle={() =>
-                              setExpandedSignupId(expanded ? null : s.id)
-                            }
-                            onRemove={() => setPendingSignupId(s.id)}
-                          />
-                        )
-                      })}
-                  </tbody>
-                </table>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
+                {slot.signups.length > 0 && (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="w-8 pb-1" />
+                        <th className="pb-1 font-medium">Volunteer</th>
+                        <th className="pb-1 font-medium">Email</th>
+                        <th className="pb-1 font-medium">Signed up</th>
+                        <th className="pb-1 font-medium">Status</th>
+                        <th className="w-10 pb-1" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...slot.signups]
+                        .sort(compareSignupsByStatus)
+                        .map((s) => {
+                          const answers = s.answers ?? []
+                          const hasAnswers = answers.length > 0
+                          const expanded = expandedSignupId === s.id
+                          return (
+                            <SignupRow
+                              key={s.id}
+                              signup={s}
+                              answers={answers}
+                              questions={event.questions}
+                              hasAnswers={hasAnswers}
+                              expanded={expanded}
+                              onToggle={() =>
+                                setExpandedSignupId(expanded ? null : s.id)
+                              }
+                              onRemove={() => setPendingSignupId(s.id)}
+                            />
+                          )
+                        })}
+                    </tbody>
+                  </table>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
