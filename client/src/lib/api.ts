@@ -1,6 +1,7 @@
 import type {
   RosterEvent,
   CreateEventRequest,
+  EventWithSlots,
   InviteLink,
   PublicInviteData,
   CreateSlotRequest,
@@ -174,6 +175,16 @@ export function createAdminApi(getToken: () => Promise<string | null>) {
         }
       )
       return checkJson<RosterEvent[]>(res)
+    },
+
+    listEvents: async (orgId: string, from: string, to: string) => {
+      const res = await fetch(
+        `${BASE}/organizations/${orgId}/events?from=${from}&to=${to}`,
+        {
+          headers: await h(),
+        }
+      )
+      return checkJson<EventWithSlots[]>(res)
     },
 
     deleteSignup: async (signupId: string) => {

@@ -138,7 +138,7 @@ export function CreateEvent() {
           questions.length > 0 ? buildQuestionPayload(questions) : null,
       })
       toast.success("Event created")
-      await queryClient.invalidateQueries({ queryKey: ["roster"] })
+      await queryClient.invalidateQueries({ queryKey: ["events"] })
       navigate(`/events/${id}`)
     } catch (e) {
       toast.error(formatApiError(e, "Failed to create event"))

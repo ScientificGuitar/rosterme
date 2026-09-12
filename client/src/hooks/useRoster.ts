@@ -5,7 +5,7 @@ export function useRoster(orgId: string, weekStart: string) {
   const api = useApi()
 
   return useQuery({
-    queryKey: ["roster", orgId, weekStart],
+    queryKey: ["events", orgId, "roster", weekStart],
     queryFn: () => api.getRoster(orgId, weekStart),
     staleTime: 5 * 60 * 1000,
   })

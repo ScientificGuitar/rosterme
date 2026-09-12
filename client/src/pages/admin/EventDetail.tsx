@@ -66,8 +66,8 @@ export function EventDetail() {
     setDeletingEvent(true)
     try {
       await api.deleteEvent(id)
-      await queryClient.invalidateQueries({ queryKey: ["roster"] })
-      await queryClient.invalidateQueries({ queryKey: ["event", id] })
+      await queryClient.invalidateQueries({ queryKey: ["events"] })
+      queryClient.removeQueries({ queryKey: ["event", id] })
       toast.success("Event deleted")
       setDeleteDialogOpen(false)
       navigate("/dashboard")

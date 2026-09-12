@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 import { useQueryClient } from "@tanstack/react-query"
 import { useOrg } from "@/hooks/useOrg"
+import { CalendarDays, LayoutList } from "lucide-react"
 import { useApi } from "@/hooks/useApi"
+import { EventList } from "@/components/admin/EventList"
 import { WeeklyGrid } from "@/components/admin/WeeklyGrid"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
@@ -19,6 +21,7 @@ export function Dashboard() {
   const [error, setError] = useState<string | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [view, setView] = useState<"list" | "calendar">("list")
 
   if (loading) {
     return (
@@ -131,15 +134,41 @@ export function Dashboard() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">{org.name}</h1>
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={() => setDeleteDialogOpen(true)}
-        >
-          Delete Organization
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div
+            role="group"
+            aria-label="View mode"
+            className="inline-flex rounded-lg border p-1"
+          >
+            <Button
+              variant={view === "list" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setView("list")}
+              aria-pressed={view === "list"}
+            >
+              <LayoutList className="h-4 w-4" />
+              List
+            </Button>
+            <Button
+              variant={view === "calendar" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setView("calendar")}
+              aria-pressed={view === "calendar"}
+            >
+              <CalendarDays className="h-4 w-4" />
+              Calendar
+            </Button>
+          </div>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setDeleteDialogOpen(true)}
+          >
+            Delete Organization
+          </Button>
+        </div>
         <ConfirmDialog
           open={deleteDialogOpen}
           onOpenChange={setDeleteDialogOpen}
@@ -158,7 +187,11 @@ export function Dashboard() {
           onConfirm={handleDeleteOrganization}
         />
       </div>
-      <WeeklyGrid orgId={org.id} />
+      {view === "list" ? (
+        <EventList orgId={org.id} />
+      ) : (
+        <WeeklyGrid orgId={org.id} />
+      )}
     </div>
   )
 }

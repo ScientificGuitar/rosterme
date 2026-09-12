@@ -93,7 +93,7 @@ function EventForm({ event, eventId }: EventFormProps) {
   const invalidateEvent = () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: ["event", eventId] }),
-      queryClient.invalidateQueries({ queryKey: ["roster"] }),
+      queryClient.invalidateQueries({ queryKey: ["events"] }),
     ])
 
   const addSlot = () => {

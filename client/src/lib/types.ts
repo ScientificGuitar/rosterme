@@ -48,4 +48,10 @@ export type EventSlotUpsert = NumericFields<Schemas["EventSlotUpsert"]>
 
 export type TimeSlotResponse = NumericFields<Schemas["TimeSlotResponse"]>
 
+export type EventWithSlots = NumericFields<
+  Schemas["EventWithSlotsResponse"]
+>
+
+export type EventSlotSummary = NumericFields<Schemas["TimeSlotResponse"]>
+
 export type UserMeResponse = NumericFields<Schemas["UserMeResponse"]>

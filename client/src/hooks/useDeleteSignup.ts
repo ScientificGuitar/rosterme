@@ -9,7 +9,7 @@ export function useDeleteSignup() {
   return useMutation({
     mutationFn: (signupId: string) => api.deleteSignup(signupId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["roster"] })
+      queryClient.invalidateQueries({ queryKey: ["events"] })
       queryClient.invalidateQueries({ queryKey: ["event"] })
     },
     onError: (e: Error) => {
