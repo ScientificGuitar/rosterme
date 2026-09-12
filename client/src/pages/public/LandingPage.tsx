@@ -1,4 +1,6 @@
+import { useEffect } from "react"
 import { useClerk } from "@clerk/react"
+import { useLocation } from "react-router-dom"
 import {
   ArrowRight,
   BellRing,
@@ -459,6 +461,16 @@ const freeFeatures = [
 ]
 
 export function LandingPage() {
+  const { hash } = useLocation()
+
+  useEffect(() => {
+    if (hash) {
+      document
+        .getElementById(hash.slice(1))
+        ?.scrollIntoView({ behavior: "smooth" })
+    }
+  }, [hash])
+
   return (
     <div className="mx-auto w-full max-w-6xl px-6 pb-20">
       {/* 1. Hero */}
@@ -724,7 +736,10 @@ export function LandingPage() {
       </section>
 
       {/* 9. Pricing */}
-      <section className="mx-auto max-w-md py-16 text-center">
+      <section
+        id="pricing"
+        className="mx-auto max-w-md scroll-mt-20 py-16 text-center"
+      >
         <h2 className="text-3xl font-bold tracking-tight">
           Start free. Keep it simple.
         </h2>
