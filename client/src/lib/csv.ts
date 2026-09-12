@@ -1,5 +1,5 @@
 import { formatTime } from "@/lib/utils"
-import type { RosterEvent } from "@/lib/types"
+import type { RosterEvent, SignupAnswer } from "@/lib/types"
 
 export const CSV_DELIMITER = ","
 
@@ -30,16 +30,58 @@ const VOLUNTEER_CSV_HEADERS = [
   "Signed Up At",
 ]
 
+/**
+ * One column per question: all active questions plus deleted ones that still
+ * have answers, so no collected data is silently dropped from the export.
+ * Headers are made unique (label, label (2), …) since CSV has no ids.
+ */
+export function csvQuestionColumns(event: RosterEvent): {
+  id: string
+  label: string
+}[] {
+  const answeredIds = new Set<string>()
+  for (const slot of event.slots) {
+    for (const s of slot.signups) {
+      for (const a of (s.answers ?? []) as SignupAnswer[]) {
+        answeredIds.add(a.questionId)
+      }
+    }
+  }
+  const seen = new Map<string, number>()
+  return event.questions
+    .filter((q) => !q.isDeleted || answeredIds.has(q.id))
+    .map((q) => {
+      const base = q.label || "Question"
+      const count = (seen.get(base) ?? 0) + 1
+      seen.set(base, count)
+      return { id: q.id, label: count === 1 ? base : `${base} (${count})` }
+    })
+}
+
+function formatAnswerForCsv(value: string): string {
+  if (value === "true") return "Yes"
+  if (value === "false") return "No"
+  return value
+}
+
 export function buildEventVolunteersCsv(
   event: RosterEvent,
   delimiter = CSV_DELIMITER
 ): string {
   const escape = (v: string | null | undefined) => escapeCsvField(v, delimiter)
+  const questionColumns = csvQuestionColumns(event)
 
-  const lines = [VOLUNTEER_CSV_HEADERS.map(escape).join(delimiter)]
+  const lines = [
+    [...VOLUNTEER_CSV_HEADERS, ...questionColumns.map((q) => q.label)]
+      .map(escape)
+      .join(delimiter),
+  ]
 
   for (const slot of event.slots) {
     for (const s of slot.signups) {
+      const answersById = new Map(
+        ((s.answers ?? []) as SignupAnswer[]).map((a) => [a.questionId, a.value])
+      )
       lines.push(
         [
           event.title,
@@ -52,6 +94,10 @@ export function buildEventVolunteersCsv(
           s.email,
           s.status,
           new Date(s.createdAt).toLocaleString(),
+          ...questionColumns.map((q) => {
+            const value = answersById.get(q.id)
+            return value === undefined ? "" : formatAnswerForCsv(value)
+          }),
         ]
           .map(escape)
           .join(delimiter)
@@ -59,8 +105,7 @@ export function buildEventVolunteersCsv(
     }
   }
 
-  // CRLF so Excel on Windows parses rows correctly.
-  return lines.join("\r\n")
+  return lines.join("\n")
 }
 
 export function buildVolunteersFilename(title: string, date: string): string {

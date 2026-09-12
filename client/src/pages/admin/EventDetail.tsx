@@ -11,6 +11,8 @@ import {
   Pencil,
   MapPin,
   Download,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -43,6 +45,7 @@ export function EventDetail() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletingEvent, setDeletingEvent] = useState(false)
   const [pendingSignupId, setPendingSignupId] = useState<string | null>(null)
+  const [expandedSignupId, setExpandedSignupId] = useState<string | null>(null)
   const deleteSignup = useDeleteSignup()
   const api = useApi()
   const navigate = useNavigate()
@@ -260,6 +263,7 @@ export function EventDetail() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b text-left text-muted-foreground">
+                      <th className="w-8 pb-1" />
                       <th className="pb-1 font-medium">Volunteer</th>
                       <th className="pb-1 font-medium">Email</th>
                       <th className="pb-1 font-medium">Signed up</th>
@@ -270,31 +274,25 @@ export function EventDetail() {
                   <tbody>
                     {[...slot.signups]
                       .sort(compareSignupsByStatus)
-                      .map((s) => (
-                        <tr key={s.id} className="border-b last:border-0">
-                          <td className="py-1">{s.volunteerName}</td>
-                          <td className="py-1 break-all text-muted-foreground">
-                            {s.email}
-                          </td>
-                          <td className="py-1 text-muted-foreground">
-                            {new Date(s.createdAt).toLocaleString()}
-                          </td>
-                          <td className="py-1">
-                            <SignupStatusBadge status={s.status} />
-                          </td>
-                          <td className="py-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                              onClick={() => setPendingSignupId(s.id)}
-                              disabled={s.status === "Cancelled" || s.status === "Removed"}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
+                      .map((s) => {
+                        const answers = s.answers ?? []
+                        const hasAnswers = answers.length > 0
+                        const expanded = expandedSignupId === s.id
+                        return (
+                          <SignupRow
+                            key={s.id}
+                            signup={s}
+                            answers={answers}
+                            questions={event.questions}
+                            hasAnswers={hasAnswers}
+                            expanded={expanded}
+                            onToggle={() =>
+                              setExpandedSignupId(expanded ? null : s.id)
+                            }
+                            onRemove={() => setPendingSignupId(s.id)}
+                          />
+                        )
+                      })}
                   </tbody>
                 </table>
               )}
@@ -476,6 +474,115 @@ function SignupStatusBadge({ status }: { status: string }) {
       {cfg.label}
     </Badge>
   )
+}
+
+interface SignupRowProps {
+  signup: {
+    id: string
+    volunteerName: string
+    email: string
+    status: string
+    createdAt: string
+  }
+  answers: { questionId: string; value: string }[]
+  questions: { id: string; label: string; isDeleted: boolean }[]
+  hasAnswers: boolean
+  expanded: boolean
+  onToggle: () => void
+  onRemove: () => void
+}
+
+function SignupRow({
+  signup,
+  answers,
+  questions,
+  hasAnswers,
+  expanded,
+  onToggle,
+  onRemove,
+}: SignupRowProps) {
+  const questionById = new Map(questions.map((q) => [q.id, q]))
+  return (
+    <>
+      <tr className="border-b last:border-0">
+        <td className="py-1">
+          {hasAnswers ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground"
+              onClick={onToggle}
+              title={expanded ? "Hide answers" : "Show answers"}
+              aria-label={expanded ? "Hide answers" : "Show answers"}
+              aria-expanded={expanded}
+            >
+              {expanded ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+            </Button>
+          ) : null}
+        </td>
+        <td className="py-1">{signup.volunteerName}</td>
+        <td className="py-1 break-all text-muted-foreground">{signup.email}</td>
+        <td className="py-1 text-muted-foreground">
+          {new Date(signup.createdAt).toLocaleString()}
+        </td>
+        <td className="py-1">
+          <SignupStatusBadge status={signup.status} />
+        </td>
+        <td className="py-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+            onClick={onRemove}
+            disabled={signup.status === "Cancelled" || signup.status === "Removed"}
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </td>
+      </tr>
+      {expanded && hasAnswers && (
+        <tr className="border-b bg-muted/40 last:border-0">
+          <td />
+          <td colSpan={5} className="py-2 pr-2">
+            <dl className="space-y-1">
+              {answers.map((answer) => {
+                const question = questionById.get(answer.questionId)
+                const label = question
+                  ? question.label
+                  : "Deleted question"
+                return (
+                  <div key={answer.questionId} className="flex gap-2 text-sm">
+                    <dt className="shrink-0 font-medium text-muted-foreground">
+                      {label}
+                      {question?.isDeleted && (
+                        <span className="ml-1 font-normal opacity-70">
+                          (deleted)
+                        </span>
+                      )}
+                      :
+                    </dt>
+                    <dd className="break-all">
+                      {formatAnswerValue(answer.value)}
+                    </dd>
+                  </div>
+                )
+              })}
+            </dl>
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
+function formatAnswerValue(value: string): string {
+  if (value === "true") return "Yes"
+  if (value === "false") return "No"
+  return value
 }
 
 async function copyToClipboard(text: string): Promise<void> {

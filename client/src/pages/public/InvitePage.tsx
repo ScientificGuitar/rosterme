@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { createPublicApi, ApiError } from "@/lib/api"
-import type { PublicSlot } from "@/lib/types"
+import type { PublicSlot, PublicQuestion } from "@/lib/types"
+import { isValidPhone } from "@/lib/eventQuestions"
 import { cn } from "@/lib/utils"
 import { CapacityBar } from "@/components/ui/capacity-bar"
 
@@ -98,7 +99,11 @@ export function InvitePage() {
               No slots have been created for this event yet.
             </p>
           ) : (
-            <SignupForm slots={event.slots} code={code!} />
+            <SignupForm
+              slots={event.slots}
+              questions={event.questions}
+              code={code!}
+            />
           )}
         </section>
       )}
@@ -106,11 +111,23 @@ export function InvitePage() {
   )
 }
 
-function SignupForm({ slots, code }: { slots: PublicSlot[]; code: string }) {
+function SignupForm({
+  slots,
+  questions,
+  code,
+}: {
+  slots: PublicSlot[]
+  questions: PublicQuestion[]
+  code: string
+}) {
   const queryClient = useQueryClient()
   const [selectedSlotId, setSelectedSlotId] = useState<string>("")
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
+  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [questionErrors, setQuestionErrors] = useState<Record<string, string>>(
+    {}
+  )
   const [submitting, setSubmitting] = useState(false)
   const [sentEmail, setSentEmail] = useState<string | null>(null)
   const [sentWaitlistPosition, setSentWaitlistPosition] = useState<number | null>(
@@ -124,6 +141,48 @@ function SignupForm({ slots, code }: { slots: PublicSlot[]; code: string }) {
   const canSubmit = !!selectedSlotId && !!name.trim() && !!email.trim()
   const selectedSlot = slots.find((s) => s.id === selectedSlotId)
   const selectedIsWaitlist = !!selectedSlot?.isFull
+
+  /**
+   * Maps backend ValidationProblem answer errors back onto the question fields.
+   * Server keys are indexed into the answers array we submitted, so rebuild
+   * that exact array to translate indexes back to question ids. Returns true
+   * if at least one error was mapped to a field.
+   */
+  const mapAnswerErrors = (err: ApiError): boolean => {
+    if (!err.fields) return false
+    const payload = buildAnswersPayload(questions, answers)
+    const next: Record<string, string> = {}
+    let mapped = false
+    for (const [key, messages] of Object.entries(err.fields)) {
+      const indexed = key.match(/^Answers\[(\d+)\]\.(?:Value|QuestionId)$/)
+      if (indexed) {
+        const questionId = payload[Number(indexed[1])]?.questionId
+        if (questionId && messages[0]) {
+          next[questionId] = messages[0]
+          mapped = true
+        }
+        continue
+      }
+      if (key === "Answers") {
+        for (const message of messages) {
+          // Required errors are keyed without an index but name the question label.
+          const byLabel = message.match(/^The question "(.+)" is required\.$/)
+          const question = byLabel
+            ? questions.find((q) => q.label === byLabel[1])
+            : undefined
+          if (question) {
+            next[question.id] = "This question is required."
+            mapped = true
+          }
+        }
+      }
+    }
+    if (mapped) {
+      setQuestionErrors((prev) => ({ ...prev, ...next }))
+      toast.error("Please fix the highlighted questions before signing up.")
+    }
+    return mapped
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -147,12 +206,20 @@ function SignupForm({ slots, code }: { slots: PublicSlot[]; code: string }) {
       return
     }
 
+    const questionErrs = validateAnswers(questions, answers)
+    setQuestionErrors(questionErrs)
+    if (Object.keys(questionErrs).length > 0) {
+      toast.error("Please fix the highlighted questions before signing up.")
+      return
+    }
+
     setSubmitting(true)
     try {
       const result = await api.createSignup(code, {
         slotId: selectedSlotId,
         volunteerName: trimmedName,
         email: trimmedEmail,
+        answers: buildAnswersPayload(questions, answers),
       })
       setSentEmail(trimmedEmail)
       setSentWaitlistPosition(
@@ -189,6 +256,7 @@ function SignupForm({ slots, code }: { slots: PublicSlot[]; code: string }) {
           await queryClient.invalidateQueries({ queryKey: ["invite", code] })
           return
         }
+        if (mapAnswerErrors(err)) return
       }
       toast.error(err instanceof Error ? err.message : "Sign up failed")
     } finally {
@@ -218,6 +286,8 @@ function SignupForm({ slots, code }: { slots: PublicSlot[]; code: string }) {
     setSentEmail(null)
     setSentWaitlistPosition(null)
     setSelectedSlotId("")
+    setAnswers({})
+    setQuestionErrors({})
   }
 
   if (sentEmail) {
@@ -369,6 +439,32 @@ function SignupForm({ slots, code }: { slots: PublicSlot[]; code: string }) {
                 {emailError}
               </p>
             )}
+            {questions.length > 0 && (
+              <div className="space-y-3 rounded-md border p-3">
+                <p className="text-sm font-medium">Signup questions</p>
+                {questions.map((question) => (
+                  <QuestionField
+                    key={question.id}
+                    question={question}
+                    value={answers[question.id] ?? ""}
+                    error={questionErrors[question.id]}
+                    disabled={submitting}
+                    onChange={(value) => {
+                      setAnswers((prev) => ({
+                        ...prev,
+                        [question.id]: value,
+                      }))
+                      setQuestionErrors((prev) => {
+                        if (!(question.id in prev)) return prev
+                        const next = { ...prev }
+                        delete next[question.id]
+                        return next
+                      })
+                    }}
+                  />
+                ))}
+              </div>
+            )}
             <Button
               type="submit"
               className="w-full"
@@ -404,6 +500,98 @@ function SignupForm({ slots, code }: { slots: PublicSlot[]; code: string }) {
       </CardContent>
     </Card>
   )
+}
+
+function QuestionField({
+  question,
+  value,
+  error,
+  disabled,
+  onChange,
+}: {
+  question: PublicQuestion
+  value: string
+  error?: string
+  disabled: boolean
+  onChange: (value: string) => void
+}) {
+  const inputId = `question-${question.id}`
+  return (
+    <div className="space-y-1">
+      <Label htmlFor={inputId} className="text-sm">
+        {question.label}
+        {question.required && <span className="ml-1 text-destructive">*</span>}
+      </Label>
+      {question.type === "Dropdown" ? (
+        <select
+          id={inputId}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={cn(
+            "h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+            error && "border-destructive"
+          )}
+          disabled={disabled}
+        >
+          <option value="">Select an option…</option>
+          {(question.options ?? []).map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <Input
+          id={inputId}
+          type={question.type === "Phone" ? "tel" : "text"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          maxLength={500}
+          placeholder={
+            question.type === "Phone" ? "+1 555 123 4567" : undefined
+          }
+          disabled={disabled}
+          aria-invalid={!!error}
+        />
+      )}
+      {error && (
+        <p className="text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function validateAnswers(
+  questions: PublicQuestion[],
+  answers: Record<string, string>
+): Record<string, string> {
+  const errors: Record<string, string> = {}
+  for (const question of questions) {
+    const value = (answers[question.id] ?? "").trim()
+    if (question.required && !value) {
+      errors[question.id] = "This question is required."
+      continue
+    }
+    if (!value) continue
+    if (question.type === "Phone" && !isValidPhone(value)) {
+      errors[question.id] = "Please enter a valid phone number."
+    }
+  }
+  return errors
+}
+
+function buildAnswersPayload(
+  questions: PublicQuestion[],
+  answers: Record<string, string>
+) {
+  return questions
+    .map((question) => ({
+      questionId: question.id,
+      value: (answers[question.id] ?? "").trim(),
+    }))
+    .filter((a) => a.value !== "")
 }
 
 function formatTime(value: string): string {

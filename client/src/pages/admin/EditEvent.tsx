@@ -8,23 +8,34 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { EventDetailsFields } from "@/components/admin/EventDetailsFields"
 import { SlotRowCard } from "@/components/admin/SlotRowCard"
+import { QuestionRowCard } from "@/components/admin/QuestionRowCard"
 import { useEvent } from "@/hooks/useEvent"
 import { useApi } from "@/hooks/useApi"
-import { activeSignupCount, toTimeInputValue } from "@/lib/utils"
+import { formatApiError } from "@/lib/api"
 import {
   createEmptySlot,
-  formatApiError,
   todayLocal,
-  validateSlotBasics,
-  type SlotDraft,
+  validateSlotRows,
+  toSlotRows,
+  buildSlotUpdatePayload,
+  type SlotRow,
 } from "@/lib/eventSlots"
+import {
+  createEmptyQuestion,
+  toQuestionDrafts,
+  validateQuestionRows,
+  buildQuestionPayload,
+  MAX_QUESTIONS,
+  type QuestionRow,
+} from "@/lib/eventQuestions"
+import {
+  activeRows,
+  clearDraftError,
+  markRowDeleted,
+  undoRowDeleted,
+  updateDraftRow,
+} from "@/lib/eventDrafts"
 import type { RosterEvent } from "@/lib/types"
-
-interface SlotRow extends SlotDraft {
-  id?: string
-  signupCount: number
-  deleted: boolean
-}
 
 export function EditEvent() {
   const { id } = useParams<{ id: string }>()
@@ -69,20 +80,14 @@ function EventForm({ event, eventId }: EventFormProps) {
   const [date, setDate] = useState(event.date)
   const [submitting, setSubmitting] = useState(false)
   const [slotErrors, setSlotErrors] = useState<Record<number, string>>({})
+  const [questionErrors, setQuestionErrors] = useState<Record<number, string>>(
+    {}
+  )
 
-  const nextKey = useRef(event.slots.length)
-  const [slots, setSlots] = useState<SlotRow[]>(() =>
-    event.slots.map((slot, i) => ({
-      key: i,
-      id: slot.id,
-      label: slot.label,
-      startTime: toTimeInputValue(slot.startTime),
-      endTime: toTimeInputValue(slot.endTime),
-      capacity: slot.capacity,
-      allowWaitlist: slot.allowWaitlist ?? true,
-      signupCount: activeSignupCount(slot.signups),
-      deleted: false,
-    }))
+  const nextKey = useRef(event.slots.length + event.questions.length)
+  const [slots, setSlots] = useState<SlotRow[]>(() => toSlotRows(event))
+  const [questions, setQuestions] = useState<QuestionRow[]>(() =>
+    toQuestionDrafts(event, event.slots.length)
   )
 
   const invalidateEvent = () =>
@@ -105,46 +110,57 @@ function EventForm({ event, eventId }: EventFormProps) {
     value: string | number | boolean
   ) => {
     setSlots((prev) =>
-      prev.map((s) => (s.key === key ? { ...s, [field]: value } : s))
+      updateDraftRow(prev, key, { [field]: value } as Partial<SlotRow>)
     )
-    setSlotErrors((prev) => {
-      if (!(key in prev)) return prev
-      const next = { ...prev }
-      delete next[key]
-      return next
-    })
+    setSlotErrors((prev) => clearDraftError(prev, key))
   }
 
   const markSlotDeleted = (key: number) => {
-    setSlots((prev) =>
-      prev
-        .map((s) => (s.key === key ? { ...s, deleted: true } : s))
-        // Rows that were never persisted can be dropped outright.
-        .filter((s) => !(s.key === key && !s.id))
-    )
+    setSlots((prev) => markRowDeleted(prev, key))
   }
 
   const undoDeleteSlot = (key: number) => {
-    setSlots((prev) =>
-      prev.map((s) => (s.key === key ? { ...s, deleted: false } : s))
+    setSlots((prev) => undoRowDeleted(prev, key))
+  }
+
+  const addQuestion = () => {
+    const key = nextKey.current++
+    setQuestions((prev) => [
+      ...prev,
+      { ...createEmptyQuestion(key), hasAnswers: false, deleted: false },
+    ])
+  }
+
+  const updateQuestion = (
+    key: number,
+    field: keyof Omit<QuestionRow, "key" | "id" | "hasAnswers" | "deleted">,
+    value: string | boolean
+  ) => {
+    setQuestions((prev) =>
+      updateDraftRow(prev, key, { [field]: value } as Partial<QuestionRow>)
     )
+    setQuestionErrors((prev) => clearDraftError(prev, key))
+  }
+
+  const markQuestionDeleted = (key: number) => {
+    setQuestions((prev) => markRowDeleted(prev, key))
+  }
+
+  const undoDeleteQuestion = (key: number) => {
+    setQuestions((prev) => undoRowDeleted(prev, key))
   }
 
   const validateSlots = (): boolean => {
-    const errors: Record<number, string> = {}
-    for (const slot of slots) {
-      if (slot.deleted) continue
-      const basic = validateSlotBasics(slot)
-      if (basic) {
-        errors[slot.key] = basic
-      } else if (slot.capacity < slot.signupCount) {
-        errors[slot.key] =
-          `Capacity cannot be below the current signup count (${slot.signupCount}).`
-      }
-    }
+    const errors = validateSlotRows(slots)
     setSlotErrors(errors)
     if (Object.keys(errors).length > 0) {
       toast.error("Fix the highlighted time slots before saving.")
+      return false
+    }
+    const questionErrs = validateQuestionRows(questions)
+    setQuestionErrors(questionErrs)
+    if (Object.keys(questionErrs).length > 0) {
+      toast.error("Fix the highlighted signup questions before saving.")
       return false
     }
     return true
@@ -167,16 +183,8 @@ function EventForm({ event, eventId }: EventFormProps) {
         // Empty string clears the location; the backend normalizes it to null.
         location: location.trim(),
         date,
-        slots: slots
-          .filter((s) => !s.deleted)
-          .map((s) => ({
-            id: s.id ?? null,
-            label: s.label.trim(),
-            startTime: s.startTime,
-            endTime: s.endTime,
-            capacity: s.capacity,
-            allowWaitlist: s.allowWaitlist,
-          })),
+        slots: buildSlotUpdatePayload(activeRows(slots)),
+        questions: buildQuestionPayload(activeRows(questions)),
       })
       await invalidateEvent()
       toast.success("Event updated")
@@ -189,6 +197,8 @@ function EventForm({ event, eventId }: EventFormProps) {
   }
 
   const deletedCount = slots.filter((s) => s.deleted).length
+  const activeSlotCount = activeRows(slots).length
+  const activeQuestionCount = activeRows(questions).length
   const isPast = event.date < todayLocal()
 
   return (
@@ -216,7 +226,7 @@ function EventForm({ event, eventId }: EventFormProps) {
         <div className="space-y-3">
           <Label>Time Slots</Label>
 
-          {slots.filter((s) => !s.deleted).length === 0 && (
+          {activeSlotCount === 0 && (
             <p className="text-sm text-muted-foreground">
               No time slots yet. Add time slots that volunteers can sign up for.
             </p>
@@ -273,9 +283,7 @@ function EventForm({ event, eventId }: EventFormProps) {
                     ? `${slot.signupCount} active signup(s) on this slot.`
                     : undefined
                 }
-                onUpdate={(field, value) =>
-                  updateSlot(slot.key, field, value)
-                }
+                onUpdate={(field, value) => updateSlot(slot.key, field, value)}
                 onRemove={() => markSlotDeleted(slot.key)}
                 removeLabel={
                   slot.signupCount > 0
@@ -303,6 +311,71 @@ function EventForm({ event, eventId }: EventFormProps) {
             disabled={isPast}
           >
             <Plus className="mr-1 h-4 w-4" /> Add Slot
+          </Button>
+        </div>
+
+        <div className="space-y-3">
+          <Label>Signup Questions</Label>
+
+          {activeQuestionCount === 0 && (
+            <p className="text-sm text-muted-foreground">
+              No questions yet. Add optional questions volunteers answer when
+              signing up.
+            </p>
+          )}
+
+          {questions.map((question) =>
+            question.deleted ? (
+              <div
+                key={question.key}
+                className="flex items-center justify-between gap-2 rounded-md border border-dashed p-3 opacity-70"
+              >
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium line-through">
+                    {question.label || "Untitled question"}
+                  </span>{" "}
+                  will be deleted on save.
+                  {question.hasAnswers && (
+                    <span className="font-medium">
+                      {" "}
+                      Existing answers will be kept and shown in the roster.
+                    </span>
+                  )}
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => undoDeleteQuestion(question.key)}
+                >
+                  <Undo2 className="mr-1 h-4 w-4" /> Undo
+                </Button>
+              </div>
+            ) : (
+              <QuestionRowCard
+                key={question.key}
+                question={question}
+                error={questionErrors[question.key]}
+                disableTypeChange={question.hasAnswers}
+                onUpdate={(field, value) =>
+                  updateQuestion(question.key, field, value)
+                }
+                onRemove={() => markQuestionDeleted(question.key)}
+                removeLabel="Remove question"
+                removeIcon={<Trash2 className="h-4 w-4" />}
+                disabled={isPast}
+              />
+            )
+          )}
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addQuestion}
+            disabled={isPast || activeQuestionCount >= MAX_QUESTIONS}
+          >
+            <Plus className="mr-1 h-4 w-4" /> Add Question
           </Button>
         </div>
 

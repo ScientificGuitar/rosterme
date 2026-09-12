@@ -1074,6 +1074,7 @@ export interface components {
             /** Format: date */
             date: string;
             slots: null | components["schemas"]["CreateSlotRequest"][];
+            questions: null | components["schemas"]["QuestionUpsert"][];
         };
         CreateOrganizationRequest: {
             name: string;
@@ -1097,6 +1098,7 @@ export interface components {
             /** Format: date */
             date: string;
             isPast: boolean;
+            questions: components["schemas"]["PublicQuestionResponse"][];
             slots: components["schemas"]["SlotAvailabilityResponse"][];
         };
         EventResponse: {
@@ -1111,6 +1113,18 @@ export interface components {
             date: string;
             /** Format: date-time */
             createdAt: string;
+        };
+        EventSlotUpsert: {
+            /** Format: uuid */
+            id: null | string;
+            label: string;
+            /** Format: time */
+            startTime: string;
+            /** Format: time */
+            endTime: string;
+            /** Format: int32 */
+            capacity: number | string;
+            allowWaitlist: null | boolean;
         };
         EventWithSlotsResponse: {
             /** Format: uuid */
@@ -1151,11 +1165,20 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        PublicQuestionResponse: {
+            /** Format: uuid */
+            id: string;
+            label: string;
+            type: string;
+            required: boolean;
+            options: null | string[];
+        };
         PublicSignupRequest: {
             /** Format: uuid */
             slotId: string;
             volunteerName: string;
             email: string;
+            answers: null | components["schemas"]["SignupAnswerRequest"][];
         };
         PublicSignupResponse: {
             /** Format: uuid */
@@ -1170,6 +1193,16 @@ export interface components {
             /** Format: int32 */
             waitlistPosition: null | number | string;
         };
+        /** @enum {unknown} */
+        QuestionType: "ShortText" | "Phone" | "Dropdown" | null;
+        QuestionUpsert: {
+            /** Format: uuid */
+            id: null | string;
+            label: string;
+            type: null | components["schemas"]["QuestionType"];
+            required: boolean;
+            options: null | string[];
+        };
         ResendSignupRequest: {
             /** Format: uuid */
             slotId: string;
@@ -1183,7 +1216,17 @@ export interface components {
             location: null | string;
             /** Format: date */
             date: string;
+            questions: components["schemas"]["RosterQuestionResponse"][];
             slots: components["schemas"]["RosterSlotResponse"][];
+        };
+        RosterQuestionResponse: {
+            /** Format: uuid */
+            id: string;
+            label: string;
+            type: string;
+            required: boolean;
+            isDeleted: boolean;
+            options: null | string[];
         };
         RosterSlotResponse: {
             /** Format: uuid */
@@ -1197,6 +1240,16 @@ export interface components {
             capacity: number | string;
             allowWaitlist: boolean;
             signups: components["schemas"]["SignupResponse"][];
+        };
+        SignupAnswerRequest: {
+            /** Format: uuid */
+            questionId: string;
+            value: string;
+        };
+        SignupAnswerResponse: {
+            /** Format: uuid */
+            questionId: string;
+            value: string;
         };
         SignupManageResponse: {
             /** Format: uuid */
@@ -1229,6 +1282,7 @@ export interface components {
             status: string;
             /** Format: date-time */
             createdAt: string;
+            answers: components["schemas"]["SignupAnswerResponse"][];
         };
         SlotAvailabilityResponse: {
             /** Format: uuid */
@@ -1270,18 +1324,7 @@ export interface components {
             /** Format: date */
             date: null | string;
             slots: null | components["schemas"]["EventSlotUpsert"][];
-        };
-        EventSlotUpsert: {
-            /** Format: uuid */
-            id: null | string;
-            label: string;
-            /** Format: time */
-            startTime: string;
-            /** Format: time */
-            endTime: string;
-            /** Format: int32 */
-            capacity: number | string;
-            allowWaitlist: null | boolean;
+            questions: null | components["schemas"]["QuestionUpsert"][];
         };
         UpdateSlotRequest: {
             label: null | string;

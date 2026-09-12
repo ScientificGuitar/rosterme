@@ -1,6 +1,7 @@
-import { ApiError } from "@/lib/api"
+import type { RosterEvent } from "@/lib/types"
+import { activeSignupCount, toTimeInputValue } from "@/lib/utils"
+import { activeRows } from "@/lib/eventDrafts"
 
-/** Shared shape for a slot row in Create/Edit forms. Edit extends this. */
 export interface SlotDraft {
   key: number
   label: string
@@ -8,6 +9,12 @@ export interface SlotDraft {
   endTime: string
   capacity: number
   allowWaitlist: boolean
+}
+
+export interface SlotRow extends SlotDraft {
+  id?: string
+  signupCount: number
+  deleted: boolean
 }
 
 export function createEmptySlot(key: number): SlotDraft {
@@ -21,7 +28,6 @@ export function createEmptySlot(key: number): SlotDraft {
   }
 }
 
-/** Stateless checks shared by Create and Edit. Edit adds signup-aware rules on top. */
 export function validateSlotBasics(slot: SlotDraft): string | null {
   if (!slot.label.trim()) return "Label is required."
   if (slot.endTime <= slot.startTime)
@@ -41,16 +47,61 @@ export function validateSlotsBasics(
   return errors
 }
 
-/** Flatten ApiError fields the same way everywhere (backend RFC 9457). */
-export function formatApiError(e: unknown, fallback: string): string {
-  if (e instanceof ApiError && e.fields) {
-    const messages = Object.entries(e.fields).flatMap(([field, msgs]) =>
-      msgs.map((m) => `${field}: ${m}`)
-    )
-    if (messages.length > 0) return messages.join("\n")
-    return e.message || fallback
+export function validateSlotWithSignups(
+  slot: SlotDraft & { signupCount: number }
+): string | null {
+  const basic = validateSlotBasics(slot)
+  if (basic) return basic
+  if (slot.capacity < slot.signupCount) {
+    return `Capacity cannot be below the current signup count (${slot.signupCount}).`
   }
-  return e instanceof Error ? e.message : fallback
+  return null
+}
+
+export function validateSlotRows(slots: SlotRow[]): Record<number, string> {
+  const errors: Record<number, string> = {}
+  for (const slot of activeRows(slots)) {
+    const err = validateSlotWithSignups(slot)
+    if (err) errors[slot.key] = err
+  }
+  return errors
+}
+
+export function toSlotRows(event: RosterEvent, keyOffset = 0): SlotRow[] {
+  return event.slots.map((slot, i) => ({
+    key: keyOffset + i,
+    id: slot.id,
+    label: slot.label,
+    startTime: toTimeInputValue(slot.startTime),
+    endTime: toTimeInputValue(slot.endTime),
+    capacity: slot.capacity,
+    allowWaitlist: slot.allowWaitlist ?? true,
+    signupCount: activeSignupCount(slot.signups),
+    deleted: false,
+  }))
+}
+
+/** Payload for POST /organizations/:id/events (CreateSlotRequest, no ids). */
+export function buildSlotCreatePayload(slots: SlotDraft[]) {
+  return slots.map((s) => ({
+    label: s.label.trim(),
+    startTime: s.startTime,
+    endTime: s.endTime,
+    capacity: s.capacity,
+    allowWaitlist: s.allowWaitlist,
+  }))
+}
+
+/** Payload for PUT /events/:id (EventSlotUpsert, ids preserved). */
+export function buildSlotUpdatePayload(slots: (SlotDraft & { id?: string })[]) {
+  return slots.map((s) => ({
+    id: s.id ?? null,
+    label: s.label.trim(),
+    startTime: s.startTime,
+    endTime: s.endTime,
+    capacity: s.capacity,
+    allowWaitlist: s.allowWaitlist,
+  }))
 }
 
 export function todayLocal(): string {

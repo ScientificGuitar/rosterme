@@ -53,6 +53,8 @@ public static class PublicEndpoints
             .Include(l => l.Event!)
                 .ThenInclude(e => e.TimeSlots)
                     .ThenInclude(s => s.Signups)
+            .Include(l => l.Event!)
+                .ThenInclude(e => e.Questions.Where(q => !q.IsDeleted))
             .FirstOrDefaultAsync(l => l.Code == code && l.IsActive
                 && (!l.ExpiresAt.HasValue || l.ExpiresAt.Value > DateTime.UtcNow), ct);
 
@@ -71,6 +73,15 @@ public static class PublicEndpoints
                 evt.Location,
                 evt.Date,
                 evt.Date < DateOnly.FromDateTime(DateTime.UtcNow),
+                evt.Questions
+                    .Where(q => !q.IsDeleted)
+                    .OrderBy(q => q.SortOrder)
+                    .Select(q => new PublicQuestionResponse(
+                        q.Id, q.Label, q.Type.ToString(), q.Required,
+                        q.Type == QuestionType.Dropdown
+                            ? q.Options?.Split('\n').Select(o => o.Trim()).Where(o => o.Length > 0).ToList()
+                            : null)
+                    ),
                 evt.TimeSlots
                     .OrderBy(s => s.StartTime)
                     .Select(s => new SlotAvailabilityResponse(
@@ -197,19 +208,6 @@ public static class PublicEndpoints
                 waitlistPosition = waitlistedCount + 1;
             }
 
-            var signup = new Signup
-            {
-                Id = Guid.NewGuid(),
-                TimeSlotId = request.SlotId,
-                VolunteerName = Norm(request.VolunteerName),
-                Email = email,
-                Status = isWaitlist ? SignupStatus.WaitlistPending : SignupStatus.Pending,
-                ManagementTokenHash = TokenService.HashToken(rawToken),
-                CreatedAt = DateTime.UtcNow
-            };
-
-            db.Signups.Add(signup);
-
             var slot = await db.TimeSlots
                 .Include(s => s.Event!)
                     .ThenInclude(e => e.Organization)
@@ -224,6 +222,34 @@ public static class PublicEndpoints
                     error = "This event has already passed",
                     code = "event_in_past"
                 });
+
+            var (answerErrors, answerValues) = await ValidateAnswersAsync(db, slot.EventId, request.Answers, ct);
+            if (answerErrors.Count > 0)
+                return Results.ValidationProblem(answerErrors);
+
+            var signup = new Signup
+            {
+                Id = Guid.NewGuid(),
+                TimeSlotId = request.SlotId,
+                VolunteerName = Norm(request.VolunteerName),
+                Email = email,
+                Status = isWaitlist ? SignupStatus.WaitlistPending : SignupStatus.Pending,
+                ManagementTokenHash = TokenService.HashToken(rawToken),
+                CreatedAt = DateTime.UtcNow
+            };
+
+            db.Signups.Add(signup);
+
+            foreach (var (questionId, value) in answerValues)
+            {
+                db.SignupAnswers.Add(new SignupAnswer
+                {
+                    Id = Guid.NewGuid(),
+                    SignupId = signup.Id,
+                    QuestionId = questionId,
+                    Value = value
+                });
+            }
 
             await EnqueueConfirmationEmail(db, outbox, emailOptions, signup, slot, rawToken, waitlistPosition, ct);
 
@@ -501,6 +527,99 @@ public static class PublicEndpoints
         await outbox.EnqueueAsync(signup.Email, subject, html, text, ct: ct);
     }
 
+    private static readonly System.Text.RegularExpressions.Regex PhoneRegex =
+        new("""^\+?[\d\s\-().]{7,20}$""", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static bool HasValidDigitCount(string value) =>
+        value.Count(char.IsDigit) is >= 7 and <= 15;
+
+    private static async Task<(Dictionary<string, string[]> Errors, List<(Guid QuestionId, string Value)> Values)> ValidateAnswersAsync(
+        AppDbContext db,
+        Guid eventId,
+        List<SignupAnswerRequest>? answers,
+        CancellationToken ct)
+    {
+        var errors = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        var values = new List<(Guid, string)>();
+
+        var questions = await db.SignupQuestions
+            .Where(q => q.EventId == eventId && !q.IsDeleted)
+            .ToListAsync(ct);
+
+        var byId = questions.ToDictionary(q => q.Id);
+        var seenIds = new HashSet<Guid>();
+
+        if (answers is not null)
+        {
+            for (var i = 0; i < answers.Count; i++)
+            {
+                var a = answers[i];
+
+                // An empty/whitespace value means the question was left
+                // unanswered: skip it entirely, regardless of whether the id
+                // is duplicated or unknown. This keeps required enforcement
+                // and dedupe checks meaningful for real answers only.
+                var value = a.Value?.Trim() ?? string.Empty;
+                if (value.Length == 0)
+                    continue;
+
+                if (!seenIds.Add(a.QuestionId))
+                {
+                    AddError(errors, $"Answers[{i}].QuestionId", "Duplicate answer for the same question.");
+                    continue;
+                }
+
+                if (!byId.TryGetValue(a.QuestionId, out var question))
+                {
+                    AddError(errors, $"Answers[{i}].QuestionId", "Unknown or deleted question.");
+                    continue;
+                }
+
+                switch (question.Type)
+                {
+                    case QuestionType.Phone:
+                        if (!PhoneRegex.IsMatch(value) || !HasValidDigitCount(value))
+                            AddError(errors, $"Answers[{i}].Value", "Please enter a valid phone number.");
+                        break;
+                    case QuestionType.Dropdown:
+                    {
+                        var options = question.Options?
+                            .Split('\n')
+                            .Select(o => o.Trim())
+                            .Where(o => o.Length > 0)
+                            .ToHashSet() ?? [];
+                        if (!options.Contains(value))
+                            AddError(errors, $"Answers[{i}].Value", "Value must be one of the available options.");
+                        break;
+                    }
+                }
+
+                if (!errors.ContainsKey($"Answers[{i}].Value"))
+                    values.Add((question.Id, value));
+            }
+        }
+
+        foreach (var question in questions.Where(q => q.Required))
+        {
+            // `values` only contains answers that passed validation above, so
+            // this matches exactly what will be persisted.
+            if (!values.Any(v => v.Item1 == question.Id))
+                AddError(errors, "Answers", $"The question \"{question.Label}\" is required.");
+        }
+
+        return (errors.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray()), values);
+    }
+
+    private static void AddError(Dictionary<string, List<string>> errors, string key, string message)
+    {
+        if (!errors.TryGetValue(key, out var list))
+        {
+            list = new List<string>();
+            errors[key] = list;
+        }
+        list.Add(message);
+    }
+
     private static string Norm(string value) => value.Trim();
 
     private static string? NormNull(string? value) =>
@@ -514,7 +633,8 @@ public static class PublicEndpoints
 public record PublicSignupRequest(
     Guid SlotId,
     [property: Required, NotWhitespace, StringLength(200)] string VolunteerName,
-    [property: Required, EmailAddress, StringLength(320)] string Email)
+    [property: Required, EmailAddress, StringLength(320)] string Email,
+    [property: MaxLength(10)] List<SignupAnswerRequest>? Answers)
     : IValidatableObject
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
@@ -527,6 +647,10 @@ public record PublicSignupRequest(
         }
     }
 }
+
+public record SignupAnswerRequest(
+    Guid QuestionId,
+    [property: StringLength(500)] string Value);
 
 public record ResendSignupRequest(
     [property: Required] Guid SlotId,
@@ -548,7 +672,9 @@ public record ResendSignupRequest(
 
 public record InvitePageResponse(Guid OrganizationId, string OrganizationName, EventPublicResponse Event);
 
-public record EventPublicResponse(Guid Id, string Title, string? Description, string? Location, DateOnly Date, bool IsPast, IEnumerable<SlotAvailabilityResponse> Slots);
+public record EventPublicResponse(Guid Id, string Title, string? Description, string? Location, DateOnly Date, bool IsPast, IEnumerable<PublicQuestionResponse> Questions, IEnumerable<SlotAvailabilityResponse> Slots);
+
+public record PublicQuestionResponse(Guid Id, string Label, string Type, bool Required, List<string>? Options);
 
 public record SlotAvailabilityResponse(Guid Id, string Label, TimeOnly StartTime, TimeOnly EndTime, int Capacity, int SignupCount, bool IsFull, bool AllowWaitlist, int WaitlistCount);
 

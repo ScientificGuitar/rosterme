@@ -13,4 +13,5 @@ public class Signup
     public DateTime CreatedAt { get; set; }
 
     public TimeSlot TimeSlot { get; set; } = null!;
+    public ICollection<SignupAnswer> Answers { get; set; } = [];
 }

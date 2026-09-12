@@ -145,6 +145,11 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddOpenApi();
 
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+});
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())

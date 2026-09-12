@@ -7,15 +7,29 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { EventDetailsFields } from "@/components/admin/EventDetailsFields"
 import { SlotRowCard } from "@/components/admin/SlotRowCard"
+import { QuestionRowCard } from "@/components/admin/QuestionRowCard"
 import { useOrg } from "@/hooks/useOrg"
 import { useApi } from "@/hooks/useApi"
+import { formatApiError } from "@/lib/api"
 import {
   createEmptySlot,
-  formatApiError,
   todayLocal,
   validateSlotsBasics,
+  buildSlotCreatePayload,
   type SlotDraft,
 } from "@/lib/eventSlots"
+import {
+  clearDraftError,
+  removeDraftRow,
+  updateDraftRow,
+} from "@/lib/eventDrafts"
+import {
+  createEmptyQuestion,
+  MAX_QUESTIONS,
+  validateQuestionDrafts,
+  buildQuestionPayload,
+  type QuestionDraft,
+} from "@/lib/eventQuestions"
 
 export function CreateEvent() {
   const { org, error: orgError } = useOrg()
@@ -27,8 +41,12 @@ export function CreateEvent() {
   const [location, setLocation] = useState("")
   const [date, setDate] = useState("")
   const [slots, setSlots] = useState<SlotDraft[]>([])
+  const [questions, setQuestions] = useState<QuestionDraft[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [slotErrors, setSlotErrors] = useState<Record<number, string>>({})
+  const [questionErrors, setQuestionErrors] = useState<Record<number, string>>(
+    {}
+  )
   const nextKey = useRef(0)
 
   if (orgError) {
@@ -53,13 +71,8 @@ export function CreateEvent() {
   }
 
   const removeSlot = (key: number) => {
-    setSlots((prev) => prev.filter((s) => s.key !== key))
-    setSlotErrors((prev) => {
-      if (!(key in prev)) return prev
-      const next = { ...prev }
-      delete next[key]
-      return next
-    })
+    setSlots((prev) => removeDraftRow(prev, key))
+    setSlotErrors((prev) => clearDraftError(prev, key))
   }
 
   const updateSlot = (
@@ -68,14 +81,29 @@ export function CreateEvent() {
     value: string | number | boolean
   ) => {
     setSlots((prev) =>
-      prev.map((s) => (s.key === key ? { ...s, [field]: value } : s))
+      updateDraftRow(prev, key, { [field]: value } as Partial<SlotDraft>)
     )
-    setSlotErrors((prev) => {
-      if (!(key in prev)) return prev
-      const next = { ...prev }
-      delete next[key]
-      return next
-    })
+    setSlotErrors((prev) => clearDraftError(prev, key))
+  }
+
+  const addQuestion = () => {
+    setQuestions((prev) => [...prev, createEmptyQuestion(nextKey.current++)])
+  }
+
+  const removeQuestion = (key: number) => {
+    setQuestions((prev) => removeDraftRow(prev, key))
+    setQuestionErrors((prev) => clearDraftError(prev, key))
+  }
+
+  const updateQuestion = (
+    key: number,
+    field: keyof Omit<QuestionDraft, "key">,
+    value: string | boolean
+  ) => {
+    setQuestions((prev) =>
+      updateDraftRow(prev, key, { [field]: value } as Partial<QuestionDraft>)
+    )
+    setQuestionErrors((prev) => clearDraftError(prev, key))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -87,8 +115,14 @@ export function CreateEvent() {
     }
     const errors = validateSlotsBasics(slots)
     setSlotErrors(errors)
+    const questionErrs = validateQuestionDrafts(questions)
+    setQuestionErrors(questionErrs)
     if (Object.keys(errors).length > 0) {
       toast.error("Fix the highlighted time slots before saving.")
+      return
+    }
+    if (Object.keys(questionErrs).length > 0) {
+      toast.error("Fix the highlighted signup questions before saving.")
       return
     }
     setSubmitting(true)
@@ -99,16 +133,9 @@ export function CreateEvent() {
         description: description.trim() || null,
         location: location.trim() || null,
         date,
-        slots:
-          slots.length > 0
-            ? slots.map((s) => ({
-              label: s.label.trim(),
-              startTime: s.startTime,
-              endTime: s.endTime,
-              capacity: s.capacity,
-              allowWaitlist: s.allowWaitlist,
-            }))
-            : null,
+        slots: slots.length > 0 ? buildSlotCreatePayload(slots) : null,
+        questions:
+          questions.length > 0 ? buildQuestionPayload(questions) : null,
       })
       toast.success("Event created")
       await queryClient.invalidateQueries({ queryKey: ["roster"] })
@@ -159,6 +186,41 @@ export function CreateEvent() {
 
           <Button type="button" variant="outline" size="sm" onClick={addSlot}>
             <Plus className="mr-1 h-4 w-4" /> Add Slot
+          </Button>
+        </div>
+
+        <div className="space-y-3">
+          <Label>Signup Questions</Label>
+
+          {questions.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              No questions yet. Add optional questions volunteers answer when
+              signing up.
+            </p>
+          )}
+
+          {questions.map((question) => (
+            <QuestionRowCard
+              key={question.key}
+              question={question}
+              error={questionErrors[question.key]}
+              onUpdate={(field, value) =>
+                updateQuestion(question.key, field, value)
+              }
+              onRemove={() => removeQuestion(question.key)}
+              removeLabel="Remove question"
+              removeIcon={<X className="h-4 w-4" />}
+            />
+          ))}
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addQuestion}
+            disabled={questions.length >= MAX_QUESTIONS}
+          >
+            <Plus className="mr-1 h-4 w-4" /> Add Question
           </Button>
         </div>
 

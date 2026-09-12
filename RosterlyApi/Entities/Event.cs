@@ -12,4 +12,5 @@ public class Event
 
     public Organization Organization { get; set; } = null!;
     public ICollection<TimeSlot> TimeSlots { get; set; } = [];
+    public ICollection<SignupQuestion> Questions { get; set; } = [];
 }

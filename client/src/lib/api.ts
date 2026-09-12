@@ -75,6 +75,18 @@ async function checkVoid(res: Response): Promise<void> {
   }
 }
 
+/** Flatten ApiError fields the same way everywhere (backend RFC 9457). */
+export function formatApiError(e: unknown, fallback: string): string {
+  if (e instanceof ApiError && e.fields) {
+    const messages = Object.entries(e.fields).flatMap(([field, msgs]) =>
+      msgs.map((m) => `${field}: ${m}`)
+    )
+    if (messages.length > 0) return messages.join("\n")
+    return e.message || fallback
+  }
+  return e instanceof Error ? e.message : fallback
+}
+
 export function createAdminApi(getToken: () => Promise<string | null>) {
   const h = () => authHeaders(getToken)
 
@@ -217,7 +229,12 @@ export function createPublicApi() {
 
     createSignup: async (
       code: string,
-      data: { slotId: string; volunteerName: string; email: string }
+      data: {
+        slotId: string
+        volunteerName: string
+        email: string
+        answers?: { questionId: string; value: string }[]
+      }
     ) => {
       const res = await fetch(`${BASE}/invite/${code}/signups`, {
         method: "POST",

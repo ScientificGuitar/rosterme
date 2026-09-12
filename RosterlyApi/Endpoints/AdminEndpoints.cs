@@ -103,6 +103,14 @@ public static class AdminEndpoints
     private static string? NormNull(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
+    private static string? SerializeOptions(List<string>? options) =>
+        options is null ? null : string.Join("\n", options.Select(o => o.Trim()));
+
+    private static List<string> ParseOptions(string? options) =>
+        string.IsNullOrEmpty(options)
+            ? []
+            : options.Split('\n').Select(o => o.Trim()).Where(o => o.Length > 0).ToList();
+
     private static async Task<Organization?> GetOwnedOrganization(AppDbContext db, Guid orgId, string userId, CancellationToken ct)
     {
         return await db.Organizations
@@ -174,6 +182,25 @@ public static class AdminEndpoints
 
         db.Events.Add(evt);
 
+        if (request.Questions is not null)
+        {
+            for (var i = 0; i < request.Questions.Count; i++)
+            {
+                var q = request.Questions[i];
+                db.SignupQuestions.Add(new SignupQuestion
+                {
+                    Id = Guid.NewGuid(),
+                    EventId = evt.Id,
+                    Label = Norm(q.Label),
+                    Type = q.Type!.Value,
+                    Required = q.Required,
+                    Options = q.Type == QuestionType.Dropdown ? SerializeOptions(q.Options) : null,
+                    SortOrder = i,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+        }
+
         if (request.Slots is not null)
         {
             foreach (var s in request.Slots)
@@ -223,6 +250,7 @@ public static class AdminEndpoints
         var userId = GetUserId(http);
         var evt = await db.Events
             .Include(e => e.Organization)
+            .Include(e => e.Questions).ThenInclude(q => q.Answers)
             .Include(e => e.TimeSlots).ThenInclude(s => s.Signups)
             .FirstOrDefaultAsync(e => e.Id == id && e.Organization.ClerkUserId == userId, ct);
 
@@ -237,6 +265,92 @@ public static class AdminEndpoints
         if (request.Date is not null) evt.Date = request.Date.Value;
 
         var increasedSlotIds = new List<Guid>();
+
+        if (request.Questions is not null)
+        {
+            var seenQuestionIds = new HashSet<Guid>();
+            foreach (var q in request.Questions)
+            {
+                if (q.Id is { } qid && !seenQuestionIds.Add(qid))
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["Questions"] = ["Duplicate question id in request."]
+                    });
+                }
+            }
+
+            var existingQuestionsById = evt.Questions.ToDictionary(q => q.Id);
+            // Snapshot before mutating: newly added questions get pulled into the
+            // tracked evt.Questions collection via relationship fixup and must
+            // not be treated as deletion candidates below.
+            var originalQuestions = evt.Questions.ToList();
+            var requestedQuestionIds = new HashSet<Guid>(
+                request.Questions.Where(q => q.Id.HasValue).Select(q => q.Id!.Value));
+
+            if (requestedQuestionIds.Any(rid => !existingQuestionsById.ContainsKey(rid)))
+            {
+                return Results.NotFound();
+            }
+
+            for (var i = 0; i < request.Questions.Count; i++)
+            {
+                var q = request.Questions[i];
+                var options = q.Type == QuestionType.Dropdown ? SerializeOptions(q.Options) : null;
+
+                if (q.Id is { } qid)
+                {
+                    var question = existingQuestionsById[qid];
+                    if (question.IsDeleted)
+                    {
+                        return Results.ValidationProblem(new Dictionary<string, string[]>
+                        {
+                            ["Questions"] = ["A deleted question cannot be updated."]
+                        });
+                    }
+
+                    if (question.Answers.Count > 0 && question.Type != q.Type)
+                    {
+                        return Results.ValidationProblem(new Dictionary<string, string[]>
+                        {
+                            ["Questions"] = [$"Cannot change the type of \"{question.Label}\" because answers already exist."]
+                        });
+                    }
+
+                    question.Label = Norm(q.Label);
+                    question.Type = q.Type!.Value;
+                    question.Required = q.Required;
+                    question.Options = options;
+                    question.SortOrder = i;
+                }
+                else
+                {
+                    db.SignupQuestions.Add(new SignupQuestion
+                    {
+                        Id = Guid.NewGuid(),
+                        EventId = evt.Id,
+                        Label = Norm(q.Label),
+                        Type = q.Type!.Value,
+                        Required = q.Required,
+                        Options = options,
+                        SortOrder = i,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+            }
+
+            foreach (var question in originalQuestions.Where(q => !requestedQuestionIds.Contains(q.Id)))
+            {
+                if (question.Answers.Count > 0)
+                {
+                    question.IsDeleted = true;
+                }
+                else
+                {
+                    db.SignupQuestions.Remove(question);
+                }
+            }
+        }
 
         if (request.Slots is not null)
         {
@@ -471,15 +585,17 @@ public static class AdminEndpoints
 
         var events = await db.Events
             .Where(e => e.OrganizationId == orgId && e.Date >= weekStart && e.Date <= weekEnd)
-            .Include(e => e.TimeSlots).ThenInclude(s => s.Signups)
+            .Include(e => e.Questions)
+            .Include(e => e.TimeSlots).ThenInclude(s => s.Signups).ThenInclude(su => su.Answers)
             .OrderBy(e => e.Date)
             .ToListAsync(ct);
 
         return Results.Ok(events.Select(e => new RosterEventResponse(
-            e.Id, e.Title, e.Description, e.Location, e.Date,
+            e.Id, e.Title, e.Description, e.Location, e.Date, RosterQuestionResponse.From(e.Questions),
             e.TimeSlots.OrderBy(s => s.StartTime).Select(s => new RosterSlotResponse(
                 s.Id, s.Label, e.Date.ToDateTime(s.StartTime), e.Date.ToDateTime(s.EndTime), s.Capacity, s.AllowWaitlist,
-                s.Signups.Select(su => new SignupResponse(su.Id, su.TimeSlotId, su.VolunteerName, su.Email, su.Status.ToString(), su.CreatedAt))
+                s.Signups.Select(su => new SignupResponse(su.Id, su.TimeSlotId, su.VolunteerName, su.Email, su.Status.ToString(), su.CreatedAt,
+                    su.Answers.Select(a => new SignupAnswerResponse(a.QuestionId, a.Value)).ToList()))
             ))
         )));
     }
@@ -559,16 +675,18 @@ public static class AdminEndpoints
         var userId = GetUserId(http);
         var evt = await db.Events
             .Include(e => e.Organization)
-            .Include(e => e.TimeSlots).ThenInclude(s => s.Signups)
+            .Include(e => e.Questions)
+            .Include(e => e.TimeSlots).ThenInclude(s => s.Signups).ThenInclude(su => su.Answers)
             .FirstOrDefaultAsync(e => e.Id == id && e.Organization.ClerkUserId == userId, ct);
 
         if (evt is null) return Results.NotFound();
 
         return Results.Ok(new RosterEventResponse(
-            evt.Id, evt.Title, evt.Description, evt.Location, evt.Date,
+            evt.Id, evt.Title, evt.Description, evt.Location, evt.Date, RosterQuestionResponse.From(evt.Questions),
             evt.TimeSlots.OrderBy(s => s.StartTime).Select(s => new RosterSlotResponse(
                 s.Id, s.Label, evt.Date.ToDateTime(s.StartTime), evt.Date.ToDateTime(s.EndTime), s.Capacity, s.AllowWaitlist,
-                s.Signups.Select(su => new SignupResponse(su.Id, su.TimeSlotId, su.VolunteerName, su.Email, su.Status.ToString(), su.CreatedAt))
+                s.Signups.Select(su => new SignupResponse(su.Id, su.TimeSlotId, su.VolunteerName, su.Email, su.Status.ToString(), su.CreatedAt,
+                    su.Answers.Select(a => new SignupAnswerResponse(a.QuestionId, a.Value)).ToList()))
             ))
         ));
     }
@@ -653,7 +771,8 @@ public record CreateEventRequest(
     [property: NotWhitespace, StringLength(2000)] string? Description,
     [property: NotWhitespace, StringLength(500)] string? Location,
     DateOnly Date,
-    [property: MaxLength(50)] List<CreateSlotRequest>? Slots) : IValidatableObject
+    [property: MaxLength(50)] List<CreateSlotRequest>? Slots,
+    [property: MaxLength(10)] List<QuestionUpsert>? Questions) : IValidatableObject
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
@@ -677,7 +796,8 @@ public record UpdateEventRequest(
     [property: StringLength(2000)] string? Description,
     [property: StringLength(500)] string? Location,
     DateOnly? Date,
-    [property: MaxLength(50)] List<EventSlotUpsert>? Slots) : IValidatableObject
+    [property: MaxLength(50)] List<EventSlotUpsert>? Slots,
+    [property: MaxLength(10)] List<QuestionUpsert>? Questions) : IValidatableObject
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
@@ -740,6 +860,54 @@ public record EventSlotUpsert(
     }
 }
 
+public record QuestionUpsert(
+    Guid? Id,
+    [property: Required, NotWhitespace, StringLength(200)] string Label,
+    QuestionType? Type,
+    bool Required,
+    [property: MaxLength(20)] List<string>? Options) : IValidatableObject
+{
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (Type is null)
+        {
+            yield return new ValidationResult(
+                "Type is required.",
+                [nameof(Type)]);
+            yield break;
+        }
+
+        if (Type == QuestionType.Dropdown)
+        {
+            var count = Options?.Count ?? 0;
+            if (count == 0)
+            {
+                yield return new ValidationResult(
+                    "Dropdown questions require at least one option.",
+                    [nameof(Options)]);
+            }
+            else if (Options!.Any(o => string.IsNullOrWhiteSpace(o)))
+            {
+                yield return new ValidationResult(
+                    "Options cannot be empty.",
+                    [nameof(Options)]);
+            }
+            else if (Options!.Any(o => o.Trim().Length > 100))
+            {
+                yield return new ValidationResult(
+                    "Each option can be at most 100 characters.",
+                    [nameof(Options)]);
+            }
+        }
+        else if (Options is { Count: > 0 })
+        {
+            yield return new ValidationResult(
+                "Options are only allowed for dropdown questions.",
+                [nameof(Options)]);
+        }
+    }
+}
+
 // --- Response DTOs ---
 
 public record OrganizationResponse(Guid Id, string Name, DateTime CreatedAt);
@@ -752,8 +920,23 @@ public record EventWithSlotsResponse(Guid Id, Guid OrganizationId, string Title,
 
 public record TimeSlotResponse(Guid Id, Guid EventId, string Label, DateTime StartTime, DateTime EndTime, int Capacity, int SignupCount, bool AllowWaitlist);
 
-public record RosterEventResponse(Guid Id, string Title, string? Description, string? Location, DateOnly Date, IEnumerable<RosterSlotResponse> Slots);
+public record RosterQuestionResponse(Guid Id, string Label, string Type, bool Required, bool IsDeleted, List<string>? Options)
+{
+    public static List<RosterQuestionResponse> From(IEnumerable<SignupQuestion> questions) =>
+        questions.OrderBy(q => q.SortOrder).Select(q => new RosterQuestionResponse(
+            q.Id, q.Label, q.Type.ToString(), q.Required, q.IsDeleted,
+            q.Options is null ? null : ParseOptions(q.Options))).ToList();
+
+    private static List<string> ParseOptions(string? options) =>
+        string.IsNullOrEmpty(options)
+            ? []
+            : options.Split('\n').Select(o => o.Trim()).Where(o => o.Length > 0).ToList();
+}
+
+public record RosterEventResponse(Guid Id, string Title, string? Description, string? Location, DateOnly Date, List<RosterQuestionResponse> Questions, IEnumerable<RosterSlotResponse> Slots);
 
 public record RosterSlotResponse(Guid Id, string Label, DateTime StartTime, DateTime EndTime, int Capacity, bool AllowWaitlist, IEnumerable<SignupResponse> Signups);
 
-public record SignupResponse(Guid Id, Guid TimeSlotId, string VolunteerName, string Email, string Status, DateTime CreatedAt);
+public record SignupResponse(Guid Id, Guid TimeSlotId, string VolunteerName, string Email, string Status, DateTime CreatedAt, List<SignupAnswerResponse> Answers);
+
+public record SignupAnswerResponse(Guid QuestionId, string Value);

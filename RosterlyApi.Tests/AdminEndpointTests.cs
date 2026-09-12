@@ -683,6 +683,356 @@ public class AdminEndpointTests : IClassFixture<IntegrationTestFactory>
         Assert.Equal(HttpStatusCode.NotFound, revokeResp.StatusCode);
     }
 
+    // --- Signup Questions ---
+
+    [Fact]
+    public async Task CreateEvent_WithQuestions_PersistsQuestionsInOrder()
+    {
+        var orgId = await SeedOrgAsync("Questions Org");
+
+        var response = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
+        {
+            title = "Event With Questions",
+            date = FutureDate(),
+            questions = new object[]
+            {
+                new { label = "T-shirt size", type = "Dropdown", required = true, options = new[] { "S", "M", "L" } },
+                new { label = "Phone", type = "Phone", required = false },
+                new { label = "Emergency contact", type = "ShortText", required = true }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var created = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var eventId = created.GetProperty("id").GetGuid();
+
+        var evt = await _client.GetFromJsonAsync<JsonElement>($"/api/events/{eventId}", _jsonOptions);
+        var questions = evt.GetProperty("questions").EnumerateArray().ToList();
+        Assert.Equal(3, questions.Count);
+        Assert.Equal("T-shirt size", questions[0].GetProperty("label").GetString());
+        Assert.Equal("Dropdown", questions[0].GetProperty("type").GetString());
+        Assert.True(questions[0].GetProperty("required").GetBoolean());
+        Assert.False(questions[0].GetProperty("isDeleted").GetBoolean());
+        var options = questions[0].GetProperty("options").EnumerateArray().Select(o => o.GetString()).ToList();
+        Assert.Equal(["S", "M", "L"], options);
+        Assert.Equal("Phone", questions[1].GetProperty("type").GetString());
+        Assert.Equal(JsonValueKind.Null, questions[1].GetProperty("options").ValueKind);
+        Assert.Equal("ShortText", questions[2].GetProperty("type").GetString());
+        Assert.True(questions[2].GetProperty("required").GetBoolean());
+    }
+
+    [Fact]
+    public async Task CreateEvent_MissingType_Returns400()
+    {
+        var orgId = await SeedOrgAsync("Missing Type Org");
+
+        var response = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
+        {
+            title = "Missing Type",
+            date = FutureDate(),
+            questions = new[] { new { label = "No type", required = false } }
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Contains("type", body.GetProperty("errors").EnumerateObject().First().Name, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CreateEvent_MoreThan10Questions_Returns400()
+    {
+        var orgId = await SeedOrgAsync("Too Many Questions Org");
+
+        var questions = Enumerable.Range(1, 11).Select(i =>
+            (object)new { label = $"Question {i}", type = "ShortText", required = false });
+
+        var response = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
+        {
+            title = "Too Many Questions",
+            date = FutureDate(),
+            questions
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateEvent_DropdownWithoutOptions_Returns400()
+    {
+        var orgId = await SeedOrgAsync("No Options Org");
+
+        var response = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
+        {
+            title = "No Options",
+            date = FutureDate(),
+            questions = new[] { new { label = "Size", type = "Dropdown", required = false } }
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Contains("options", body.GetProperty("errors").EnumerateObject().First().Name, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CreateEvent_DropdownTooManyOptions_Returns400()
+    {
+        var orgId = await SeedOrgAsync("Too Many Options Org");
+
+        var options = Enumerable.Range(1, 21).Select(i => $"Option {i}").ToArray();
+
+        var response = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
+        {
+            title = "Too Many Options",
+            date = FutureDate(),
+            questions = new[] { new { label = "Size", type = "Dropdown", required = false, options } }
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateEvent_NonDropdownWithOptions_Returns400()
+    {
+        var orgId = await SeedOrgAsync("Bad Options Org");
+
+        var response = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
+        {
+            title = "Bad Options",
+            date = FutureDate(),
+            questions = new[] { new { label = "Name", type = "ShortText", required = false, options = new[] { "A" } } }
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateEvent_UpsertsQuestions()
+    {
+        var orgId = await SeedOrgAsync("Upsert Questions Org");
+        var eventId = await SeedEventWithQuestionsAsync(orgId);
+
+        var evt = await _client.GetFromJsonAsync<JsonElement>($"/api/events/{eventId}", _jsonOptions);
+        var questions = evt.GetProperty("questions").EnumerateArray().ToList();
+        var sizeId = questions[0].GetProperty("id").GetGuid();
+
+        // Edit the dropdown label, drop the phone question, add a new one.
+        var update = await _client.PutAsJsonAsync($"/api/events/{eventId}", new
+        {
+            questions = new object[]
+            {
+                new { id = sizeId, label = "Shirt size", type = "Dropdown", required = true, options = new[] { "S", "M", "L", "XL" } },
+                new { label = "Emergency contact", type = "ShortText", required = false }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+
+        var updated = await _client.GetFromJsonAsync<JsonElement>($"/api/events/{eventId}", _jsonOptions);
+        var updatedQuestions = updated.GetProperty("questions").EnumerateArray().ToList();
+        Assert.Equal(2, updatedQuestions.Count);
+        Assert.Equal(sizeId, updatedQuestions[0].GetProperty("id").GetGuid());
+        Assert.Equal("Shirt size", updatedQuestions[0].GetProperty("label").GetString());
+        Assert.Equal("Emergency contact", updatedQuestions[1].GetProperty("label").GetString());
+    }
+
+    [Fact]
+    public async Task UpdateEvent_RemoveQuestionWithoutAnswers_HardDeletes()
+    {
+        var orgId = await SeedOrgAsync("Hard Delete Org");
+        var eventId = await SeedEventWithQuestionsAsync(orgId);
+
+        var update = await _client.PutAsJsonAsync($"/api/events/{eventId}", new
+        {
+            questions = new object[] { }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+
+        var updated = await _client.GetFromJsonAsync<JsonElement>($"/api/events/{eventId}", _jsonOptions);
+        Assert.Equal(0, updated.GetProperty("questions").EnumerateArray().Count());
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.Equal(0, await db.SignupQuestions.CountAsync(q => q.EventId == eventId));
+        }
+    }
+
+    [Fact]
+    public async Task UpdateEvent_RemoveQuestionWithAnswers_SoftDeletesAndKeepsAnswers()
+    {
+        var orgId = await SeedOrgAsync("Soft Delete Org");
+        var eventId = await SeedEventWithQuestionsAsync(orgId);
+
+        var evt = await _client.GetFromJsonAsync<JsonElement>($"/api/events/{eventId}", _jsonOptions);
+        var questions = evt.GetProperty("questions").EnumerateArray().ToList();
+        var sizeId = questions[0].GetProperty("id").GetGuid();
+        var phoneId = questions[1].GetProperty("id").GetGuid();
+
+        var code = await SeedInviteLinkForEventAsync(eventId);
+        var page = await _client.GetAsync($"/api/invite/{code}");
+        var pageJson = await page.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var slotId = pageJson.GetProperty("event").GetProperty("slots").EnumerateArray().First().GetProperty("id").GetGuid();
+
+        var signupResp = await _client.PostAsJsonAsync($"/api/invite/{code}/signups", new
+        {
+            slotId,
+            volunteerName = "Answerer",
+            email = "answerer@example.com",
+            answers = new[]
+            {
+                new { questionId = sizeId, value = "M" },
+                new { questionId = phoneId, value = "+1 555 123 4567" }
+            }
+        });
+        Assert.Equal(HttpStatusCode.Created, signupResp.StatusCode);
+
+        // Remove both questions.
+        var update = await _client.PutAsJsonAsync($"/api/events/{eventId}", new
+        {
+            questions = Array.Empty<object>()
+        });
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+
+        var updated = await _client.GetFromJsonAsync<JsonElement>($"/api/events/{eventId}", _jsonOptions);
+        var updatedQuestions = updated.GetProperty("questions").EnumerateArray().ToList();
+        Assert.Equal(2, updatedQuestions.Count);
+        Assert.All(updatedQuestions, q => Assert.True(q.GetProperty("isDeleted").GetBoolean()));
+
+        // Answers are kept and still linked to the (soft-deleted) questions.
+        var signup = updated.GetProperty("slots").EnumerateArray().First()
+            .GetProperty("signups").EnumerateArray().First();
+        var answers = signup.GetProperty("answers").EnumerateArray().ToList();
+        Assert.Equal(2, answers.Count);
+        Assert.Contains(answers, a => a.GetProperty("questionId").GetGuid() == sizeId && a.GetProperty("value").GetString() == "M");
+        Assert.Contains(answers, a => a.GetProperty("questionId").GetGuid() == phoneId && a.GetProperty("value").GetString() == "+1 555 123 4567");
+    }
+
+    [Fact]
+    public async Task UpdateEvent_DuplicateQuestionId_Returns400()
+    {
+        var orgId = await SeedOrgAsync("Dup Question Org");
+        var eventId = await SeedEventWithQuestionsAsync(orgId);
+
+        var evt = await _client.GetFromJsonAsync<JsonElement>($"/api/events/{eventId}", _jsonOptions);
+        var questionId = evt.GetProperty("questions").EnumerateArray().First().GetProperty("id").GetGuid();
+
+        var update = await _client.PutAsJsonAsync($"/api/events/{eventId}", new
+        {
+            questions = new object[]
+            {
+                new { id = questionId, label = "A", type = "ShortText", required = false },
+                new { id = questionId, label = "B", type = "ShortText", required = false }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, update.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateEvent_UnknownQuestionId_Returns404()
+    {
+        var orgId = await SeedOrgAsync("Unknown Question Org");
+        var eventId = await SeedEventWithQuestionsAsync(orgId);
+
+        var update = await _client.PutAsJsonAsync($"/api/events/{eventId}", new
+        {
+            questions = new object[]
+            {
+                new { id = Guid.NewGuid(), label = "A", type = "ShortText", required = false }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.NotFound, update.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateEvent_ChangeTypeWithAnswers_Returns400()
+    {
+        var orgId = await SeedOrgAsync("Type Change Org");
+        var eventId = await SeedEventWithQuestionsAsync(orgId);
+
+        var evt = await _client.GetFromJsonAsync<JsonElement>($"/api/events/{eventId}", _jsonOptions);
+        var questions = evt.GetProperty("questions").EnumerateArray().ToList();
+        var sizeId = questions[0].GetProperty("id").GetGuid();
+        var phoneId = questions[1].GetProperty("id").GetGuid();
+
+        var code = await SeedInviteLinkForEventAsync(eventId);
+        var page = await _client.GetAsync($"/api/invite/{code}");
+        var pageJson = await page.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var slotId = pageJson.GetProperty("event").GetProperty("slots").EnumerateArray().First().GetProperty("id").GetGuid();
+
+        var signupResp = await _client.PostAsJsonAsync($"/api/invite/{code}/signups", new
+        {
+            slotId,
+            volunteerName = "Typed",
+            email = "typed@example.com",
+            answers = new[] { new { questionId = phoneId, value = "+1 555 123 4567" } }
+        });
+        Assert.Equal(HttpStatusCode.Created, signupResp.StatusCode);
+
+        // Change the type of the answered question.
+        var update = await _client.PutAsJsonAsync($"/api/events/{eventId}", new
+        {
+            questions = new object[]
+            {
+                new { id = sizeId, label = "T-shirt size", type = "Dropdown", required = true, options = new[] { "S", "M", "L" } },
+                new { id = phoneId, label = "Phone", type = "ShortText", required = false }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, update.StatusCode);
+        var body = await update.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.True(body.GetProperty("errors").EnumerateObject().Any());
+    }
+
+    [Fact]
+    public async Task UpdateEvent_UpdateDeletedQuestion_Returns400()
+    {
+        var orgId = await SeedOrgAsync("Update Deleted Org");
+        var eventId = await SeedEventWithQuestionsAsync(orgId);
+
+        var evt = await _client.GetFromJsonAsync<JsonElement>($"/api/events/{eventId}", _jsonOptions);
+        var questions = evt.GetProperty("questions").EnumerateArray().ToList();
+        var sizeId = questions[0].GetProperty("id").GetGuid();
+        var phoneId = questions[1].GetProperty("id").GetGuid();
+
+        var code = await SeedInviteLinkForEventAsync(eventId);
+        var page = await _client.GetAsync($"/api/invite/{code}");
+        var pageJson = await page.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var slotId = pageJson.GetProperty("event").GetProperty("slots").EnumerateArray().First().GetProperty("id").GetGuid();
+
+        var signupResp = await _client.PostAsJsonAsync($"/api/invite/{code}/signups", new
+        {
+            slotId,
+            volunteerName = "Deleted Updater",
+            email = "deletedupdater@example.com",
+            answers = new[] { new { questionId = phoneId, value = "+1 555 123 4567" } }
+        });
+        Assert.Equal(HttpStatusCode.Created, signupResp.StatusCode);
+
+        // Delete the phone question, then try to update it by id.
+        var update = await _client.PutAsJsonAsync($"/api/events/{eventId}", new
+        {
+            questions = new object[]
+            {
+                new { id = sizeId, label = "T-shirt size", type = "Dropdown", required = true, options = new[] { "S", "M", "L" } }
+            }
+        });
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+
+        var resurrect = await _client.PutAsJsonAsync($"/api/events/{eventId}", new
+        {
+            questions = new object[]
+            {
+                new { id = sizeId, label = "T-shirt size", type = "Dropdown", required = true, options = new[] { "S", "M", "L" } },
+                new { id = phoneId, label = "Phone", type = "Phone", required = false }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resurrect.StatusCode);
+    }
+
     // --- Helpers ---
 
     private async Task<Guid> SeedOrgAsync(string name)
@@ -699,6 +1049,30 @@ public class AdminEndpointTests : IClassFixture<IntegrationTestFactory>
     {
         var date = DateOnly.Parse(dateString);
         return date.AddDays(-(((int)date.DayOfWeek + 6) % 7)).ToString("yyyy-MM-dd");
+    }
+
+    private async Task<Guid> SeedEventWithQuestionsAsync(Guid orgId)
+    {
+        var response = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
+        {
+            title = "Questions Event",
+            date = FutureDate(),
+            slots = new[] { new { label = "Slot A", startTime = "09:00", endTime = "10:00", capacity = 3 } },
+            questions = new object[]
+            {
+                new { label = "T-shirt size", type = "Dropdown", required = true, options = new[] { "S", "M", "L" } },
+                new { label = "Phone", type = "Phone", required = false }
+            }
+        });
+        var evt = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        return evt.GetProperty("id").GetGuid();
+    }
+
+    private async Task<string> SeedInviteLinkForEventAsync(Guid eventId)
+    {
+        var response = await _client.PostAsJsonAsync($"/api/events/{eventId}/invite-links", new { });
+        var link = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        return link.GetProperty("code").GetString()!;
     }
 
     private async Task<(Guid orgId, Guid eventId, Guid slotId)> SeedSlotAsync(string orgName)

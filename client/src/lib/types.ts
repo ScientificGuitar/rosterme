@@ -32,6 +32,14 @@ export type PublicSlot = NumericFields<Schemas["SlotAvailabilityResponse"]>
 
 export type SignupManageData = NumericFields<Schemas["SignupManageResponse"]>
 
+export type RosterQuestion = NumericFields<Schemas["RosterQuestionResponse"]>
+
+export type SignupAnswer = Schemas["SignupAnswerResponse"]
+
+export type PublicQuestion = NumericFields<Schemas["PublicQuestionResponse"]>
+
+export type QuestionType = NonNullable<Schemas["QuestionType"]>
+
 export type UpdateSlotRequest = NumericFields<Schemas["UpdateSlotRequest"]>
 
 export type UpdateEventRequest = NumericFields<Schemas["UpdateEventRequest"]>
