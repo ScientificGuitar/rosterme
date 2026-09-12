@@ -1134,15 +1134,14 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
         var page = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
         var questions = page.GetProperty("event").GetProperty("questions").EnumerateArray().ToList();
 
-        Assert.Equal(3, questions.Count);
+        Assert.Equal(2, questions.Count);
         Assert.Equal("T-shirt size", questions[0].GetProperty("label").GetString());
         Assert.Equal("Dropdown", questions[0].GetProperty("type").GetString());
         Assert.True(questions[0].GetProperty("required").GetBoolean());
         var options = questions[0].GetProperty("options").EnumerateArray().Select(o => o.GetString()).ToList();
         Assert.Equal(["S", "M", "L"], options);
-        Assert.Equal("Phone", questions[1].GetProperty("label").GetString());
-        Assert.Equal("Emergency contact", questions[2].GetProperty("label").GetString());
-        Assert.Equal("ShortText", questions[2].GetProperty("type").GetString());
+        Assert.Equal("Emergency contact", questions[1].GetProperty("label").GetString());
+        Assert.Equal("ShortText", questions[1].GetProperty("type").GetString());
         // Deleted question must not appear.
         Assert.DoesNotContain(questions, q => q.GetProperty("type").GetString() == "Phone");
     }
@@ -1184,7 +1183,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
             Assert.Equal(3, signup.Answers.Count);
             Assert.Contains(signup.Answers, a => a.Value == "M");
             Assert.Contains(signup.Answers, a => a.Value == "+1 (555) 123-4567");
-            Assert.Contains(signup.Answers, a => a.Value == "true");
+            Assert.Contains(signup.Answers, a => a.Value == "Jane Doe");
         }
     }
 
@@ -1393,7 +1392,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
                 .FirstAsync(s => s.Email == "emptyanswers@example.com");
             Assert.Equal(2, signup.Answers.Count);
             Assert.Contains(signup.Answers, a => a.Value == "M");
-            Assert.Contains(signup.Answers, a => a.Value == "true");
+            Assert.Contains(signup.Answers, a => a.Value == "Jane Doe");
         }
     }
 

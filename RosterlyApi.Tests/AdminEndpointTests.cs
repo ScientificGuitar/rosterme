@@ -968,7 +968,11 @@ public class AdminEndpointTests : IDisposable
             slotId,
             volunteerName = "Typed",
             email = "typed@example.com",
-            answers = new[] { new { questionId = phoneId, value = "+1 555 123 4567" } }
+            answers = new object[]
+            {
+                new { questionId = sizeId, value = "M" },
+                new { questionId = phoneId, value = "+1 555 123 4567" }
+            }
         });
         Assert.Equal(HttpStatusCode.Created, signupResp.StatusCode);
 
@@ -1008,7 +1012,11 @@ public class AdminEndpointTests : IDisposable
             slotId,
             volunteerName = "Deleted Updater",
             email = "deletedupdater@example.com",
-            answers = new[] { new { questionId = phoneId, value = "+1 555 123 4567" } }
+            answers = new object[]
+            {
+                new { questionId = sizeId, value = "M" },
+                new { questionId = phoneId, value = "+1 555 123 4567" }
+            }
         });
         Assert.Equal(HttpStatusCode.Created, signupResp.StatusCode);
 
