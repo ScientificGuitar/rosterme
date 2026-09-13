@@ -1,8 +1,10 @@
 import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
-import { Show, UserButton, useClerk } from "@clerk/react"
+import { Show, useClerk } from "@clerk/react"
 import { Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ThemedUserButton } from "@/components/ThemedUserButton"
+import { ThemeToggle } from "@/components/ThemeToggle"
 import { cn } from "@/lib/utils"
 
 const marketingLinks = [
@@ -50,6 +52,7 @@ export function MarketingHeader() {
         </div>
         <div className="hidden items-center gap-2 md:flex">
           <Show when="signed-out">
+            <ThemeToggle />
             <Button
               variant="outline"
               onClick={() => openSignIn({ fallbackRedirectUrl: "/dashboard" })}
@@ -66,18 +69,25 @@ export function MarketingHeader() {
             <Button asChild>
               <Link to="/dashboard">Go to dashboard</Link>
             </Button>
-            <UserButton />
+            <ThemedUserButton />
           </Show>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="md:hidden"
-          onClick={() => setOpen((v) => !v)}
-          aria-label={open ? "Close menu" : "Open menu"}
-        >
-          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </Button>
+        <div className="flex items-center gap-1 md:hidden">
+          <Show when="signed-out">
+            <ThemeToggle />
+          </Show>
+          <Show when="signed-in">
+            <ThemedUserButton />
+          </Show>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setOpen((v) => !v)}
+            aria-label={open ? "Close menu" : "Open menu"}
+          >
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </Button>
+        </div>
       </div>
       {open && (
         <div className="border-t px-6 py-3 md:hidden">

@@ -1,18 +1,16 @@
 import { Link, useLocation } from "react-router-dom"
-import { UserButton, useClerk, useUser } from "@clerk/react"
+import { useClerk, useUser } from "@clerk/react"
 import {
   BarChart3,
   LayoutDashboard,
   LogOut,
-  Moon,
   Plus,
-  Sun,
   Users,
   X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { useTheme } from "@/components/theme-provider"
+import { ThemedUserButton } from "@/components/ThemedUserButton"
 import { cn } from "@/lib/utils"
 
 const navItems = [
@@ -36,13 +34,12 @@ export function AppSidebar({
   const location = useLocation()
   const { signOut } = useClerk()
   const { user } = useUser()
-  const { theme, setTheme } = useTheme()
 
   const sidebar = (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-4 py-3">
         <Link
-          to="/dashboard"
+          to="/"
           onClick={onClose}
           className="text-lg font-semibold hover:underline"
         >
@@ -95,7 +92,7 @@ export function AppSidebar({
       </nav>
       <div className="border-t p-3">
         <div className="flex items-center gap-2">
-          <UserButton />
+          <ThemedUserButton />
           <div className="min-w-0 flex-1 leading-tight">
             <p className="truncate text-sm font-medium">
               {user?.fullName ?? "Account"}
@@ -107,18 +104,6 @@ export function AppSidebar({
               </p>
             )}
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            aria-label={theme === "dark" ? "Light mode" : "Dark mode"}
-          >
-            {theme === "dark" ? (
-              <Sun className="h-4 w-4" />
-            ) : (
-              <Moon className="h-4 w-4" />
-            )}
-          </Button>
           <Button
             variant="ghost"
             size="icon"

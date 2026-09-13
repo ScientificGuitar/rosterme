@@ -28,6 +28,7 @@ import { PrivacyPolicyPage } from "@/pages/legal/PrivacyPolicyPage"
 import { Footer } from "@/components/Footer"
 import { MarketingHeader } from "@/components/MarketingHeader"
 import { AppSidebar } from "@/components/AppSidebar"
+import { ThemeToggle } from "@/components/ThemeToggle"
 
 function EditEventWrapper() {
   const { id } = useParams()
@@ -59,10 +60,13 @@ function MarketingLayout() {
 function PublicLayout() {
   return (
     <div className="flex min-h-svh flex-col">
-      <header className="border-b px-6 py-3">
-        <Link to="/" className="text-lg font-semibold hover:underline">
-          RosterMe
-        </Link>
+      <header className="border-b">
+        <div className="flex items-center justify-between px-6 py-3">
+          <Link to="/" className="text-lg font-semibold hover:underline">
+            RosterMe
+          </Link>
+          <ThemeToggle />
+        </div>
       </header>
       <main className="flex-1 p-6">
         <Outlet />
