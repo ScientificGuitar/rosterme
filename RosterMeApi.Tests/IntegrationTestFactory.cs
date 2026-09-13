@@ -84,6 +84,8 @@ public class IntegrationTestFactory : WebApplicationFactory<Program>, IAsyncLife
                 .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, TestAuthHandler>("Test", null);
 
             services.AddAuthorization();
+            services.AddAuthorizationBuilder()
+                .AddPolicy("SuperAdmin", p => p.RequireClaim("role", "superAdmin"));
 
             // Tests must never send real emails: stop the outbox/reminder
             // background workers entirely (they poll on a timer and would hit

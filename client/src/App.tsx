@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Toaster } from "sonner"
-import { useAuth } from "@clerk/react"
+import { useAuth, useUser } from "@clerk/react"
 import { Menu } from "lucide-react"
 import {
   Routes,
@@ -13,6 +13,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Dashboard } from "@/pages/admin/Dashboard"
+import { SuperAdminPage } from "@/pages/admin/SuperAdminPage"
 import { GroupsPage } from "@/pages/admin/GroupsPage"
 import { CreateEvent } from "@/pages/admin/CreateEvent"
 import { EventDetail } from "@/pages/admin/EventDetail"
@@ -40,6 +41,16 @@ function RequireAuth() {
 
   if (!isLoaded) return null
   if (!isSignedIn) return <Navigate to="/" replace />
+
+  return <Outlet />
+}
+
+function RequireSuperAdmin() {
+  const { user, isLoaded } = useUser()
+
+  if (!isLoaded) return null
+  const role = (user?.publicMetadata as { role?: string } | undefined)?.role
+  if (role !== "superAdmin") return <Navigate to="/" replace />
 
   return <Outlet />
 }
@@ -124,6 +135,11 @@ export function App() {
             <Route path="/events/:id" element={<EventDetail />} />
             <Route path="/events/:id/edit" element={<EditEventWrapper />} />
             <Route path="/reports" element={<ReportsPage />} />
+          </Route>
+          <Route element={<RequireSuperAdmin />}>
+            <Route element={<AppLayout />}>
+              <Route path="/admin" element={<SuperAdminPage />} />
+            </Route>
           </Route>
         </Route>
         <Route element={<PublicLayout />}>

@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   LogOut,
   Plus,
+  ShieldCheck,
   Users,
   X,
 } from "lucide-react"
@@ -34,6 +35,11 @@ export function AppSidebar({
   const location = useLocation()
   const { signOut } = useClerk()
   const { user } = useUser()
+  const isSuperAdmin =
+    (user?.publicMetadata as { role?: string } | undefined)?.role === "superAdmin"
+  const visibleNavItems = isSuperAdmin
+    ? [...navItems, { to: "/admin", label: "SuperAdmin", icon: ShieldCheck, soon: false }]
+    : navItems
 
   const sidebar = (
     <div className="flex h-full flex-col">
@@ -64,7 +70,7 @@ export function AppSidebar({
         </Button>
       </div>
       <nav className="flex-1 space-y-1 px-3" aria-label="App">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const Icon = item.icon
           const active = isActive(location.pathname, item.to)
           return (

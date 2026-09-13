@@ -229,7 +229,98 @@ export function createAdminApi(getToken: () => Promise<string | null>) {
       })
       await checkVoid(res)
     },
+
+    getSuperAdminStats: async () => {
+      const res = await fetch(`${BASE}/superadmin/stats`, { headers: await h() })
+      return checkJson<SuperAdminStats>(res)
+    },
+
+    getSuperAdminActivity: async (days = 30) => {
+      const res = await fetch(`${BASE}/superadmin/activity?days=${days}`, {
+        headers: await h(),
+      })
+      return checkJson<SuperAdminActivity>(res)
+    },
+
+    getSuperAdminRecent: async (take = 10) => {
+      const res = await fetch(`${BASE}/superadmin/recent?take=${take}`, {
+        headers: await h(),
+      })
+      return checkJson<SuperAdminRecent>(res)
+    },
+
+    listOutbox: async (params?: { sent?: boolean; skip?: number; take?: number }) => {
+      const search = new URLSearchParams()
+      if (params?.sent !== undefined) search.set("sent", String(params.sent))
+      if (params?.skip !== undefined) search.set("skip", String(params.skip))
+      if (params?.take !== undefined) search.set("take", String(params.take))
+      const qs = search.toString() ? `?${search}` : ""
+      const res = await fetch(`${BASE}/superadmin/outbox${qs}`, {
+        headers: await h(),
+      })
+      return checkJson<SuperAdminOutboxList>(res)
+    },
+
+    deleteOutboxMessage: async (id: string) => {
+      const res = await fetch(`${BASE}/superadmin/outbox/${id}`, {
+        method: "DELETE",
+        headers: await h(),
+      })
+      await checkVoid(res)
+    },
   }
+}
+
+export interface SuperAdminStats {
+  groups: number
+  events: number
+  slots: number
+  signups: number
+  inviteLinks: number
+  owners: number
+  emailsPending: number
+  emailsSent: number
+  capacityFillRate: number
+  signupsByStatus: Record<string, number>
+}
+
+export interface DayCount {
+  date: string
+  count: number
+}
+
+export interface SuperAdminActivity {
+  signupsPerDay: DayCount[]
+  eventsPerDay: DayCount[]
+}
+
+export interface SuperAdminRecent {
+  groups: { id: string; name: string; groupOwner: string; createdAt: string }[]
+  events: { id: string; groupId: string; title: string; date: string; createdAt: string }[]
+  signups: {
+    id: string
+    timeSlotId: string
+    volunteerName: string
+    email: string
+    status: string
+    createdAt: string
+  }[]
+}
+
+export interface SuperAdminOutboxRow {
+  id: string
+  to: string
+  subject: string
+  sent: boolean
+  createdAt: string
+  sentAt: string | null
+}
+
+export interface SuperAdminOutboxList {
+  total: number
+  skip: number
+  take: number
+  items: SuperAdminOutboxRow[]
 }
 
 export type AdminApi = ReturnType<typeof createAdminApi>

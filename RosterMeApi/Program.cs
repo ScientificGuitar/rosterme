@@ -113,6 +113,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("SuperAdmin", p => p.RequireClaim("role", "superAdmin"));
 
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<AppDbContext>();
@@ -236,6 +238,7 @@ app.MapScalarApiReference();
 
 app.MapAdminEndpoints();
 app.MapPublicEndpoints();
+app.MapSuperAdminEndpoints();
 
 app.Run();
 
