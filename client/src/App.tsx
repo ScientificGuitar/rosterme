@@ -43,16 +43,6 @@ function RequireAuth() {
   return <Outlet />
 }
 
-function HomeRoute() {
-  const { isLoaded, isSignedIn } = useAuth()
-
-  if (!isLoaded) return null
-  if (isSignedIn) return <Navigate to="/dashboard" replace />
-
-  return <LandingPage />
-}
-
-/** Public marketing pages: header with Features/Resources + footer. */
 function MarketingLayout() {
   return (
     <div className="flex min-h-svh flex-col">
@@ -114,12 +104,12 @@ export function App() {
       <Toaster richColors position="top-right" />
       <Routes>
         <Route element={<MarketingLayout />}>
-          <Route path="/" element={<HomeRoute />} />
+          <Route path="/" element={<LandingPage />} />
           <Route path="/features" element={<FeaturesPage />} />
           <Route path="/resources" element={<ResourcesPage />} />
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-          <Route path="*" element={<HomeRoute />} />
+          <Route path="*" element={<LandingPage />} />
         </Route>
         <Route element={<RequireAuth />}>
           <Route element={<AppLayout />}>

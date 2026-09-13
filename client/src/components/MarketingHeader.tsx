@@ -52,16 +52,12 @@ export function MarketingHeader() {
           <Show when="signed-out">
             <Button
               variant="outline"
-              onClick={() =>
-                openSignIn({ fallbackRedirectUrl: window.location.pathname })
-              }
+              onClick={() => openSignIn({ fallbackRedirectUrl: "/dashboard" })}
             >
               Sign in
             </Button>
             <Button
-              onClick={() =>
-                openSignUp({ fallbackRedirectUrl: window.location.pathname })
-              }
+              onClick={() => openSignUp({ fallbackRedirectUrl: "/dashboard" })}
             >
               Sign up
             </Button>
@@ -107,17 +103,13 @@ export function MarketingHeader() {
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() =>
-                  openSignIn({ fallbackRedirectUrl: window.location.pathname })
-                }
+                onClick={() => openSignIn({ fallbackRedirectUrl: "/dashboard" })}
               >
                 Sign in
               </Button>
               <Button
                 className="flex-1"
-                onClick={() =>
-                  openSignUp({ fallbackRedirectUrl: window.location.pathname })
-                }
+                onClick={() => openSignUp({ fallbackRedirectUrl: "/dashboard" })}
               >
                 Sign up
               </Button>
