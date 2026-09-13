@@ -7,7 +7,7 @@ public class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
-    public DbSet<Organization> Organizations => Set<Organization>();
+    public DbSet<Group> Groups => Set<Group>();
     public DbSet<Event> Events => Set<Event>();
     public DbSet<TimeSlot> TimeSlots => Set<TimeSlot>();
     public DbSet<Signup> Signups => Set<Signup>();
@@ -18,12 +18,12 @@ public class AppDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Organization>(entity =>
+        modelBuilder.Entity<Group>(entity =>
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
-            entity.Property(e => e.ClerkUserId).HasMaxLength(100).IsRequired();
-            entity.HasIndex(e => e.ClerkUserId);
+            entity.Property(e => e.GroupOwner).HasMaxLength(100).IsRequired();
+            entity.HasIndex(e => e.GroupOwner);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
         });
 
@@ -33,11 +33,11 @@ public class AppDbContext : DbContext
             entity.Property(e => e.Title).HasMaxLength(300).IsRequired();
             entity.Property(e => e.Description).HasMaxLength(2000);
             entity.Property(e => e.Location).HasMaxLength(500);
-            entity.HasOne(e => e.Organization)
+            entity.HasOne(e => e.Group)
                 .WithMany(o => o.Events)
-                .HasForeignKey(e => e.OrganizationId)
+                .HasForeignKey(e => e.GroupId)
                 .OnDelete(DeleteBehavior.Cascade);
-            entity.HasIndex(e => new { e.OrganizationId, e.Date });
+            entity.HasIndex(e => new { e.GroupId, e.Date });
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
         });
 

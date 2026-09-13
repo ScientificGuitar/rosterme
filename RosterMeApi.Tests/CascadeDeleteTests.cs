@@ -24,8 +24,7 @@ public class CascadeDeleteTests(IntegrationTestFactory factory) : IDisposable
 
         // Create event with slot
         var eventDate = FutureDate();
-        var createEvt = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var createEvt = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Cascade Event",
             date = eventDate,
             slots = new[] { new { label = "Cascade Slot", startTime = "08:00", endTime = "09:00", capacity = 5 } }
@@ -39,8 +38,9 @@ public class CascadeDeleteTests(IntegrationTestFactory factory) : IDisposable
         var code = link.GetProperty("code").GetString()!;
 
         var roster = await _client.GetFromJsonAsync<JsonElement>(
-            $"/api/organizations/{orgId}/roster?weekStart={WeekStartFor(eventDate)}", _jsonOptions);
-        var slotId = roster.EnumerateArray().First()
+            $"/api/roster?weekStart={WeekStartFor(eventDate)}", _jsonOptions);
+        var slotId = roster.EnumerateArray()
+            .First(e => e.GetProperty("id").GetGuid() == eventId)
             .GetProperty("slots").EnumerateArray().First()
             .GetProperty("id").GetGuid();
 
@@ -65,8 +65,7 @@ public class CascadeDeleteTests(IntegrationTestFactory factory) : IDisposable
         // endpoint will 404 because EventId is null and Event is not loadable).
         var orgId = await SeedOrgAsync("Orphan Link Org");
 
-        var createEvt = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var createEvt = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Doomed Event",
             date = FutureDate()
         });
@@ -98,27 +97,26 @@ public class CascadeDeleteTests(IntegrationTestFactory factory) : IDisposable
     }
 
     [Fact]
-    public async Task DeleteOrganization_CascadesToEventsAndSlots()
+    public async Task DeleteGroup_CascadesToEventsAndSlots()
     {
         var orgId = await SeedOrgAsync("Cascade Org 2");
 
-        await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Doomed Event",
             date = FutureDate(),
             slots = new[] { new { label = "Doomed Slot", startTime = "08:00", endTime = "09:00", capacity = 2 } }
         });
 
-        // Delete the organization via API
-        var deleteOrgResp = await _client.DeleteAsync($"/api/organizations/{orgId}");
+        // Delete the group via API
+        var deleteOrgResp = await _client.DeleteAsync($"/api/groups/{orgId}");
         Assert.Equal(HttpStatusCode.NoContent, deleteOrgResp.StatusCode);
 
         // Verify cascade: nothing should remain
         using var checkScope = factory.Services.CreateScope();
         var checkDb = checkScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        Assert.False(await checkDb.Organizations.AnyAsync(o => o.Id == orgId));
-        Assert.False(await checkDb.Events.AnyAsync(e => e.OrganizationId == orgId));
-        Assert.False(await checkDb.TimeSlots.AnyAsync(s => s.Event != null && s.Event.OrganizationId == orgId));
+        Assert.False(await checkDb.Groups.AnyAsync(o => o.Id == orgId));
+        Assert.False(await checkDb.Events.AnyAsync(e => e.GroupId == orgId));
+        Assert.False(await checkDb.TimeSlots.AnyAsync(s => s.Event != null && s.Event.GroupId == orgId));
     }
 
     // --- Helpers ---
@@ -136,14 +134,14 @@ public class CascadeDeleteTests(IntegrationTestFactory factory) : IDisposable
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var org = new Organization
+        var org = new Group
         {
             Id = Guid.NewGuid(),
             Name = name,
-            ClerkUserId = TestAuthHandler.TestUserId,
+            GroupOwner = TestAuthHandler.TestUserId,
             CreatedAt = DateTime.UtcNow
         };
-        db.Organizations.Add(org);
+        db.Groups.Add(org);
         await db.SaveChangesAsync();
         return org.Id;
     }

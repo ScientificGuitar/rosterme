@@ -2,20 +2,20 @@ import { useAuth } from "@clerk/react"
 import { useQuery } from "@tanstack/react-query"
 import { useApi } from "./useApi"
 
-export function useOrg() {
+export function useGroups() {
   const { isSignedIn } = useAuth()
   const api = useApi()
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["org"],
-    queryFn: () => api.getCurrentUser(),
+    queryKey: ["groups"],
+    queryFn: () => api.getGroups(),
     enabled: isSignedIn,
     staleTime: 5 * 60 * 1000,
     retry: false,
   })
 
   return {
-    org: isSignedIn ? (data?.organization ?? null) : null,
+    groups: data ?? [],
     loading: isSignedIn && isLoading,
     error: isSignedIn ? (error ?? null) : null,
   }

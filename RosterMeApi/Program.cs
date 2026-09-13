@@ -234,29 +234,10 @@ app.UseAuthorization();
 app.MapOpenApi();
 app.MapScalarApiReference();
 
-app.MapGet("/api/user/me", async (HttpContext http, AppDbContext db) =>
-{
-    var userId = http.User.FindFirst("sub")?.Value;
-    if (userId is null) return Results.Unauthorized();
-
-    var org = await db.Organizations.FirstOrDefaultAsync(o => o.ClerkUserId == userId);
-
-    return Results.Ok(new UserMeResponse(
-        userId,
-        org is null ? null : new UserMeOrganization(org.Id, org.Name)
-    ));
-})
-.RequireAuthorization()
-.Produces<UserMeResponse>()
-.Produces(401);
-
 app.MapAdminEndpoints();
 app.MapPublicEndpoints();
 
 app.Run();
-
-public record UserMeResponse(string UserId, UserMeOrganization? Organization);
-public record UserMeOrganization(Guid Id, string Name);
 
 // Required by WebApplicationFactory<Program> in the test project.
 // The partial class gives the compiler a hook to surface the

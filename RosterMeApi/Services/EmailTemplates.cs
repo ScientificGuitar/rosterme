@@ -6,7 +6,7 @@ public static class EmailTemplates
 {
     public static (string Subject, string HtmlBody, string TextBody) BuildSignupConfirmation(
         string volunteerName,
-        string organizationName,
+        string groupName,
         string eventTitle,
         string slotLabel,
         DateOnly eventDate,
@@ -57,7 +57,7 @@ public static class EmailTemplates
                     <table role="presentation" width="100%" maxwidth="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background-color:#ffffff;border-radius:12px;overflow:hidden;">
                       <tr>
                         <td style="padding:32px 32px 24px;">
-                          <p style="margin:0 0 4px;font-size:14px;color:#71717a;">{HttpUtility.HtmlEncode(organizationName)}</p>
+                          <p style="margin:0 0 4px;font-size:14px;color:#71717a;">{HttpUtility.HtmlEncode(groupName)}</p>
                           <h1 style="margin:0 0 4px;font-size:22px;color:#18181b;">Confirm your signup</h1>
                           <h2 style="margin:0 0 16px;font-size:16px;font-weight:500;color:#3f3f46;">{HttpUtility.HtmlEncode(eventTitle)}</h2>
                           <p style="margin:0;font-size:14px;color:#3f3f46;">You've signed up as a volunteer for the shift below. Your spot isn't confirmed until you click the button.</p>
@@ -105,7 +105,7 @@ public static class EmailTemplates
             """ + (hasCalendarAttachment ? "\nAn .ics invite is also attached to this email." : "");
 
         var text = $"""
-            {organizationName}
+            {groupName}
 
             Confirm your signup for: {eventTitle}
             Shift: {slotLabel}
@@ -124,7 +124,7 @@ public static class EmailTemplates
 
     public static (string Subject, string HtmlBody, string TextBody) BuildWaitlistConfirmation(
         string volunteerName,
-        string organizationName,
+        string groupName,
         string eventTitle,
         string slotLabel,
         DateOnly eventDate,
@@ -156,7 +156,7 @@ public static class EmailTemplates
                     <table role="presentation" width="100%" maxwidth="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background-color:#ffffff;border-radius:12px;overflow:hidden;">
                       <tr>
                         <td style="padding:32px 32px 24px;">
-                          <p style="margin:0 0 4px;font-size:14px;color:#71717a;">{HttpUtility.HtmlEncode(organizationName)}</p>
+                          <p style="margin:0 0 4px;font-size:14px;color:#71717a;">{HttpUtility.HtmlEncode(groupName)}</p>
                           <h1 style="margin:0 0 4px;font-size:22px;color:#18181b;">Confirm to join the waitlist</h1>
                           <h2 style="margin:0 0 16px;font-size:16px;font-weight:500;color:#3f3f46;">{HttpUtility.HtmlEncode(eventTitle)}</h2>
                           <p style="margin:0;font-size:14px;color:#3f3f46;">This shift is currently full. Click the button below to confirm your email and join the waitlist. If a spot opens up, we'll automatically promote you in first-come order and email you.</p>
@@ -197,7 +197,7 @@ public static class EmailTemplates
         var textLocation = string.IsNullOrWhiteSpace(location) ? "" : $"\nLocation: {location}";
 
         var text = $"""
-            {organizationName}
+            {groupName}
 
             Confirm to join the waitlist for: {eventTitle}
             Shift: {slotLabel}
@@ -218,7 +218,7 @@ public static class EmailTemplates
 
     public static (string Subject, string HtmlBody, string TextBody) BuildWaitlistPromotion(
         string volunteerName,
-        string organizationName,
+        string groupName,
         string eventTitle,
         string slotLabel,
         DateOnly eventDate,
@@ -269,7 +269,7 @@ public static class EmailTemplates
                     <table role="presentation" width="100%" maxwidth="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background-color:#ffffff;border-radius:12px;overflow:hidden;">
                       <tr>
                         <td style="padding:32px 32px 24px;">
-                          <p style="margin:0 0 4px;font-size:14px;color:#71717a;">{HttpUtility.HtmlEncode(organizationName)}</p>
+                          <p style="margin:0 0 4px;font-size:14px;color:#71717a;">{HttpUtility.HtmlEncode(groupName)}</p>
                           <h1 style="margin:0 0 4px;font-size:22px;color:#18181b;">You're in!</h1>
                           <h2 style="margin:0 0 16px;font-size:16px;font-weight:500;color:#3f3f46;">{HttpUtility.HtmlEncode(eventTitle)}</h2>
                           <p style="margin:0;font-size:14px;color:#3f3f46;">A spot opened up and you've been automatically promoted from the waitlist. You're now confirmed for the shift below.</p>
@@ -318,7 +318,7 @@ public static class EmailTemplates
             """ + (hasCalendarAttachment ? "\nAn .ics invite is also attached to this email." : "");
 
         var text = $"""
-            {organizationName}
+            {groupName}
 
             You're in: {eventTitle}
             Shift: {slotLabel}
@@ -338,7 +338,7 @@ public static class EmailTemplates
 
     public static (string Subject, string HtmlBody, string TextBody) BuildSignupReminder(
         string volunteerName,
-        string organizationName,
+        string groupName,
         string eventTitle,
         string slotLabel,
         DateOnly eventDate,
@@ -369,7 +369,7 @@ public static class EmailTemplates
                     <table role="presentation" width="100%" maxwidth="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background-color:#ffffff;border-radius:12px;overflow:hidden;">
                       <tr>
                         <td style="padding:32px 32px 24px;">
-                          <p style="margin:0 0 4px;font-size:14px;color:#71717a;">{HttpUtility.HtmlEncode(organizationName)}</p>
+                          <p style="margin:0 0 4px;font-size:14px;color:#71717a;">{HttpUtility.HtmlEncode(groupName)}</p>
                           <h1 style="margin:0 0 4px;font-size:22px;color:#18181b;">Your shift is tomorrow</h1>
                           <h2 style="margin:0 0 16px;font-size:16px;font-weight:500;color:#3f3f46;">{HttpUtility.HtmlEncode(eventTitle)}</h2>
                           <p style="margin:0;font-size:14px;color:#3f3f46;">Just a friendly reminder — you're confirmed for the shift below, starting in about 24 hours.</p>
@@ -410,7 +410,7 @@ public static class EmailTemplates
         var textLocation = string.IsNullOrWhiteSpace(location) ? "" : $"\nLocation: {location}";
 
         var text = $"""
-            {organizationName}
+            {groupName}
 
             Reminder: {eventTitle} is tomorrow
             Shift: {slotLabel}
@@ -430,7 +430,7 @@ public static class EmailTemplates
 
     public static (string Subject, string HtmlBody, string TextBody) BuildSignupRemoved(
         string volunteerName,
-        string organizationName,
+        string groupName,
         string eventTitle,
         string slotLabel,
         DateOnly eventDate,
@@ -461,10 +461,10 @@ public static class EmailTemplates
                     <table role="presentation" width="100%" maxwidth="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background-color:#ffffff;border-radius:12px;overflow:hidden;">
                       <tr>
                         <td style="padding:32px 32px 24px;">
-                          <p style="margin:0 0 4px;font-size:14px;color:#71717a;">{HttpUtility.HtmlEncode(organizationName)}</p>
+                          <p style="margin:0 0 4px;font-size:14px;color:#71717a;">{HttpUtility.HtmlEncode(groupName)}</p>
                           <h1 style="margin:0 0 4px;font-size:22px;color:#18181b;">You've been removed from this shift</h1>
                           <h2 style="margin:0 0 16px;font-size:16px;font-weight:500;color:#3f3f46;">{HttpUtility.HtmlEncode(eventTitle)}</h2>
-                          <p style="margin:0;font-size:14px;color:#3f3f46;">{(wasWaitlisted ? "The organization has removed you from the waitlist for the shift below. You don't need to take any action." : "The organization has removed you from the shift below. You don't need to take any action.")}</p>
+                          <p style="margin:0;font-size:14px;color:#3f3f46;">{(wasWaitlisted ? "The organizer has removed you from the waitlist for the shift below. You don't need to take any action." : "The organizer has removed you from the shift below. You don't need to take any action.")}</p>
                         </td>
                       </tr>
                       <tr>
@@ -485,7 +485,7 @@ public static class EmailTemplates
                       <tr>
                         <td style="padding:24px 32px 32px;">
                           <p style="margin:0;font-size:13px;color:#71717a;">
-                            If you have questions, please contact the organization directly.
+                            If you have questions, please contact the organizer directly.
                           </p>
                         </td>
                       </tr>
@@ -500,7 +500,7 @@ public static class EmailTemplates
         var textLocation = string.IsNullOrWhiteSpace(location) ? "" : $"\nLocation: {location}";
 
         var text = $"""
-            {organizationName}
+            {groupName}
 
             You've been removed from: {eventTitle}
             Shift: {slotLabel}
@@ -508,7 +508,7 @@ public static class EmailTemplates
             Name: {volunteerName}
 
             The organization has {(wasWaitlisted ? "removed you from the waitlist for this shift" : "removed you from this shift")}. You don't need to take any action.
-            If you have questions, please contact the organization directly.
+            If you have questions, please contact the organizer directly.
             """;
 
         return (subject, html, text);

@@ -16,30 +16,30 @@ public class ValidationTests(IntegrationTestFactory factory) : IDisposable
     private readonly HttpClient _public = factory.CreateClient();
     private readonly JsonSerializerOptions _json = new() { PropertyNameCaseInsensitive = true };
 
-    // --- CreateOrganization ---
+    // --- CreateGroup ---
 
     [Fact]
-    public async Task CreateOrganization_EmptyName_Returns400()
+    public async Task CreateGroup_EmptyName_Returns400()
     {
-        var response = await _admin.PostAsJsonAsync("/api/organizations", new { name = "" });
+        var response = await _admin.PostAsJsonAsync("/api/groups", new { name = "" });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         await AssertProblemDetailsAsync(response, "Name");
     }
 
     [Fact]
-    public async Task CreateOrganization_WhitespaceName_Returns400()
+    public async Task CreateGroup_WhitespaceName_Returns400()
     {
-        var response = await _admin.PostAsJsonAsync("/api/organizations", new { name = "   " });
+        var response = await _admin.PostAsJsonAsync("/api/groups", new { name = "   " });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         await AssertProblemDetailsAsync(response, "Name");
     }
 
     [Fact]
-    public async Task CreateOrganization_OverlongName_Returns400()
+    public async Task CreateGroup_OverlongName_Returns400()
     {
-        var response = await _admin.PostAsJsonAsync("/api/organizations", new { name = new string('a', 201) });
+        var response = await _admin.PostAsJsonAsync("/api/groups", new { name = new string('a', 201) });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         await AssertProblemDetailsAsync(response, "Name");
@@ -48,12 +48,25 @@ public class ValidationTests(IntegrationTestFactory factory) : IDisposable
     // --- CreateEvent ---
 
     [Fact]
+    public async Task CreateEvent_EmptyGroupId_Returns400()
+    {
+        var response = await _admin.PostAsJsonAsync("/api/events", new
+        {
+            groupId = Guid.Empty,
+            title = "Sunday Service",
+            date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)).ToString("yyyy-MM-dd")
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        await AssertProblemDetailsAsync(response, "GroupId");
+    }
+
+    [Fact]
     public async Task CreateEvent_EmptyTitle_Returns400()
     {
         var orgId = await SeedOrgAsync();
 
-        var response = await _admin.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var response = await _admin.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "",
             date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)).ToString("yyyy-MM-dd")
         });
@@ -67,8 +80,7 @@ public class ValidationTests(IntegrationTestFactory factory) : IDisposable
     {
         var orgId = await SeedOrgAsync();
 
-        var response = await _admin.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var response = await _admin.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = new string('x', 301),
             date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)).ToString("yyyy-MM-dd")
         });
@@ -82,8 +94,7 @@ public class ValidationTests(IntegrationTestFactory factory) : IDisposable
     {
         var orgId = await SeedOrgAsync();
 
-        var response = await _admin.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var response = await _admin.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Service",
             date = "0001-01-01"
         });
@@ -97,8 +108,7 @@ public class ValidationTests(IntegrationTestFactory factory) : IDisposable
     {
         var orgId = await SeedOrgAsync();
 
-        var response = await _admin.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var response = await _admin.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Service",
             date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1)).ToString("yyyy-MM-dd")
         });
@@ -126,8 +136,7 @@ public class ValidationTests(IntegrationTestFactory factory) : IDisposable
     {
         var orgId = await SeedOrgAsync();
 
-        var response = await _admin.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var response = await _admin.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Service",
             date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)).ToString("yyyy-MM-dd"),
             slots = new[] { new { label = "Bad", startTime = "08:00", endTime = "09:00", capacity = 0 } }
@@ -145,8 +154,7 @@ public class ValidationTests(IntegrationTestFactory factory) : IDisposable
     {
         var orgId = await SeedOrgAsync();
 
-        var response = await _admin.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var response = await _admin.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Service",
             date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)).ToString("yyyy-MM-dd"),
             slots = new[] { new { label = "Backwards", startTime = "10:00", endTime = "09:00", capacity = 2 } }
@@ -160,8 +168,7 @@ public class ValidationTests(IntegrationTestFactory factory) : IDisposable
     {
         var orgId = await SeedOrgAsync();
 
-        var response = await _admin.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var response = await _admin.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "",
             date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)).ToString("yyyy-MM-dd"),
             slots = new[]
@@ -403,8 +410,7 @@ public class ValidationTests(IntegrationTestFactory factory) : IDisposable
     {
         var orgId = await SeedOrgAsync();
 
-        var response = await _admin.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var response = await _admin.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "   ",
             date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)).ToString("yyyy-MM-dd")
         });
@@ -524,7 +530,7 @@ public class ValidationTests(IntegrationTestFactory factory) : IDisposable
         // with a 400 status field. Title and content type are framework-defined
         // and may evolve.
         var content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
-        var response = await _admin.PostAsync("/api/organizations", content);
+        var response = await _admin.PostAsync("/api/groups", content);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var bodyText = await response.Content.ReadAsStringAsync();
@@ -546,7 +552,7 @@ public class ValidationTests(IntegrationTestFactory factory) : IDisposable
 
     private async Task<Guid> SeedOrgAsync()
     {
-        var resp = await _admin.PostAsJsonAsync("/api/organizations", new { name = "Val Org" });
+        var resp = await _admin.PostAsJsonAsync("/api/groups", new { name = "Val Org" });
         var body = await resp.Content.ReadFromJsonAsync<JsonElement>(_json);
         return body.GetProperty("id").GetGuid();
     }
@@ -554,8 +560,7 @@ public class ValidationTests(IntegrationTestFactory factory) : IDisposable
     private async Task<Guid> SeedEventAsync()
     {
         var orgId = await SeedOrgAsync();
-        var resp = await _admin.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var resp = await _admin.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Val Event",
             date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)).ToString("yyyy-MM-dd")
         });
@@ -567,8 +572,7 @@ public class ValidationTests(IntegrationTestFactory factory) : IDisposable
     {
         var orgId = await SeedOrgAsync();
         var futureDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30));
-        var evtResp = await _admin.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var evtResp = await _admin.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Future Event",
             date = futureDate.ToString("yyyy-MM-dd"),
             slots = new[] { new { label = "Slot 1", startTime = "08:00", endTime = "09:00", capacity = 3 } }

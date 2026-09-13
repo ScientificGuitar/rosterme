@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { EventDetailsFields } from "@/components/admin/EventDetailsFields"
+import { GroupSelect } from "@/components/admin/GroupSelect"
 import { SlotRowCard } from "@/components/admin/SlotRowCard"
 import { QuestionRowCard } from "@/components/admin/QuestionRowCard"
 import { useEvent } from "@/hooks/useEvent"
@@ -77,6 +78,7 @@ function EventForm({ event, eventId }: EventFormProps) {
   const queryClient = useQueryClient()
 
   const [title, setTitle] = useState(event.title)
+  const [groupId, setGroupId] = useState(event.groupId)
   const [description, setDescription] = useState(event.description ?? "")
   const [location, setLocation] = useState(event.location ?? "")
   const [date, setDate] = useState(event.date)
@@ -179,6 +181,7 @@ function EventForm({ event, eventId }: EventFormProps) {
 
     try {
       await api.updateEvent(eventId, {
+        groupId,
         title: title.trim(),
         // Empty string clears the description; the backend normalizes it to null.
         description: description.trim(),
@@ -216,6 +219,11 @@ function EventForm({ event, eventId }: EventFormProps) {
           </p>
         )}
         <form onSubmit={handleSubmit} className="space-y-6">
+          <GroupSelect
+            value={groupId}
+            onChange={setGroupId}
+            disabled={isPast}
+          />
           <EventDetailsFields
             title={title}
             description={description}

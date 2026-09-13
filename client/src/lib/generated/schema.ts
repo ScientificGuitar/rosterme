@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/api/user/me": {
+    "/api/groups": {
         parameters: {
             query?: never;
             header?: never;
@@ -26,7 +26,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["UserMeResponse"];
+                        "application/json": components["schemas"]["GroupResponse"][];
                     };
                 };
                 /** @description Unauthorized */
@@ -39,22 +39,6 @@ export interface paths {
             };
         };
         put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/organizations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
         post: {
             parameters: {
                 query?: never;
@@ -64,7 +48,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["CreateOrganizationRequest"];
+                    "application/json": components["schemas"]["CreateGroupRequest"];
                 };
             };
             responses: {
@@ -74,7 +58,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["OrganizationResponse"];
+                        "application/json": components["schemas"]["GroupResponse"];
                     };
                 };
                 /** @description Bad Request */
@@ -99,7 +83,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organizations/{id}": {
+    "/api/groups/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -123,7 +107,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["OrganizationResponse"];
+                        "application/json": components["schemas"]["GroupResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -183,7 +167,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organizations/{orgId}/events": {
+    "/api/events": {
         parameters: {
             query?: never;
             header?: never;
@@ -197,9 +181,7 @@ export interface paths {
                     to: string;
                 };
                 header?: never;
-                path: {
-                    orgId: string;
-                };
+                path?: never;
                 cookie?: never;
             };
             requestBody?: never;
@@ -220,13 +202,6 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Not Found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
             };
         };
         put?: never;
@@ -234,9 +209,7 @@ export interface paths {
             parameters: {
                 query?: never;
                 header?: never;
-                path: {
-                    orgId: string;
-                };
+                path?: never;
                 cookie?: never;
             };
             requestBody: {
@@ -572,7 +545,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organizations/{orgId}/roster": {
+    "/api/roster": {
         parameters: {
             query?: never;
             header?: never;
@@ -585,9 +558,7 @@ export interface paths {
                     weekStart: string;
                 };
                 header?: never;
-                path: {
-                    orgId: string;
-                };
+                path?: never;
                 cookie?: never;
             };
             requestBody?: never;
@@ -603,13 +574,6 @@ export interface paths {
                 };
                 /** @description Unauthorized */
                 401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not Found */
-                404: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1068,6 +1032,8 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         CreateEventRequest: {
+            /** Format: uuid */
+            groupId: string;
             title: string;
             description: null | string;
             location: null | string;
@@ -1076,7 +1042,7 @@ export interface components {
             slots: null | components["schemas"]["CreateSlotRequest"][];
             questions: null | components["schemas"]["QuestionUpsert"][];
         };
-        CreateOrganizationRequest: {
+        CreateGroupRequest: {
             name: string;
         };
         CreateSlotRequest: {
@@ -1105,7 +1071,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
-            organizationId: string;
+            groupId: string;
             title: string;
             description: null | string;
             location: null | string;
@@ -1130,7 +1096,8 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
-            organizationId: string;
+            groupId: string;
+            groupName: string;
             title: string;
             description: null | string;
             location: null | string;
@@ -1139,6 +1106,13 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             slots: components["schemas"]["TimeSlotResponse"][];
+        };
+        GroupResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: date-time */
+            createdAt: string;
         };
         InviteLinkResponse: {
             /** Format: uuid */
@@ -1154,16 +1128,9 @@ export interface components {
         };
         InvitePageResponse: {
             /** Format: uuid */
-            organizationId: string;
-            organizationName: string;
+            groupId: string;
+            groupName: string;
             event: components["schemas"]["EventPublicResponse"];
-        };
-        OrganizationResponse: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            /** Format: date-time */
-            createdAt: string;
         };
         PublicQuestionResponse: {
             /** Format: uuid */
@@ -1211,6 +1178,9 @@ export interface components {
         RosterEventResponse: {
             /** Format: uuid */
             id: string;
+            /** Format: uuid */
+            groupId: string;
+            groupName: string;
             title: string;
             description: null | string;
             location: null | string;
@@ -1259,7 +1229,7 @@ export interface components {
             status: string;
             /** Format: date-time */
             confirmedAt: null | string;
-            organizationName: string;
+            groupName: string;
             eventTitle: string;
             eventLocation: null | string;
             /** Format: date */
@@ -1318,6 +1288,8 @@ export interface components {
             allowWaitlist: boolean;
         };
         UpdateEventRequest: {
+            /** Format: uuid */
+            groupId: null | string;
             title: null | string;
             description: null | string;
             location: null | string;
@@ -1335,15 +1307,6 @@ export interface components {
             /** Format: int32 */
             capacity: null | number | string;
             allowWaitlist: null | boolean;
-        };
-        UserMeOrganization: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-        };
-        UserMeResponse: {
-            userId: string;
-            organization: null | components["schemas"]["UserMeOrganization"];
         };
     };
     responses: never;

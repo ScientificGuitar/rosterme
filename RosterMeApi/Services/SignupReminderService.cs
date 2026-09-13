@@ -48,7 +48,7 @@ public class SignupReminderService
             .Where(s => s.Status == SignupStatus.Confirmed && s.ReminderSentAt == null)
             .Include(s => s.TimeSlot)
                 .ThenInclude(t => t.Event)
-                    .ThenInclude(e => e.Organization)
+                    .ThenInclude(e => e.Group)
             .Where(s => s.TimeSlot.Event.Date >= today && s.TimeSlot.Event.Date <= maxDate)
             .OrderBy(s => s.CreatedAt)
             .Take(batchSize * 4)
@@ -102,7 +102,7 @@ public class SignupReminderService
             var evt = slot.Event;
             var (subject, html, text) = EmailTemplates.BuildSignupReminder(
                 signup.VolunteerName,
-                evt.Organization.Name,
+                evt.Group.Name,
                 evt.Title,
                 slot.Label,
                 evt.Date,

@@ -8,9 +8,9 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Label } from "@/components/ui/label"
 import { EventDetailsFields } from "@/components/admin/EventDetailsFields"
+import { GroupSelect } from "@/components/admin/GroupSelect"
 import { SlotRowCard } from "@/components/admin/SlotRowCard"
 import { QuestionRowCard } from "@/components/admin/QuestionRowCard"
-import { useOrg } from "@/hooks/useOrg"
 import { useApi } from "@/hooks/useApi"
 import { formatApiError } from "@/lib/api"
 import {
@@ -34,10 +34,10 @@ import {
 } from "@/lib/eventQuestions"
 
 export function CreateEvent() {
-  const { org, error: orgError } = useOrg()
   const api = useApi()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [groupId, setGroupId] = useState("")
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [location, setLocation] = useState("")
@@ -50,23 +50,6 @@ export function CreateEvent() {
     {}
   )
   const nextKey = useRef(0)
-
-  if (orgError) {
-    return (
-      <div className="py-12 text-center">
-        <p className="mb-4 text-muted-foreground">
-          {orgError instanceof Error
-            ? orgError.message
-            : "Failed to load organization"}
-        </p>
-        <Button variant="outline" onClick={() => navigate("/dashboard")}>
-          Back to Dashboard
-        </Button>
-      </div>
-    )
-  }
-
-  if (!org) return null
 
   const addSlot = () => {
     setSlots((prev) => [...prev, createEmptySlot(nextKey.current++)])
@@ -110,7 +93,10 @@ export function CreateEvent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!org) return
+    if (!groupId) {
+      toast.error("Select a group for this event")
+      return
+    }
     if (date < todayLocal()) {
       toast.error("Event date cannot be in the past")
       return
@@ -130,7 +116,8 @@ export function CreateEvent() {
     setSubmitting(true)
 
     try {
-      const { id } = await api.createEvent(org.id, {
+      const { id } = await api.createEvent({
+        groupId,
         title: title.trim(),
         description: description.trim() || null,
         location: location.trim() || null,
@@ -157,6 +144,7 @@ export function CreateEvent() {
       <Separator />
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
+          <GroupSelect value={groupId} onChange={setGroupId} />
           <EventDetailsFields
             title={title}
             description={description}

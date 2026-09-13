@@ -17,28 +17,30 @@ public static class AdminEndpoints
     {
         var admin = app.MapGroup("/api").RequireAuthorization().AddEndpointFilter<ValidateDtoFilter>();
 
-        admin.MapPost("/organizations", CreateOrganization)
-            .Produces<OrganizationResponse>(201)
+        admin.MapPost("/groups", CreateGroup)
+            .Produces<GroupResponse>(201)
             .Produces(400)
             .Produces(401);
-        admin.MapGet("/organizations/{id}", GetOrganization)
-            .Produces<OrganizationResponse>()
+        admin.MapGet("/groups", ListGroups)
+            .Produces<IEnumerable<GroupResponse>>()
+            .Produces(401);
+        admin.MapGet("/groups/{id}", GetGroup)
+            .Produces<GroupResponse>()
             .Produces(401)
             .Produces(404);
-        admin.MapDelete("/organizations/{id}", DeleteOrganization)
+        admin.MapDelete("/groups/{id}", DeleteGroup)
             .Produces(204)
             .Produces(401)
             .Produces(404);
 
-        admin.MapPost("/organizations/{orgId}/events", CreateEvent)
+        admin.MapPost("/events", CreateEvent)
             .Produces<EventResponse>(201)
             .Produces(400)
             .Produces(401)
             .Produces(404);
-        admin.MapGet("/organizations/{orgId}/events", ListEvents)
+        admin.MapGet("/events", ListEvents)
             .Produces<IEnumerable<EventWithSlotsResponse>>()
-            .Produces(401)
-            .Produces(404);
+            .Produces(401);
         admin.MapPut("/events/{id}", UpdateEvent)
             .Produces<EventResponse>()
             .Produces(400)
@@ -64,10 +66,9 @@ public static class AdminEndpoints
             .Produces(401)
             .Produces(404);
 
-        admin.MapGet("/organizations/{orgId}/roster", GetRoster)
+        admin.MapGet("/roster", GetRoster)
             .Produces<IEnumerable<RosterEventResponse>>()
-            .Produces(401)
-            .Produces(404);
+            .Produces(401);
 
         admin.MapDelete("/signups/{id}", DeleteSignup)
             .Produces(204)
@@ -111,51 +112,63 @@ public static class AdminEndpoints
             ? []
             : options.Split('\n').Select(o => o.Trim()).Where(o => o.Length > 0).ToList();
 
-    private static async Task<Organization?> GetOwnedOrganization(AppDbContext db, Guid orgId, string userId, CancellationToken ct)
+    private static async Task<Group?> GetOwnedGroup(AppDbContext db, Guid groupId, string userId, CancellationToken ct)
     {
-        return await db.Organizations
-            .FirstOrDefaultAsync(o => o.Id == orgId && o.ClerkUserId == userId, ct);
+        return await db.Groups
+            .FirstOrDefaultAsync(o => o.Id == groupId && o.GroupOwner == userId, ct);
     }
 
-    // --- Organization ---
+    // --- Groups ---
 
-    private static async Task<IResult> CreateOrganization(CreateOrganizationRequest request, AppDbContext db, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> CreateGroup(CreateGroupRequest request, AppDbContext db, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
 
-        var org = new Organization
+        var group = new Group
         {
             Id = Guid.NewGuid(),
             Name = Norm(request.Name),
-            ClerkUserId = userId,
+            GroupOwner = userId,
             CreatedAt = DateTime.UtcNow
         };
 
-        db.Organizations.Add(org);
+        db.Groups.Add(group);
         await db.SaveChangesAsync(ct);
 
-        return Results.Created($"/api/organizations/{org.Id}", new OrganizationResponse(org.Id, org.Name, org.CreatedAt));
+        return Results.Created($"/api/groups/{group.Id}", new GroupResponse(group.Id, group.Name, group.CreatedAt));
     }
 
-    private static async Task<IResult> GetOrganization(Guid id, AppDbContext db, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> ListGroups(AppDbContext db, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
 
-        var org = await db.Organizations
-            .FirstOrDefaultAsync(o => o.Id == id && o.ClerkUserId == userId, ct);
+        var groups = await db.Groups
+            .Where(g => g.GroupOwner == userId)
+            .OrderBy(g => g.Name)
+            .ToListAsync(ct);
 
-        if (org is null) return Results.NotFound();
-
-        return Results.Ok(new OrganizationResponse(org.Id, org.Name, org.CreatedAt));
+        return Results.Ok(groups.Select(g => new GroupResponse(g.Id, g.Name, g.CreatedAt)));
     }
 
-    private static async Task<IResult> DeleteOrganization(Guid id, AppDbContext db, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> GetGroup(Guid id, AppDbContext db, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
-        var org = await GetOwnedOrganization(db, id, userId, ct);
-        if (org is null) return Results.NotFound();
 
-        db.Organizations.Remove(org);
+        var group = await db.Groups
+            .FirstOrDefaultAsync(o => o.Id == id && o.GroupOwner == userId, ct);
+
+        if (group is null) return Results.NotFound();
+
+        return Results.Ok(new GroupResponse(group.Id, group.Name, group.CreatedAt));
+    }
+
+    private static async Task<IResult> DeleteGroup(Guid id, AppDbContext db, HttpContext http, CancellationToken ct)
+    {
+        var userId = GetUserId(http);
+        var group = await GetOwnedGroup(db, id, userId, ct);
+        if (group is null) return Results.NotFound();
+
+        db.Groups.Remove(group);
         await db.SaveChangesAsync(ct);
 
         return Results.NoContent();
@@ -163,16 +176,16 @@ public static class AdminEndpoints
 
     // --- Events ---
 
-    private static async Task<IResult> CreateEvent(Guid orgId, CreateEventRequest request, AppDbContext db, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> CreateEvent(CreateEventRequest request, AppDbContext db, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
-        var org = await GetOwnedOrganization(db, orgId, userId, ct);
-        if (org is null) return Results.NotFound();
+        var group = await GetOwnedGroup(db, request.GroupId, userId, ct);
+        if (group is null) return Results.NotFound();
 
         var evt = new Event
         {
             Id = Guid.NewGuid(),
-            OrganizationId = orgId,
+            GroupId = request.GroupId,
             Title = Norm(request.Title),
             Description = NormNull(request.Description),
             Location = NormNull(request.Location),
@@ -222,25 +235,23 @@ public static class AdminEndpoints
         await db.SaveChangesAsync(ct);
 
         return Results.Created($"/api/events/{evt.Id}", new EventResponse(
-            evt.Id, evt.OrganizationId, evt.Title, evt.Description, evt.Location, evt.Date, evt.CreatedAt
+            evt.Id, evt.GroupId, evt.Title, evt.Description, evt.Location, evt.Date, evt.CreatedAt
         ));
     }
 
-    private static async Task<IResult> ListEvents(Guid orgId, DateOnly from, DateOnly to, AppDbContext db, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> ListEvents(DateOnly from, DateOnly to, AppDbContext db, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
 
-        var orgExists = await db.Organizations.AnyAsync(o => o.Id == orgId && o.ClerkUserId == userId, ct);
-        if (!orgExists) return Results.NotFound();
-
         var events = await db.Events
-            .Where(e => e.OrganizationId == orgId && e.Date >= from && e.Date <= to)
+            .Where(e => e.Group.GroupOwner == userId && e.Date >= from && e.Date <= to)
+            .Include(e => e.Group)
             .Include(e => e.TimeSlots).ThenInclude(s => s.Signups)
             .OrderBy(e => e.Date)
             .ToListAsync(ct);
 
         return Results.Ok(events.Select(e => new EventWithSlotsResponse(
-            e.Id, e.OrganizationId, e.Title, e.Description, e.Location, e.Date, e.CreatedAt,
+            e.Id, e.GroupId, e.Group.Name, e.Title, e.Description, e.Location, e.Date, e.CreatedAt,
             e.TimeSlots.OrderBy(s => s.StartTime).Select(s => new TimeSlotResponse(s.Id, s.EventId, s.Label, e.Date.ToDateTime(s.StartTime), e.Date.ToDateTime(s.EndTime), s.Capacity, s.Signups.Count(sg => sg.Status == SignupStatus.Pending || sg.Status == SignupStatus.Confirmed), s.AllowWaitlist))
         )));
     }
@@ -249,10 +260,10 @@ public static class AdminEndpoints
     {
         var userId = GetUserId(http);
         var evt = await db.Events
-            .Include(e => e.Organization)
+            .Include(e => e.Group)
             .Include(e => e.Questions).ThenInclude(q => q.Answers)
             .Include(e => e.TimeSlots).ThenInclude(s => s.Signups)
-            .FirstOrDefaultAsync(e => e.Id == id && e.Organization.ClerkUserId == userId, ct);
+            .FirstOrDefaultAsync(e => e.Id == id && e.Group.GroupOwner == userId, ct);
 
         if (evt is null) return Results.NotFound();
 
@@ -263,6 +274,12 @@ public static class AdminEndpoints
         if (request.Location is not null)
             evt.Location = NormNull(request.Location);
         if (request.Date is not null) evt.Date = request.Date.Value;
+        if (request.GroupId is { } newGroupId && newGroupId != evt.GroupId)
+        {
+            var newGroup = await GetOwnedGroup(db, newGroupId, userId, ct);
+            if (newGroup is null) return Results.NotFound();
+            evt.GroupId = newGroupId;
+        }
 
         var increasedSlotIds = new List<Guid>();
 
@@ -452,7 +469,7 @@ public static class AdminEndpoints
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
 
-            return Results.Ok(new EventResponse(evt.Id, evt.OrganizationId, evt.Title, evt.Description, evt.Location, evt.Date, evt.CreatedAt));
+            return Results.Ok(new EventResponse(evt.Id, evt.GroupId, evt.Title, evt.Description, evt.Location, evt.Date, evt.CreatedAt));
         });
     }
 
@@ -460,8 +477,8 @@ public static class AdminEndpoints
     {
         var userId = GetUserId(http);
         var evt = await db.Events
-            .Include(e => e.Organization)
-            .FirstOrDefaultAsync(e => e.Id == id && e.Organization.ClerkUserId == userId, ct);
+            .Include(e => e.Group)
+            .FirstOrDefaultAsync(e => e.Id == id && e.Group.GroupOwner == userId, ct);
 
         if (evt is null) return Results.NotFound();
 
@@ -477,8 +494,8 @@ public static class AdminEndpoints
     {
         var userId = GetUserId(http);
         var evt = await db.Events
-            .Include(e => e.Organization)
-            .FirstOrDefaultAsync(e => e.Id == eventId && e.Organization.ClerkUserId == userId, ct);
+            .Include(e => e.Group)
+            .FirstOrDefaultAsync(e => e.Id == eventId && e.Group.GroupOwner == userId, ct);
 
         if (evt is null) return Results.NotFound();
 
@@ -504,8 +521,8 @@ public static class AdminEndpoints
     {
         var userId = GetUserId(http);
         var slot = await db.TimeSlots
-            .Include(s => s.Event).ThenInclude(e => e.Organization)
-            .FirstOrDefaultAsync(s => s.Id == slotId && s.EventId == eventId && s.Event.Organization.ClerkUserId == userId, ct);
+            .Include(s => s.Event).ThenInclude(e => e.Group)
+            .FirstOrDefaultAsync(s => s.Id == slotId && s.EventId == eventId && s.Event.Group.GroupOwner == userId, ct);
 
         if (slot is null) return Results.NotFound();
 
@@ -562,8 +579,8 @@ public static class AdminEndpoints
     {
         var userId = GetUserId(http);
         var slot = await db.TimeSlots
-            .Include(s => s.Event).ThenInclude(e => e.Organization)
-            .FirstOrDefaultAsync(s => s.Id == slotId && s.EventId == eventId && s.Event.Organization.ClerkUserId == userId, ct);
+            .Include(s => s.Event).ThenInclude(e => e.Group)
+            .FirstOrDefaultAsync(s => s.Id == slotId && s.EventId == eventId && s.Event.Group.GroupOwner == userId, ct);
 
         if (slot is null) return Results.NotFound();
 
@@ -575,23 +592,22 @@ public static class AdminEndpoints
 
     // --- Roster ---
 
-    private static async Task<IResult> GetRoster(Guid orgId, DateOnly weekStart, AppDbContext db, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> GetRoster(DateOnly weekStart, AppDbContext db, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
-        var orgExists = await db.Organizations.AnyAsync(o => o.Id == orgId && o.ClerkUserId == userId, ct);
-        if (!orgExists) return Results.NotFound();
 
         var weekEnd = weekStart.AddDays(6);
 
         var events = await db.Events
-            .Where(e => e.OrganizationId == orgId && e.Date >= weekStart && e.Date <= weekEnd)
+            .Where(e => e.Group.GroupOwner == userId && e.Date >= weekStart && e.Date <= weekEnd)
+            .Include(e => e.Group)
             .Include(e => e.Questions)
             .Include(e => e.TimeSlots).ThenInclude(s => s.Signups).ThenInclude(su => su.Answers)
             .OrderBy(e => e.Date)
             .ToListAsync(ct);
 
         return Results.Ok(events.Select(e => new RosterEventResponse(
-            e.Id, e.Title, e.Description, e.Location, e.Date, RosterQuestionResponse.From(e.Questions),
+            e.Id, e.GroupId, e.Group.Name, e.Title, e.Description, e.Location, e.Date, RosterQuestionResponse.From(e.Questions),
             e.TimeSlots.OrderBy(s => s.StartTime).Select(s => new RosterSlotResponse(
                 s.Id, s.Label, e.Date.ToDateTime(s.StartTime), e.Date.ToDateTime(s.EndTime), s.Capacity, s.AllowWaitlist,
                 s.Signups.Select(su => new SignupResponse(su.Id, su.TimeSlotId, su.VolunteerName, su.Email, su.Status.ToString(), su.CreatedAt,
@@ -606,8 +622,8 @@ public static class AdminEndpoints
     {
         var userId = GetUserId(http);
         var signup = await db.Signups
-            .Include(s => s.TimeSlot).ThenInclude(s => s.Event).ThenInclude(e => e.Organization)
-            .FirstOrDefaultAsync(s => s.Id == id && s.TimeSlot.Event.Organization.ClerkUserId == userId, ct);
+            .Include(s => s.TimeSlot).ThenInclude(s => s.Event).ThenInclude(e => e.Group)
+            .FirstOrDefaultAsync(s => s.Id == id && s.TimeSlot.Event.Group.GroupOwner == userId, ct);
 
         if (signup is null) return Results.NotFound();
 
@@ -646,7 +662,7 @@ public static class AdminEndpoints
             var evt = slot.Event;
             var (subject, html, text) = EmailTemplates.BuildSignupRemoved(
                 signup.VolunteerName,
-                evt.Organization.Name,
+                evt.Group.Name,
                 evt.Title,
                 slot.Label,
                 evt.Date,
@@ -674,15 +690,15 @@ public static class AdminEndpoints
     {
         var userId = GetUserId(http);
         var evt = await db.Events
-            .Include(e => e.Organization)
+            .Include(e => e.Group)
             .Include(e => e.Questions)
             .Include(e => e.TimeSlots).ThenInclude(s => s.Signups).ThenInclude(su => su.Answers)
-            .FirstOrDefaultAsync(e => e.Id == id && e.Organization.ClerkUserId == userId, ct);
+            .FirstOrDefaultAsync(e => e.Id == id && e.Group.GroupOwner == userId, ct);
 
         if (evt is null) return Results.NotFound();
 
         return Results.Ok(new RosterEventResponse(
-            evt.Id, evt.Title, evt.Description, evt.Location, evt.Date, RosterQuestionResponse.From(evt.Questions),
+            evt.Id, evt.GroupId, evt.Group.Name, evt.Title, evt.Description, evt.Location, evt.Date, RosterQuestionResponse.From(evt.Questions),
             evt.TimeSlots.OrderBy(s => s.StartTime).Select(s => new RosterSlotResponse(
                 s.Id, s.Label, evt.Date.ToDateTime(s.StartTime), evt.Date.ToDateTime(s.EndTime), s.Capacity, s.AllowWaitlist,
                 s.Signups.Select(su => new SignupResponse(su.Id, su.TimeSlotId, su.VolunteerName, su.Email, su.Status.ToString(), su.CreatedAt,
@@ -697,8 +713,8 @@ public static class AdminEndpoints
     {
         var userId = GetUserId(http);
         var evt = await db.Events
-            .Include(e => e.Organization)
-            .FirstOrDefaultAsync(e => e.Id == eventId && e.Organization.ClerkUserId == userId, ct);
+            .Include(e => e.Group)
+            .FirstOrDefaultAsync(e => e.Id == eventId && e.Group.GroupOwner == userId, ct);
 
         if (evt is null) return Results.NotFound();
 
@@ -722,8 +738,8 @@ public static class AdminEndpoints
     {
         var userId = GetUserId(http);
         var evt = await db.Events
-            .Include(e => e.Organization)
-            .FirstOrDefaultAsync(e => e.Id == eventId && e.Organization.ClerkUserId == userId, ct);
+            .Include(e => e.Group)
+            .FirstOrDefaultAsync(e => e.Id == eventId && e.Group.GroupOwner == userId, ct);
 
         if (evt is null) return Results.NotFound();
 
@@ -739,10 +755,10 @@ public static class AdminEndpoints
     {
         var userId = GetUserId(http);
         var link = await db.InviteLinks
-            .Include(l => l.Event!).ThenInclude(e => e.Organization)
+            .Include(l => l.Event!).ThenInclude(e => e.Group)
             .FirstOrDefaultAsync(l => l.Id == id && l.EventId != null, ct);
 
-        if (link is null || link.Event is null || link.Event.Organization.ClerkUserId != userId)
+        if (link is null || link.Event is null || link.Event.Group.GroupOwner != userId)
             return Results.NotFound();
 
         if (!link.IsActive) return Results.NoContent();
@@ -763,10 +779,11 @@ public static class AdminEndpoints
 
 // --- Request DTOs ---
 
-public record CreateOrganizationRequest(
+public record CreateGroupRequest(
     [property: Required, NotWhitespace, StringLength(200)] string Name);
 
 public record CreateEventRequest(
+    Guid GroupId,
     [property: Required, NotWhitespace, StringLength(300)] string Title,
     [property: NotWhitespace, StringLength(2000)] string? Description,
     [property: NotWhitespace, StringLength(500)] string? Location,
@@ -776,6 +793,12 @@ public record CreateEventRequest(
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
+        if (GroupId == Guid.Empty)
+        {
+            yield return new ValidationResult(
+                "GroupId is required.",
+                [nameof(GroupId)]);
+        }
         if (Date == default)
         {
             yield return new ValidationResult(
@@ -792,6 +815,7 @@ public record CreateEventRequest(
 }
 
 public record UpdateEventRequest(
+    Guid? GroupId,
     [property: NotWhitespace, StringLength(300)] string? Title,
     [property: StringLength(2000)] string? Description,
     [property: StringLength(500)] string? Location,
@@ -910,13 +934,13 @@ public record QuestionUpsert(
 
 // --- Response DTOs ---
 
-public record OrganizationResponse(Guid Id, string Name, DateTime CreatedAt);
+public record GroupResponse(Guid Id, string Name, DateTime CreatedAt);
 
 public record InviteLinkResponse(Guid Id, Guid? EventId, string Code, bool IsActive, DateTime CreatedAt, DateTime? ExpiresAt);
 
-public record EventResponse(Guid Id, Guid OrganizationId, string Title, string? Description, string? Location, DateOnly Date, DateTime CreatedAt);
+public record EventResponse(Guid Id, Guid GroupId, string Title, string? Description, string? Location, DateOnly Date, DateTime CreatedAt);
 
-public record EventWithSlotsResponse(Guid Id, Guid OrganizationId, string Title, string? Description, string? Location, DateOnly Date, DateTime CreatedAt, IEnumerable<TimeSlotResponse> Slots);
+public record EventWithSlotsResponse(Guid Id, Guid GroupId, string GroupName, string Title, string? Description, string? Location, DateOnly Date, DateTime CreatedAt, IEnumerable<TimeSlotResponse> Slots);
 
 public record TimeSlotResponse(Guid Id, Guid EventId, string Label, DateTime StartTime, DateTime EndTime, int Capacity, int SignupCount, bool AllowWaitlist);
 
@@ -933,7 +957,7 @@ public record RosterQuestionResponse(Guid Id, string Label, string Type, bool Re
             : options.Split('\n').Select(o => o.Trim()).Where(o => o.Length > 0).ToList();
 }
 
-public record RosterEventResponse(Guid Id, string Title, string? Description, string? Location, DateOnly Date, List<RosterQuestionResponse> Questions, IEnumerable<RosterSlotResponse> Slots);
+public record RosterEventResponse(Guid Id, Guid GroupId, string GroupName, string Title, string? Description, string? Location, DateOnly Date, List<RosterQuestionResponse> Questions, IEnumerable<RosterSlotResponse> Slots);
 
 public record RosterSlotResponse(Guid Id, string Label, DateTime StartTime, DateTime EndTime, int Capacity, bool AllowWaitlist, IEnumerable<SignupResponse> Signups);
 

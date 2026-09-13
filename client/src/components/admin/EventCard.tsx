@@ -19,6 +19,7 @@ export function EventCard({ event }: EventCardProps) {
             {event.title}
           </Link>
         </CardTitle>
+        <p className="text-[11px] text-muted-foreground">{event.groupName}</p>
       </CardHeader>
       <CardContent className="space-y-2">
         {event.location && (

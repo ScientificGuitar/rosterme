@@ -49,13 +49,13 @@ export function InvitePage() {
     )
   }
 
-  const { organizationName, event } = data
+  const { groupName, event } = data
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <header className="space-y-1 text-center">
         <p className="text-sm font-medium text-muted-foreground">
-          {organizationName}
+          {groupName}
         </p>
         <h1 className="text-3xl font-bold">{event.title}</h1>
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -83,7 +83,7 @@ export function InvitePage() {
             <Calendar className="h-8 w-8 text-muted-foreground" />
             <p className="font-medium">This event has already passed</p>
             <p className="text-sm text-muted-foreground">
-              Signups are closed. Contact {organizationName} if you have any
+              Signups are closed. Contact {groupName} if you have any
               questions.
             </p>
           </CardContent>

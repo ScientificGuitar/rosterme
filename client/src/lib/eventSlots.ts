@@ -81,7 +81,7 @@ export function toSlotRows(event: RosterEvent, keyOffset = 0): SlotRow[] {
   }))
 }
 
-/** Payload for POST /organizations/:id/events (CreateSlotRequest, no ids). */
+/** Payload for POST /events (CreateSlotRequest, no ids). */
 export function buildSlotCreatePayload(slots: SlotDraft[]) {
   return slots.map((s) => ({
     label: s.label.trim(),

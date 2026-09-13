@@ -49,7 +49,7 @@ public static class PublicEndpoints
     {
         var link = await db.InviteLinks
             .Include(l => l.Event!)
-                .ThenInclude(e => e.Organization)
+                .ThenInclude(e => e.Group)
             .Include(l => l.Event!)
                 .ThenInclude(e => e.TimeSlots)
                     .ThenInclude(s => s.Signups)
@@ -64,8 +64,8 @@ public static class PublicEndpoints
         var evt = link.Event;
 
         return Results.Ok(new InvitePageResponse(
-            evt.OrganizationId,
-            evt.Organization.Name,
+            evt.GroupId,
+            evt.Group.Name,
             new EventPublicResponse(
                 evt.Id,
                 evt.Title,
@@ -210,7 +210,7 @@ public static class PublicEndpoints
 
             var slot = await db.TimeSlots
                 .Include(s => s.Event!)
-                    .ThenInclude(e => e.Organization)
+                    .ThenInclude(e => e.Group)
                 .FirstOrDefaultAsync(s => s.Id == request.SlotId, ct);
 
             if (slot is null || slot.Event is null)
@@ -269,7 +269,7 @@ public static class PublicEndpoints
         var signup = await db.Signups
             .Include(s => s.TimeSlot)
                 .ThenInclude(t => t.Event)
-                    .ThenInclude(e => e.Organization)
+                    .ThenInclude(e => e.Group)
             .FirstOrDefaultAsync(s => s.ManagementTokenHash == hash, ct);
 
         if (signup is null)
@@ -301,7 +301,7 @@ public static class PublicEndpoints
             signup.Email,
             signup.Status.ToString(),
             signup.ConfirmedAt,
-            evt.Organization.Name,
+            evt.Group.Name,
             evt.Title,
             evt.Location,
             evt.Date,
@@ -329,8 +329,8 @@ public static class PublicEndpoints
         if (signup.Status == SignupStatus.Removed)
             return Results.Conflict(new
             {
-                error = "This signup was removed by the organization.",
-                code = "removed_by_organization"
+                error = "This signup was removed by the organizer.",
+                code = "removed_by_organizer"
             });
 
         if (signup.Status == SignupStatus.Cancelled)
@@ -361,8 +361,8 @@ public static class PublicEndpoints
                 await tx.CommitAsync(ct);
                 return Results.Conflict(new
                 {
-                    error = "This signup was removed by the organization.",
-                    code = "removed_by_organization"
+                    error = "This signup was removed by the organizer.",
+                    code = "removed_by_organizer"
                 });
             }
 
@@ -401,7 +401,7 @@ public static class PublicEndpoints
         var signup = await db.Signups
             .Include(s => s.TimeSlot)
                 .ThenInclude(t => t.Event!)
-                    .ThenInclude(e => e.Organization)
+                    .ThenInclude(e => e.Group)
             .FirstOrDefaultAsync(s => s.TimeSlotId == request.SlotId
                 && s.Email == email
                 && s.TimeSlot.EventId == link.EventId, ct);
@@ -418,8 +418,8 @@ public static class PublicEndpoints
         if (signup.Status == SignupStatus.Removed)
             return Results.NotFound(new
             {
-                error = "This signup was removed by the organization.",
-                code = "removed_by_organization"
+                error = "This signup was removed by the organizer.",
+                code = "removed_by_organizer"
             });
 
         if (signup.Status == SignupStatus.Cancelled)
@@ -480,7 +480,7 @@ public static class PublicEndpoints
             signup.Id.ToString());
         var (subject, html, text) = EmailTemplates.BuildSignupConfirmation(
             signup.VolunteerName,
-            slot.Event.Organization.Name,
+            slot.Event.Group.Name,
             slot.Event.Title,
             slot.Label,
             slot.Event.Date,
@@ -514,7 +514,7 @@ public static class PublicEndpoints
         var evt = slot.Event;
         var (subject, html, text) = EmailTemplates.BuildWaitlistConfirmation(
             signup.VolunteerName,
-            evt.Organization.Name,
+            evt.Group.Name,
             evt.Title,
             slot.Label,
             evt.Date,
@@ -670,7 +670,7 @@ public record ResendSignupRequest(
 
 // --- Response DTOs ---
 
-public record InvitePageResponse(Guid OrganizationId, string OrganizationName, EventPublicResponse Event);
+public record InvitePageResponse(Guid GroupId, string GroupName, EventPublicResponse Event);
 
 public record EventPublicResponse(Guid Id, string Title, string? Description, string? Location, DateOnly Date, bool IsPast, IEnumerable<PublicQuestionResponse> Questions, IEnumerable<SlotAvailabilityResponse> Slots);
 
@@ -686,7 +686,7 @@ public record SignupManageResponse(
     string Email,
     string Status,
     DateTime? ConfirmedAt,
-    string OrganizationName,
+    string GroupName,
     string EventTitle,
     string? EventLocation,
     DateOnly EventDate,

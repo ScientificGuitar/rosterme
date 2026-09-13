@@ -84,7 +84,7 @@ export function SignupManagePage() {
         <CardContent className="space-y-4 p-6 pt-2">
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              {data.organizationName}
+              {data.groupName}
             </p>
             <p className="text-lg font-semibold">{data.eventTitle}</p>
           </div>
@@ -159,8 +159,7 @@ export function SignupManagePage() {
           {isRemoved ? (
             <div className="flex items-center gap-2 rounded-md border p-3 text-sm text-muted-foreground">
               <CalendarX2 className="h-4 w-4" />
-              This signup was removed by the organization. Your spot has been
-              released.
+              This signup was removed by the organizer. Your spot has been released.
             </div>
           ) : isCancelled ? (
             <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">

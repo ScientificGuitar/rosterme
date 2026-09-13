@@ -2,13 +2,13 @@ import type {
   RosterEvent,
   CreateEventRequest,
   EventWithSlots,
+  Group,
   InviteLink,
   PublicInviteData,
   CreateSlotRequest,
   UpdateSlotRequest,
   UpdateEventRequest,
   TimeSlotResponse,
-  UserMeResponse,
   SignupManageData,
 } from "@/lib/types"
 
@@ -92,22 +92,22 @@ export function createAdminApi(getToken: () => Promise<string | null>) {
   const h = () => authHeaders(getToken)
 
   return {
-    getCurrentUser: async () => {
-      const res = await fetch(`${BASE}/user/me`, { headers: await h() })
-      return checkJson<UserMeResponse>(res)
+    getGroups: async () => {
+      const res = await fetch(`${BASE}/groups`, { headers: await h() })
+      return checkJson<Group[]>(res)
     },
 
-    createOrganization: async (name: string) => {
-      const res = await fetch(`${BASE}/organizations`, {
+    createGroup: async (name: string) => {
+      const res = await fetch(`${BASE}/groups`, {
         method: "POST",
         headers: await h(),
         body: JSON.stringify({ name }),
       })
-      return checkJson<{ id: string; name: string; createdAt: string }>(res)
+      return checkJson<Group>(res)
     },
 
-    createEvent: async (orgId: string, data: CreateEventRequest) => {
-      const res = await fetch(`${BASE}/organizations/${orgId}/events`, {
+    createEvent: async (data: CreateEventRequest) => {
+      const res = await fetch(`${BASE}/events`, {
         method: "POST",
         headers: await h(),
         body: JSON.stringify(data),
@@ -167,23 +167,17 @@ export function createAdminApi(getToken: () => Promise<string | null>) {
       await checkVoid(res)
     },
 
-    getRoster: async (orgId: string, weekStart: string) => {
-      const res = await fetch(
-        `${BASE}/organizations/${orgId}/roster?weekStart=${weekStart}`,
-        {
-          headers: await h(),
-        }
-      )
+    getRoster: async (weekStart: string) => {
+      const res = await fetch(`${BASE}/roster?weekStart=${weekStart}`, {
+        headers: await h(),
+      })
       return checkJson<RosterEvent[]>(res)
     },
 
-    listEvents: async (orgId: string, from: string, to: string) => {
-      const res = await fetch(
-        `${BASE}/organizations/${orgId}/events?from=${from}&to=${to}`,
-        {
-          headers: await h(),
-        }
-      )
+    listEvents: async (from: string, to: string) => {
+      const res = await fetch(`${BASE}/events?from=${from}&to=${to}`, {
+        headers: await h(),
+      })
       return checkJson<EventWithSlots[]>(res)
     },
 
@@ -219,8 +213,8 @@ export function createAdminApi(getToken: () => Promise<string | null>) {
       await checkVoid(res)
     },
 
-    deleteOrganization: async (orgId: string) => {
-      const res = await fetch(`${BASE}/organizations/${orgId}`, {
+    deleteGroup: async (groupId: string) => {
+      const res = await fetch(`${BASE}/groups/${groupId}`, {
         method: "DELETE",
         headers: await h(),
       })

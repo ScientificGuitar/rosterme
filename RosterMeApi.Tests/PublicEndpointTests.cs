@@ -27,7 +27,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
-        Assert.Equal("Public Org", body.GetProperty("organizationName").GetString());
+        Assert.Equal("Public Org", body.GetProperty("groupName").GetString());
 
         var evt = body.GetProperty("event");
         Assert.Equal(eventId, evt.GetProperty("id").GetGuid());
@@ -218,7 +218,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
         Assert.Equal("Manager", body.GetProperty("volunteerName").GetString());
         Assert.Equal("manager@example.com", body.GetProperty("email").GetString());
         Assert.Equal("Confirmed", body.GetProperty("status").GetString());
-        Assert.Equal("Manage Org", body.GetProperty("organizationName").GetString());
+        Assert.Equal("Manage Org", body.GetProperty("groupName").GetString());
         Assert.Equal("Future Event", body.GetProperty("eventTitle").GetString());
         Assert.Equal("Slot 1", body.GetProperty("slotLabel").GetString());
 
@@ -676,7 +676,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
         var cancel = await _publicClient.PostAsync($"/api/signup/manage/{rawToken}/cancel", null);
         Assert.Equal(HttpStatusCode.Conflict, cancel.StatusCode);
         var body = await cancel.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
-        Assert.Equal("removed_by_organization", body.GetProperty("code").GetString());
+        Assert.Equal("removed_by_organizer", body.GetProperty("code").GetString());
 
         using var verifyScope = factory.Services.CreateScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -776,8 +776,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
         var (orgId, eventId, code) = await SeedInviteLinkAsync("Scoped Org");
 
         // Create a second event under the same org with its own slot, then look up its slot id
-        var otherEventResp = await _adminClient.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var otherEventResp = await _adminClient.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Other Event",
             date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)).ToString("yyyy-MM-dd"),
             slots = new[] { new { label = "Other Slot", startTime = "08:00", endTime = "09:00", capacity = 5 } }
@@ -1460,13 +1459,12 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
 
     private async Task<(Guid orgId, Guid eventId, string code)> SeedEventWithQuestionsAsync(string orgName)
     {
-        var resp = await _adminClient.PostAsJsonAsync("/api/organizations", new { name = orgName });
+        var resp = await _adminClient.PostAsJsonAsync("/api/groups", new { name = orgName });
         var org = await resp.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
         var orgId = org.GetProperty("id").GetGuid();
 
         var futureDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30));
-        var evtResp = await _adminClient.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var evtResp = await _adminClient.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Questions Event",
             date = futureDate.ToString("yyyy-MM-dd"),
             slots = new[]
@@ -1541,14 +1539,13 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
     }
 
     private async Task<(Guid orgId, Guid eventId, string code)> SeedInviteLinkAsync(string name)    {
-        var resp = await _adminClient.PostAsJsonAsync("/api/organizations", new { name });
+        var resp = await _adminClient.PostAsJsonAsync("/api/groups", new { name });
         var org = await resp.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
         var orgId = org.GetProperty("id").GetGuid();
 
         // Create a future event with a slot so the invite page has data
         var futureDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30));
-        var evtResp = await _adminClient.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var evtResp = await _adminClient.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Future Event",
             date = futureDate.ToString("yyyy-MM-dd"),
             slots = new[]

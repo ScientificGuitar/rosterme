@@ -33,7 +33,6 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
-import { useOrg } from "@/hooks/useOrg"
 import { useEvent } from "@/hooks/useEvent"
 import { useDeleteSignup } from "@/hooks/useDeleteSignup"
 import { useApi } from "@/hooks/useApi"
@@ -41,8 +40,7 @@ import type { InviteLink } from "@/lib/types"
 
 export function EventDetail() {
   const { id } = useParams<{ id: string }>()
-  const { org, loading: orgLoading, error: orgError } = useOrg()
-  const { data: event, isLoading, error } = useEvent(org && id ? id : undefined)
+  const { data: event, isLoading, error } = useEvent(id)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletingEvent, setDeletingEvent] = useState(false)
   const [pendingSignupId, setPendingSignupId] = useState<string | null>(null)
@@ -90,24 +88,9 @@ export function EventDetail() {
     }
   }
 
-  if (orgLoading || (isLoading && !event)) {
+  if (isLoading && !event) {
     return (
       <div className="py-12 text-center text-muted-foreground">Loading...</div>
-    )
-  }
-
-  if (orgError) {
-    return (
-      <div className="py-12 text-center">
-        <p className="mb-4 text-muted-foreground">
-          {orgError instanceof Error
-            ? orgError.message
-            : "Failed to load organization"}
-        </p>
-        <Button variant="outline" onClick={() => navigate("/dashboard")}>
-          Back to Dashboard
-        </Button>
-      </div>
     )
   }
 
@@ -142,7 +125,9 @@ export function EventDetail() {
           </Button>
           <div className="flex-1">
             <h1 className="text-2xl font-bold">{event.title}</h1>
-            <p className="text-sm text-muted-foreground">{event.date}</p>
+            <p className="text-sm text-muted-foreground">
+              {event.groupName} · {event.date}
+            </p>
             {event.location && (
               <p className="flex items-center gap-1 text-sm text-muted-foreground">
                 <MapPin className="h-3.5 w-3.5" />

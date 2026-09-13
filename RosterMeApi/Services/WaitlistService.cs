@@ -55,7 +55,7 @@ public static class WaitlistService
     {
         var slot = await db.TimeSlots
             .Include(s => s.Event!)
-                .ThenInclude(e => e.Organization)
+                .ThenInclude(e => e.Group)
             .FirstOrDefaultAsync(s => s.Id == slotId, ct);
 
         if (slot is null || slot.Event is null) return 0;
@@ -108,7 +108,7 @@ public static class WaitlistService
             evt.Title, evt.Description, evt.Location, evt.Date,
             slot.StartTime, slot.EndTime, slot.Label, manageUrl, signup.Id.ToString());
         var (subject, html, text) = EmailTemplates.BuildWaitlistPromotion(
-            signup.VolunteerName, evt.Organization.Name, evt.Title, slot.Label, evt.Date,
+            signup.VolunteerName, evt.Group.Name, evt.Title, slot.Label, evt.Date,
             slot.StartTime, slot.EndTime, manageUrl, evt.Location, links,
             hasCalendarAttachment: true);
 

@@ -4,10 +4,6 @@ import { Button } from "@/components/ui/button"
 import { EventCard } from "@/components/admin/EventCard"
 import { useRoster } from "@/hooks/useRoster"
 
-interface WeeklyGridProps {
-  orgId: string
-}
-
 function getMonday(date: Date): Date {
   const d = new Date(date)
   const day = d.getDay()
@@ -48,7 +44,7 @@ function formatWeekRange(monday: Date): string {
   return `${months[monday.getMonth()]} ${monday.getDate()} – ${months[sunday.getMonth()]} ${sunday.getDate()}, ${sunday.getFullYear()}`
 }
 
-export function WeeklyGrid({ orgId }: WeeklyGridProps) {
+export function WeeklyGrid() {
   const [monday, setMonday] = useState(() => getMonday(new Date()))
   const weekStart = formatDate(monday)
   const {
@@ -56,7 +52,7 @@ export function WeeklyGrid({ orgId }: WeeklyGridProps) {
     isLoading,
     error,
     refetch,
-  } = useRoster(orgId, weekStart)
+  } = useRoster(weekStart)
 
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday)

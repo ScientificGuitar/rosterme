@@ -165,17 +165,17 @@ public class SignupReminderServiceTests
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var org = new Organization
+        var org = new Group
         {
             Id = Guid.NewGuid(),
             Name = "Reminder Test Org",
-            ClerkUserId = TestAuthHandler.TestUserId,
+            GroupOwner = TestAuthHandler.TestUserId,
             CreatedAt = DateTime.UtcNow
         };
         var evt = new Event
         {
             Id = Guid.NewGuid(),
-            OrganizationId = org.Id,
+            GroupId = org.Id,
             Title = "Reminder Event",
             Date = DateOnly.FromDateTime(slotStartUtc),
             CreatedAt = DateTime.UtcNow
@@ -202,7 +202,7 @@ public class SignupReminderServiceTests
             CreatedAt = createdAt ?? DateTime.UtcNow
         };
 
-        db.Organizations.Add(org);
+        db.Groups.Add(org);
         db.Events.Add(evt);
         db.TimeSlots.Add(slot);
         db.Signups.Add(signup);

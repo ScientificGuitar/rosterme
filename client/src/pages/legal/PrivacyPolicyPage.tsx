@@ -178,12 +178,12 @@ export function PrivacyPolicyPage() {
         </p>
         <p>
           <strong>
-            Organizations see their own roster (separate controllers).
+            Organizers see their own roster (separate controllers).
           </strong>{" "}
           An organizer can see the names, email addresses, and statuses of
           volunteers who signed up for their events, and can export that list.
-          Volunteers: by signing up, you understand the organization running the
-          event receives the details you enter. Organizations must use roster
+          Volunteers: by signing up, you understand the organizer running the
+          event receives the details you enter. Organizers must use roster
           data only to run their events (see our Terms of Service) and handle
           any copies they export responsibly.
         </p>

@@ -24,12 +24,12 @@ public class AdminEndpointTests : IDisposable
         _client = factory.CreateClient();
     }
 
-    // --- Organization ---
+    // --- Group ---
 
     [Fact]
-    public async Task CreateOrganization_Returns201()
+    public async Task CreateGroup_Returns201()
     {
-        var response = await _client.PostAsJsonAsync("/api/organizations", new { name = "Test Church" });
+        var response = await _client.PostAsJsonAsync("/api/groups", new { name = "Test Church" });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
@@ -38,9 +38,9 @@ public class AdminEndpointTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateOrganization_TrimsName()
+    public async Task CreateGroup_TrimsName()
     {
-        var response = await _client.PostAsJsonAsync("/api/organizations", new { name = "  Padded Church  " });
+        var response = await _client.PostAsJsonAsync("/api/groups", new { name = "  Padded Church  " });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
@@ -52,8 +52,7 @@ public class AdminEndpointTests : IDisposable
     {
         var orgId = await SeedOrgAsync("Trim Org");
 
-        var response = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var response = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "  Sunday Service  ",
             description = "  Morning gathering  ",
             location = "  123 Main St  ",
@@ -76,11 +75,11 @@ public class AdminEndpointTests : IDisposable
     }
 
     [Fact]
-    public async Task GetOrganization_ReturnsOrg()
+    public async Task GetGroup_ReturnsGroup()
     {
         var orgId = await SeedOrgAsync("Simple Org");
 
-        var response = await _client.GetAsync($"/api/organizations/{orgId}");
+        var response = await _client.GetAsync($"/api/groups/{orgId}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
@@ -88,25 +87,50 @@ public class AdminEndpointTests : IDisposable
     }
 
     [Fact]
-    public async Task GetOrganization_OtherUsersOrg_Returns404()
+    public async Task GetGroup_OtherUsersGroup_Returns404()
     {
         var otherOrgId = Guid.NewGuid();
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.Organizations.Add(new Organization
+            db.Groups.Add(new Group
             {
                 Id = otherOrgId,
                 Name = "Other Org",
-                ClerkUserId = TestAuthHandler.OtherUserId,
+                GroupOwner = TestAuthHandler.OtherUserId,
                 CreatedAt = DateTime.UtcNow
             });
             await db.SaveChangesAsync();
         }
 
-        var response = await _client.GetAsync($"/api/organizations/{otherOrgId}");
+        var response = await _client.GetAsync($"/api/groups/{otherOrgId}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ListGroups_ReturnsOnlyOwnedGroups()
+    {
+        var ownId = await SeedOrgAsync("Own Group");
+        var otherId = Guid.NewGuid();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Groups.Add(new Group
+            {
+                Id = otherId,
+                Name = "Other Group",
+                GroupOwner = TestAuthHandler.OtherUserId,
+                CreatedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var groups = await _client.GetFromJsonAsync<JsonElement>("/api/groups", _jsonOptions);
+        var ids = groups.EnumerateArray().Select(g => g.GetProperty("id").GetGuid()).ToList();
+
+        Assert.Contains(ownId, ids);
+        Assert.DoesNotContain(otherId, ids);
     }
 
     // --- Events ---
@@ -116,8 +140,7 @@ public class AdminEndpointTests : IDisposable
     {
         var orgId = await SeedOrgAsync("Event Org");
 
-        var response = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var response = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Sunday Service",
             date = FutureDate()
         });
@@ -128,13 +151,98 @@ public class AdminEndpointTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateEvent_OtherUsersGroup_Returns404()
+    {
+        var otherGroupId = Guid.NewGuid();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Groups.Add(new Group
+            {
+                Id = otherGroupId,
+                Name = "Other Group",
+                GroupOwner = TestAuthHandler.OtherUserId,
+                CreatedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var response = await _client.PostAsJsonAsync("/api/events", new
+        {
+            groupId = otherGroupId,
+            title = "Sunday Service",
+            date = FutureDate()
+        });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateEvent_ReassignGroup_MovesEvent()
+    {
+        var groupA = await SeedOrgAsync("Group A");
+        var groupB = await SeedOrgAsync("Group B");
+        var create = await _client.PostAsJsonAsync("/api/events", new
+        {
+            groupId = groupA,
+            title = "Movable Event",
+            date = FutureDate()
+        });
+        var created = await create.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var eventId = created.GetProperty("id").GetGuid();
+
+        var update = await _client.PutAsJsonAsync($"/api/events/{eventId}", new
+        {
+            groupId = groupB,
+            title = "Movable Event"
+        });
+
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+        var evt = await _client.GetFromJsonAsync<JsonElement>($"/api/events/{eventId}", _jsonOptions);
+        Assert.Equal(groupB, evt.GetProperty("groupId").GetGuid());
+    }
+
+    [Fact]
+    public async Task UpdateEvent_ReassignToOtherUsersGroup_Returns404()
+    {
+        var groupA = await SeedOrgAsync("Group A");
+        var otherGroupId = Guid.NewGuid();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Groups.Add(new Group
+            {
+                Id = otherGroupId,
+                Name = "Other Group",
+                GroupOwner = TestAuthHandler.OtherUserId,
+                CreatedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+        var create = await _client.PostAsJsonAsync("/api/events", new
+        {
+            groupId = groupA,
+            title = "Movable Event",
+            date = FutureDate()
+        });
+        var created = await create.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var eventId = created.GetProperty("id").GetGuid();
+
+        var update = await _client.PutAsJsonAsync($"/api/events/{eventId}", new
+        {
+            groupId = otherGroupId
+        });
+
+        Assert.Equal(HttpStatusCode.NotFound, update.StatusCode);
+    }
+
+    [Fact]
     public async Task CreateEvent_WithInlineSlots_Returns201WithSlots()
     {
         var orgId = await SeedOrgAsync("Slots Org");
         var eventDate = FutureDate();
 
-        var response = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var response = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Service With Slots",
             date = eventDate,
             slots = new[]
@@ -148,7 +256,7 @@ public class AdminEndpointTests : IDisposable
 
         // Verify slots appear in roster
         var roster = await _client.GetFromJsonAsync<JsonElement>(
-            $"/api/organizations/{orgId}/roster?weekStart={WeekStartFor(eventDate)}", _jsonOptions);
+            $"/api/roster?weekStart={WeekStartFor(eventDate)}", _jsonOptions);
         var events = roster.EnumerateArray().ToList();
         var evt = events.First(e => e.GetProperty("title").GetString() == "Service With Slots");
         var slots = evt.GetProperty("slots").EnumerateArray().ToList();
@@ -161,11 +269,11 @@ public class AdminEndpointTests : IDisposable
         var orgId = await SeedOrgAsync("List Org");
         var baseDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30));
 
-        await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new { title = "Event 1", date = baseDate.ToString("yyyy-MM-dd") });
-        await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new { title = "Event 2", date = baseDate.AddDays(7).ToString("yyyy-MM-dd") });
-        await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new { title = "Event 3", date = baseDate.AddDays(14).ToString("yyyy-MM-dd") });
+        await _client.PostAsJsonAsync("/api/events", new { groupId = orgId,  title = "Event 1", date = baseDate.ToString("yyyy-MM-dd") });
+        await _client.PostAsJsonAsync("/api/events", new { groupId = orgId,  title = "Event 2", date = baseDate.AddDays(7).ToString("yyyy-MM-dd") });
+        await _client.PostAsJsonAsync("/api/events", new { groupId = orgId,  title = "Event 3", date = baseDate.AddDays(14).ToString("yyyy-MM-dd") });
 
-        var response = await _client.GetAsync($"/api/organizations/{orgId}/events?from={baseDate.AddDays(5):yyyy-MM-dd}&to={baseDate.AddDays(10):yyyy-MM-dd}");
+        var response = await _client.GetAsync($"/api/events?from={baseDate.AddDays(5):yyyy-MM-dd}&to={baseDate.AddDays(10):yyyy-MM-dd}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
@@ -179,8 +287,7 @@ public class AdminEndpointTests : IDisposable
     public async Task UpdateEvent_UpdatesFields()
     {
         var orgId = await SeedOrgAsync("Update Org");
-        var create = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events",
-            new { title = "Old Title", date = FutureDate() });
+        var create = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, title = "Old Title", date = FutureDate() });
         var created = await create.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
         var eventId = created.GetProperty("id").GetGuid();
 
@@ -196,8 +303,7 @@ public class AdminEndpointTests : IDisposable
     public async Task UpdateEvent_EmptyDescription_ClearsDescription()
     {
         var orgId = await SeedOrgAsync("Clear Description Org");
-        var create = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events",
-            new { title = "Described Event", description = "Old description", date = FutureDate() });
+        var create = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, title = "Described Event", description = "Old description", date = FutureDate() });
         var created = await create.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
         var eventId = created.GetProperty("id").GetGuid();
 
@@ -213,8 +319,7 @@ public class AdminEndpointTests : IDisposable
     public async Task UpdateEvent_WhitespaceDescription_ClearsDescription()
     {
         var orgId = await SeedOrgAsync("Clear Whitespace Description Org");
-        var create = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events",
-            new { title = "Described Event", description = "Old description", date = FutureDate() });
+        var create = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, title = "Described Event", description = "Old description", date = FutureDate() });
         var created = await create.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
         var eventId = created.GetProperty("id").GetGuid();
 
@@ -230,8 +335,7 @@ public class AdminEndpointTests : IDisposable
     public async Task UpdateEvent_WithSlotSync_CreatesUpdatesAndDeletesAtomically()
     {
         var orgId = await SeedOrgAsync("Sync Slots Org");
-        var create = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var create = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Sync Event",
             date = FutureDate(),
             slots = new[]
@@ -351,8 +455,7 @@ public class AdminEndpointTests : IDisposable
     {
         var orgId = await SeedOrgAsync("Delete Org");
         var eventDate = FutureDate();
-        var create = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events",
-            new { title = "To Delete", date = eventDate });
+        var create = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, title = "To Delete", date = eventDate });
         var created = await create.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
         var eventId = created.GetProperty("id").GetGuid();
 
@@ -361,8 +464,10 @@ public class AdminEndpointTests : IDisposable
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
         var roster = await _client.GetFromJsonAsync<JsonElement>(
-            $"/api/organizations/{orgId}/roster?weekStart={WeekStartFor(eventDate)}", _jsonOptions);
-        Assert.Empty(roster.EnumerateArray());
+            $"/api/roster?weekStart={WeekStartFor(eventDate)}", _jsonOptions);
+        Assert.DoesNotContain(
+            roster.EnumerateArray(),
+            e => e.GetProperty("id").GetGuid() == eventId);
     }
 
     // --- Slots ---
@@ -371,8 +476,7 @@ public class AdminEndpointTests : IDisposable
     public async Task CreateSlot_Returns201()
     {
         var orgId = await SeedOrgAsync("Slot Org");
-        var create = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events",
-            new { title = "Slot Event", date = FutureDate() });
+        var create = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, title = "Slot Event", date = FutureDate() });
         var created = await create.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
         var eventId = created.GetProperty("id").GetGuid();
 
@@ -395,8 +499,7 @@ public class AdminEndpointTests : IDisposable
     public async Task DeleteSlot_RemovesSlot()
     {
         var orgId = await SeedOrgAsync("Del Slot Org");
-        var createEvt = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events",
-            new { title = "Del Slot Event", date = FutureDate() });
+        var createEvt = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, title = "Del Slot Event", date = FutureDate() });
         var evt = await createEvt.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
         var eventId = evt.GetProperty("id").GetGuid();
 
@@ -417,15 +520,14 @@ public class AdminEndpointTests : IDisposable
     {
         var orgId = await SeedOrgAsync("Roster Org");
         var eventDate = FutureDate();
-        var create = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var create = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Roster Event",
             date = eventDate,
             slots = new[] { new { label = "Slot 1", startTime = "08:00", endTime = "09:00", capacity = 2 } }
         });
         Assert.Equal(HttpStatusCode.Created, create.StatusCode);
 
-        var response = await _client.GetAsync($"/api/organizations/{orgId}/roster?weekStart={WeekStartFor(eventDate)}");
+        var response = await _client.GetAsync($"/api/roster?weekStart={WeekStartFor(eventDate)}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
@@ -439,7 +541,7 @@ public class AdminEndpointTests : IDisposable
     {
         var orgId = await SeedOrgAsync("Empty Org");
 
-        var response = await _client.GetAsync($"/api/organizations/{orgId}/roster?weekStart=2025-01-06");
+        var response = await _client.GetAsync($"/api/roster?weekStart=2025-01-06");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
@@ -526,7 +628,7 @@ public class AdminEndpointTests : IDisposable
         var cancelResp = await _client.PostAsync($"/api/signup/manage/{rawToken}/cancel", null);
         Assert.Equal(HttpStatusCode.Conflict, cancelResp.StatusCode);
         var cancelBody = await cancelResp.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
-        Assert.Equal("removed_by_organization", cancelBody.GetProperty("code").GetString());
+        Assert.Equal("removed_by_organizer", cancelBody.GetProperty("code").GetString());
 
         // Resend after removal reports removal, and the spot is freed for re-signup
         var resendResp = await _client.PostAsJsonAsync($"/api/invite/{code}/signups/resend",
@@ -608,18 +710,18 @@ public class AdminEndpointTests : IDisposable
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var org = new Organization
+            var org = new Group
             {
                 Id = Guid.NewGuid(),
                 Name = "Other",
-                ClerkUserId = TestAuthHandler.OtherUserId,
+                GroupOwner = TestAuthHandler.OtherUserId,
                 CreatedAt = DateTime.UtcNow
             };
-            db.Organizations.Add(org);
+            db.Groups.Add(org);
             db.Events.Add(new Event
             {
                 Id = otherEventId,
-                OrganizationId = org.Id,
+                GroupId = org.Id,
                 Title = "Other Event",
                 Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(7)),
                 CreatedAt = DateTime.UtcNow
@@ -691,8 +793,7 @@ public class AdminEndpointTests : IDisposable
     {
         var orgId = await SeedOrgAsync("Questions Org");
 
-        var response = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var response = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Event With Questions",
             date = FutureDate(),
             questions = new object[]
@@ -727,8 +828,7 @@ public class AdminEndpointTests : IDisposable
     {
         var orgId = await SeedOrgAsync("Missing Type Org");
 
-        var response = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var response = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Missing Type",
             date = FutureDate(),
             questions = new[] { new { label = "No type", required = false } }
@@ -747,8 +847,7 @@ public class AdminEndpointTests : IDisposable
         var questions = Enumerable.Range(1, 11).Select(i =>
             (object)new { label = $"Question {i}", type = "ShortText", required = false });
 
-        var response = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var response = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Too Many Questions",
             date = FutureDate(),
             questions
@@ -762,8 +861,7 @@ public class AdminEndpointTests : IDisposable
     {
         var orgId = await SeedOrgAsync("No Options Org");
 
-        var response = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var response = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "No Options",
             date = FutureDate(),
             questions = new[] { new { label = "Size", type = "Dropdown", required = false } }
@@ -781,8 +879,7 @@ public class AdminEndpointTests : IDisposable
 
         var options = Enumerable.Range(1, 21).Select(i => $"Option {i}").ToArray();
 
-        var response = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var response = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Too Many Options",
             date = FutureDate(),
             questions = new[] { new { label = "Size", type = "Dropdown", required = false, options } }
@@ -796,8 +893,7 @@ public class AdminEndpointTests : IDisposable
     {
         var orgId = await SeedOrgAsync("Bad Options Org");
 
-        var response = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var response = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Bad Options",
             date = FutureDate(),
             questions = new[] { new { label = "Name", type = "ShortText", required = false, options = new[] { "A" } } }
@@ -1046,7 +1142,7 @@ public class AdminEndpointTests : IDisposable
 
     private async Task<Guid> SeedOrgAsync(string name)
     {
-        var response = await _client.PostAsJsonAsync("/api/organizations", new { name });
+        var response = await _client.PostAsJsonAsync("/api/groups", new { name });
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
         return body.GetProperty("id").GetGuid();
     }
@@ -1062,8 +1158,7 @@ public class AdminEndpointTests : IDisposable
 
     private async Task<Guid> SeedEventWithQuestionsAsync(Guid orgId)
     {
-        var response = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var response = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Questions Event",
             date = FutureDate(),
             slots = new[] { new { label = "Slot A", startTime = "09:00", endTime = "10:00", capacity = 3 } },
@@ -1088,8 +1183,7 @@ public class AdminEndpointTests : IDisposable
     {
         var orgId = await SeedOrgAsync(orgName);
         var eventDate = FutureDate();
-        var createEvt = await _client.PostAsJsonAsync($"/api/organizations/{orgId}/events", new
-        {
+        var createEvt = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, 
             title = "Test Event",
             date = eventDate,
             slots = new[] { new { label = "Test Slot", startTime = "09:00", endTime = "10:00", capacity = 3 } }
@@ -1097,10 +1191,12 @@ public class AdminEndpointTests : IDisposable
         var evt = await createEvt.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
         var eventId = evt.GetProperty("id").GetGuid();
 
-        // Fetch the roster to get the slot ID
+        // Fetch the roster to get the slot ID (filter to our own event:
+        // the roster is aggregated across all owned groups)
         var roster = await _client.GetFromJsonAsync<JsonElement>(
-            $"/api/organizations/{orgId}/roster?weekStart={WeekStartFor(eventDate)}", _jsonOptions);
-        var slotId = roster.EnumerateArray().First()
+            $"/api/roster?weekStart={WeekStartFor(eventDate)}", _jsonOptions);
+        var slotId = roster.EnumerateArray()
+            .First(e => e.GetProperty("id").GetGuid() == eventId)
             .GetProperty("slots").EnumerateArray().First()
             .GetProperty("id").GetGuid();
 

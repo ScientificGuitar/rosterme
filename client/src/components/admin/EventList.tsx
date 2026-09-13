@@ -9,10 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import type { EventWithSlots } from "@/lib/types"
 
-interface EventListProps {
-  orgId: string
-}
-
 type EventStatusFilter = "active" | "inactive" | "all"
 type EventSortBy = "date" | "title" | "status"
 
@@ -45,7 +41,7 @@ function formatEventDate(date: string): string {
 const selectClassName =
   "h-9 rounded-md border border-input bg-transparent px-2.5 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
 
-export function EventList({ orgId }: EventListProps) {
+export function EventList() {
   const api = useApi()
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<EventStatusFilter>("active")
@@ -67,8 +63,8 @@ export function EventList({ orgId }: EventListProps) {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["events", orgId, from, to],
-    queryFn: () => api.listEvents(orgId, from, to),
+    queryKey: ["events", from, to],
+    queryFn: () => api.listEvents(from, to),
     staleTime: 5 * 60 * 1000,
   })
 
@@ -203,6 +199,7 @@ function EventListItem({ event, today }: { event: EventWithSlots; today: string 
             {event.title}
           </Link>
         </CardTitle>
+        <p className="text-xs text-muted-foreground">{event.groupName}</p>
       </CardHeader>
       <CardContent className="space-y-2">
         {event.location && (
