@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 
-function useStartFree() {
+function useStart() {
   const { openSignUp } = useClerk()
   return () => openSignUp({ fallbackRedirectUrl: "/dashboard" })
 }
@@ -40,12 +40,12 @@ function CtaButton({
   size?: "default" | "lg"
   className?: string
 }) {
-  const startFree = useStartFree()
+  const start = useStart()
   return (
     <Button
       variant={variant}
       size={size}
-      onClick={startFree}
+      onClick={start}
       className={className}
     >
       {children}
@@ -453,13 +453,6 @@ const audiences = [
   },
 ]
 
-const freeFeatures = [
-  "1 organization",
-  "Unlimited events",
-  "Volunteer signup links",
-  "Automatic email reminders",
-]
-
 export function LandingPage() {
   const { hash } = useLocation()
 
@@ -477,7 +470,7 @@ export function LandingPage() {
       <section className="grid items-center gap-10 py-14 lg:grid-cols-2 lg:py-20">
         <div>
           <Badge variant="secondary" className="mb-4">
-            Free for small organizations · Unlimited events
+            Built for community organizations
           </Badge>
           <h1 className="text-4xl font-bold tracking-tight text-balance sm:text-5xl">
             Volunteer scheduling, without the spreadsheet chase.
@@ -492,7 +485,7 @@ export function LandingPage() {
             platform.
           </p>
           <div className="mt-7 flex flex-wrap items-center gap-3">
-            <CtaButton>Create your first roster for free</CtaButton>
+            <CtaButton>Create your first roster</CtaButton>
             <Button variant="outline" size="lg" asChild>
               <a href="#how-it-works">See how it works</a>
             </Button>
@@ -735,38 +728,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* 9. Pricing */}
-      <section
-        id="pricing"
-        className="mx-auto max-w-md scroll-mt-20 py-16 text-center"
-      >
-        <h2 className="text-3xl font-bold tracking-tight">
-          Start free. Keep it simple.
-        </h2>
-        <p className="mt-3 text-muted-foreground">
-          RosterMe&rsquo;s MVP is free for small organizations.
-        </p>
-        <Card className="mt-8 text-left">
-          <CardHeader className="text-center">
-            <CardTitle className="text-xl">Free</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ul className="space-y-2">
-              {freeFeatures.map((f) => (
-                <li key={f} className="flex items-center gap-2 text-sm">
-                  <ClipboardCheck className="h-4 w-4 shrink-0 text-primary" />
-                  {f}
-                </li>
-              ))}
-            </ul>
-            <p className="text-center text-sm text-muted-foreground">
-              No complicated pricing. No per-volunteer charges.
-            </p>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* 10. Final CTA */}
+      {/* 9. Final CTA */}
       <section className="rounded-2xl bg-primary px-6 py-14 text-center text-primary-foreground">
         <h2 className="mx-auto max-w-2xl text-3xl font-bold tracking-tight text-balance">
           Spend less time organizing volunteers.
@@ -781,7 +743,6 @@ export function LandingPage() {
             Create your first roster
           </CtaButton>
         </div>
-        <p className="mt-3 text-sm opacity-80">Free to get started.</p>
       </section>
     </div>
   )
