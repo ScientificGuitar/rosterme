@@ -28,10 +28,16 @@ public static class AdminEndpoints
             .Produces<GroupResponse>()
             .Produces(401)
             .Produces(404);
+        admin.MapPut("/groups/{id}", UpdateGroup)
+            .Produces<GroupResponse>()
+            .Produces(400)
+            .Produces(401)
+            .Produces(404);
         admin.MapDelete("/groups/{id}", DeleteGroup)
             .Produces(204)
             .Produces(401)
-            .Produces(404);
+            .Produces(404)
+            .Produces(409);
 
         admin.MapPost("/events", CreateEvent)
             .Produces<EventResponse>(201)
@@ -135,7 +141,7 @@ public static class AdminEndpoints
         db.Groups.Add(group);
         await db.SaveChangesAsync(ct);
 
-        return Results.Created($"/api/groups/{group.Id}", new GroupResponse(group.Id, group.Name, group.CreatedAt));
+        return Results.Created($"/api/groups/{group.Id}", new GroupResponse(group.Id, group.Name, group.CreatedAt, 0));
     }
 
     private static async Task<IResult> ListGroups(AppDbContext db, HttpContext http, CancellationToken ct)
@@ -145,9 +151,14 @@ public static class AdminEndpoints
         var groups = await db.Groups
             .Where(g => g.GroupOwner == userId)
             .OrderBy(g => g.Name)
+            .Select(g => new GroupResponse(
+                g.Id,
+                g.Name,
+                g.CreatedAt,
+                db.Events.Count(e => e.GroupId == g.Id)))
             .ToListAsync(ct);
 
-        return Results.Ok(groups.Select(g => new GroupResponse(g.Id, g.Name, g.CreatedAt)));
+        return Results.Ok(groups);
     }
 
     private static async Task<IResult> GetGroup(Guid id, AppDbContext db, HttpContext http, CancellationToken ct)
@@ -155,11 +166,30 @@ public static class AdminEndpoints
         var userId = GetUserId(http);
 
         var group = await db.Groups
-            .FirstOrDefaultAsync(o => o.Id == id && o.GroupOwner == userId, ct);
+            .Where(o => o.Id == id && o.GroupOwner == userId)
+            .Select(o => new GroupResponse(
+                o.Id,
+                o.Name,
+                o.CreatedAt,
+                db.Events.Count(e => e.GroupId == o.Id)))
+            .FirstOrDefaultAsync(ct);
 
         if (group is null) return Results.NotFound();
 
-        return Results.Ok(new GroupResponse(group.Id, group.Name, group.CreatedAt));
+        return Results.Ok(group);
+    }
+
+    private static async Task<IResult> UpdateGroup(Guid id, UpdateGroupRequest request, AppDbContext db, HttpContext http, CancellationToken ct)
+    {
+        var userId = GetUserId(http);
+        var group = await GetOwnedGroup(db, id, userId, ct);
+        if (group is null) return Results.NotFound();
+
+        group.Name = Norm(request.Name);
+        await db.SaveChangesAsync(ct);
+
+        var eventCount = await db.Events.CountAsync(e => e.GroupId == id, ct);
+        return Results.Ok(new GroupResponse(group.Id, group.Name, group.CreatedAt, eventCount));
     }
 
     private static async Task<IResult> DeleteGroup(Guid id, AppDbContext db, HttpContext http, CancellationToken ct)
@@ -167,6 +197,15 @@ public static class AdminEndpoints
         var userId = GetUserId(http);
         var group = await GetOwnedGroup(db, id, userId, ct);
         if (group is null) return Results.NotFound();
+
+        if (await db.Events.AnyAsync(e => e.GroupId == id, ct))
+        {
+            return Results.Conflict(new
+            {
+                error = "This group still has events. Move or delete its events first.",
+                code = "group_has_events"
+            });
+        }
 
         db.Groups.Remove(group);
         await db.SaveChangesAsync(ct);
@@ -782,6 +821,9 @@ public static class AdminEndpoints
 public record CreateGroupRequest(
     [property: Required, NotWhitespace, StringLength(200)] string Name);
 
+public record UpdateGroupRequest(
+    [property: Required, NotWhitespace, StringLength(200)] string Name);
+
 public record CreateEventRequest(
     Guid GroupId,
     [property: Required, NotWhitespace, StringLength(300)] string Title,
@@ -934,7 +976,7 @@ public record QuestionUpsert(
 
 // --- Response DTOs ---
 
-public record GroupResponse(Guid Id, string Name, DateTime CreatedAt);
+public record GroupResponse(Guid Id, string Name, DateTime CreatedAt, int EventCount);
 
 public record InviteLinkResponse(Guid Id, Guid? EventId, string Code, bool IsActive, DateTime CreatedAt, DateTime? ExpiresAt);
 

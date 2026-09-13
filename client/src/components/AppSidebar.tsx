@@ -7,6 +7,7 @@ import {
   Moon,
   Plus,
   Sun,
+  Users,
   X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -16,6 +17,7 @@ import { cn } from "@/lib/utils"
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, soon: false },
+  { to: "/groups", label: "Groups", icon: Users, soon: false },
   { to: "/reports", label: "Reports", icon: BarChart3, soon: true },
 ]
 

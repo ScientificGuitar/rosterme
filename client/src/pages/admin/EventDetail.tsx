@@ -66,6 +66,7 @@ export function EventDetail() {
     try {
       await api.deleteEvent(id)
       await queryClient.invalidateQueries({ queryKey: ["events"] })
+      await queryClient.invalidateQueries({ queryKey: ["groups"] })
       queryClient.removeQueries({ queryKey: ["event", id] })
       toast.success("Event deleted")
       setDeleteDialogOpen(false)

@@ -13,6 +13,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Dashboard } from "@/pages/admin/Dashboard"
+import { GroupsPage } from "@/pages/admin/GroupsPage"
 import { CreateEvent } from "@/pages/admin/CreateEvent"
 import { EventDetail } from "@/pages/admin/EventDetail"
 import { EditEvent } from "@/pages/admin/EditEvent"
@@ -123,6 +124,7 @@ export function App() {
         <Route element={<RequireAuth />}>
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/groups" element={<GroupsPage />} />
             <Route path="/events" element={<Dashboard />} />
             <Route path="/events/new" element={<CreateEvent />} />
             <Route path="/events/:id" element={<EventDetail />} />

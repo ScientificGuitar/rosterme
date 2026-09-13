@@ -45,6 +45,28 @@ public class ValidationTests(IntegrationTestFactory factory) : IDisposable
         await AssertProblemDetailsAsync(response, "Name");
     }
 
+    [Fact]
+    public async Task UpdateGroup_WhitespaceName_Returns400()
+    {
+        var orgId = await SeedOrgAsync();
+
+        var response = await _admin.PutAsJsonAsync($"/api/groups/{orgId}", new { name = "   " });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        await AssertProblemDetailsAsync(response, "Name");
+    }
+
+    [Fact]
+    public async Task UpdateGroup_OverlongName_Returns400()
+    {
+        var orgId = await SeedOrgAsync();
+
+        var response = await _admin.PutAsJsonAsync($"/api/groups/{orgId}", new { name = new string('a', 201) });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        await AssertProblemDetailsAsync(response, "Name");
+    }
+
     // --- CreateEvent ---
 
     [Fact]

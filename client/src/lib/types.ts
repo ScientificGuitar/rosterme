@@ -24,6 +24,8 @@ export type CreateEventRequest = NumericFields<Schemas["CreateEventRequest"]>
 
 export type CreateGroupRequest = NumericFields<Schemas["CreateGroupRequest"]>
 
+export type UpdateGroupRequest = NumericFields<Schemas["UpdateGroupRequest"]>
+
 export type Group = NumericFields<Schemas["GroupResponse"]>
 
 export type CreateSlotRequest = NumericFields<Schemas["CreateSlotRequest"]>

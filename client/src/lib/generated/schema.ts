@@ -126,7 +126,53 @@ export interface paths {
                 };
             };
         };
-        put?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateGroupRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GroupResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         post?: never;
         delete: {
             parameters: {
@@ -155,6 +201,13 @@ export interface paths {
                 };
                 /** @description Not Found */
                 404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1113,6 +1166,8 @@ export interface components {
             name: string;
             /** Format: date-time */
             createdAt: string;
+            /** Format: int32 */
+            eventCount: number | string;
         };
         InviteLinkResponse: {
             /** Format: uuid */
@@ -1297,6 +1352,9 @@ export interface components {
             date: null | string;
             slots: null | components["schemas"]["EventSlotUpsert"][];
             questions: null | components["schemas"]["QuestionUpsert"][];
+        };
+        UpdateGroupRequest: {
+            name: string;
         };
         UpdateSlotRequest: {
             label: null | string;

@@ -128,6 +128,7 @@ export function CreateEvent() {
       })
       toast.success("Event created")
       await queryClient.invalidateQueries({ queryKey: ["events"] })
+      await queryClient.invalidateQueries({ queryKey: ["groups"] })
       navigate(`/events/${id}`)
     } catch (e) {
       toast.error(formatApiError(e, "Failed to create event"))

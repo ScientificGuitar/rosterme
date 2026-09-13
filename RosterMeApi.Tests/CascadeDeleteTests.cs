@@ -97,26 +97,38 @@ public class CascadeDeleteTests(IntegrationTestFactory factory) : IDisposable
     }
 
     [Fact]
-    public async Task DeleteGroup_CascadesToEventsAndSlots()
+    public async Task DeleteGroup_WithEvents_Returns409AndKeepsGroup()
     {
         var orgId = await SeedOrgAsync("Cascade Org 2");
 
-        await _client.PostAsJsonAsync("/api/events", new { groupId = orgId, 
+        await _client.PostAsJsonAsync("/api/events", new { groupId = orgId,
             title = "Doomed Event",
             date = FutureDate(),
             slots = new[] { new { label = "Doomed Slot", startTime = "08:00", endTime = "09:00", capacity = 2 } }
         });
 
-        // Delete the group via API
+        // Delete is blocked while events exist
+        var deleteOrgResp = await _client.DeleteAsync($"/api/groups/{orgId}");
+        Assert.Equal(HttpStatusCode.Conflict, deleteOrgResp.StatusCode);
+
+        // Verify nothing was deleted
+        using var checkScope = factory.Services.CreateScope();
+        var checkDb = checkScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.True(await checkDb.Groups.AnyAsync(o => o.Id == orgId));
+        Assert.True(await checkDb.Events.AnyAsync(e => e.GroupId == orgId));
+    }
+
+    [Fact]
+    public async Task DeleteGroup_WithoutEvents_Returns204()
+    {
+        var orgId = await SeedOrgAsync("Empty Group");
+
         var deleteOrgResp = await _client.DeleteAsync($"/api/groups/{orgId}");
         Assert.Equal(HttpStatusCode.NoContent, deleteOrgResp.StatusCode);
 
-        // Verify cascade: nothing should remain
         using var checkScope = factory.Services.CreateScope();
         var checkDb = checkScope.ServiceProvider.GetRequiredService<AppDbContext>();
         Assert.False(await checkDb.Groups.AnyAsync(o => o.Id == orgId));
-        Assert.False(await checkDb.Events.AnyAsync(e => e.GroupId == orgId));
-        Assert.False(await checkDb.TimeSlots.AnyAsync(s => s.Event != null && s.Event.GroupId == orgId));
     }
 
     // --- Helpers ---

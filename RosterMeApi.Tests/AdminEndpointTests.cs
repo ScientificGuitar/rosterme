@@ -133,6 +133,98 @@ public class AdminEndpointTests : IDisposable
         Assert.DoesNotContain(otherId, ids);
     }
 
+    [Fact]
+    public async Task UpdateGroup_RenamesGroup()
+    {
+        var orgId = await SeedOrgAsync("Old Name");
+
+        var response = await _client.PutAsJsonAsync($"/api/groups/{orgId}", new { name = "New Name" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("New Name", body.GetProperty("name").GetString());
+        Assert.Equal(orgId, body.GetProperty("id").GetGuid());
+    }
+
+    [Fact]
+    public async Task UpdateGroup_TrimsName()
+    {
+        var orgId = await SeedOrgAsync("Old Name");
+
+        var response = await _client.PutAsJsonAsync($"/api/groups/{orgId}", new { name = "  Padded  " });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("Padded", body.GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task UpdateGroup_OtherUsersGroup_Returns404()
+    {
+        var otherOrgId = Guid.NewGuid();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Groups.Add(new Group
+            {
+                Id = otherOrgId,
+                Name = "Other Org",
+                GroupOwner = TestAuthHandler.OtherUserId,
+                CreatedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var response = await _client.PutAsJsonAsync($"/api/groups/{otherOrgId}", new { name = "Hacked" });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteGroup_WithEvents_Returns409()
+    {
+        var orgId = await SeedOrgAsync("Blocked Group");
+        await _client.PostAsJsonAsync("/api/events", new
+        {
+            groupId = orgId,
+            title = "Blocking Event",
+            date = FutureDate()
+        });
+
+        var response = await _client.DeleteAsync($"/api/groups/{orgId}");
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("group_has_events", body.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task DeleteGroup_WithoutEvents_Returns204()
+    {
+        var orgId = await SeedOrgAsync("Empty Group");
+
+        var response = await _client.DeleteAsync($"/api/groups/{orgId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ListGroups_IncludesEventCount()
+    {
+        var orgId = await SeedOrgAsync("Counted Group");
+        await _client.PostAsJsonAsync("/api/events", new
+        {
+            groupId = orgId,
+            title = "Counted Event",
+            date = FutureDate()
+        });
+
+        var groups = await _client.GetFromJsonAsync<JsonElement>("/api/groups", _jsonOptions);
+        var group = groups.EnumerateArray().First(g => g.GetProperty("id").GetGuid() == orgId);
+
+        Assert.Equal(1, group.GetProperty("eventCount").GetInt32());
+    }
+
     // --- Events ---
 
     [Fact]

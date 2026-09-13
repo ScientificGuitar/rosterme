@@ -106,6 +106,15 @@ export function createAdminApi(getToken: () => Promise<string | null>) {
       return checkJson<Group>(res)
     },
 
+    updateGroup: async (groupId: string, name: string) => {
+      const res = await fetch(`${BASE}/groups/${groupId}`, {
+        method: "PUT",
+        headers: await h(),
+        body: JSON.stringify({ name }),
+      })
+      return checkJson<Group>(res)
+    },
+
     createEvent: async (data: CreateEventRequest) => {
       const res = await fetch(`${BASE}/events`, {
         method: "POST",
