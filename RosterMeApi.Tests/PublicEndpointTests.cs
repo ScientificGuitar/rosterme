@@ -181,7 +181,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
     }
 
     [Fact]
-    public async Task GetSignupDetails_ValidToken_AutoConfirmsAndReturnsDetails()
+    public async Task GetSignupDetails_PendingToken_ReturnsPendingWithoutMutating()
     {
         var (_, _, code) = await SeedInviteLinkAsync("Manage Org");
 
@@ -210,6 +210,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
                 .Split('"')[0];
         }
 
+        // A plain GET (e.g. from a link prefetcher) must not confirm the signup.
         var manageResp = await _publicClient.GetAsync($"/api/signup/manage/{rawToken}");
         Assert.Equal(HttpStatusCode.OK, manageResp.StatusCode);
         var body = await manageResp.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
@@ -217,8 +218,57 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
         Assert.Equal(signupId, body.GetProperty("signupId").GetGuid());
         Assert.Equal("Manager", body.GetProperty("volunteerName").GetString());
         Assert.Equal("manager@example.com", body.GetProperty("email").GetString());
-        Assert.Equal("Confirmed", body.GetProperty("status").GetString());
+        Assert.Equal("Pending", body.GetProperty("status").GetString());
         Assert.Equal("Manage Org", body.GetProperty("groupName").GetString());
+        Assert.Equal("Future Event", body.GetProperty("eventTitle").GetString());
+        Assert.Equal("Slot 1", body.GetProperty("slotLabel").GetString());
+
+        using var verifyScope = factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var stillPending = await verifyDb.Signups.SingleAsync(s => s.Id == signupId);
+        Assert.Equal(SignupStatus.Pending, stillPending.Status);
+        Assert.Null(stillPending.ConfirmedAt);
+    }
+
+    [Fact]
+    public async Task ConfirmSignup_PendingToken_ConfirmsAndReturnsDetails()
+    {
+        var (_, _, code) = await SeedInviteLinkAsync("Confirm Org");
+
+        var getPage = await _publicClient.GetAsync($"/api/invite/{code}");
+        var page = await getPage.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var slotId = page.GetProperty("event").GetProperty("slots").EnumerateArray().First().GetProperty("id").GetGuid();
+
+        var resp = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+        {
+            slotId,
+            volunteerName = "Confirmer",
+            email = "confirmer@example.com"
+        });
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+
+        string rawToken;
+        Guid signupId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var signup = await db.Signups.SingleAsync(s => s.Email == "confirmer@example.com");
+            signupId = signup.Id;
+            var message = await db.EmailMessages.SingleAsync(m => m.To == "confirmer@example.com");
+            rawToken = message.HtmlBody
+                .Substring(message.HtmlBody.IndexOf("/signup/manage/", StringComparison.Ordinal) + "/signup/manage/".Length)
+                .Split('"')[0];
+        }
+
+        var confirmResp = await _publicClient.PostAsync($"/api/signup/manage/{rawToken}/confirm", null);
+        Assert.Equal(HttpStatusCode.OK, confirmResp.StatusCode);
+        var body = await confirmResp.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+
+        Assert.Equal(signupId, body.GetProperty("signupId").GetGuid());
+        Assert.Equal("Confirmer", body.GetProperty("volunteerName").GetString());
+        Assert.Equal("confirmer@example.com", body.GetProperty("email").GetString());
+        Assert.Equal("Confirmed", body.GetProperty("status").GetString());
+        Assert.Equal("Confirm Org", body.GetProperty("groupName").GetString());
         Assert.Equal("Future Event", body.GetProperty("eventTitle").GetString());
         Assert.Equal("Slot 1", body.GetProperty("slotLabel").GetString());
 
@@ -227,6 +277,89 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
         var confirmed = await verifyDb.Signups.SingleAsync(s => s.Id == signupId);
         Assert.Equal(SignupStatus.Confirmed, confirmed.Status);
         Assert.NotNull(confirmed.ConfirmedAt);
+    }
+
+    [Fact]
+    public async Task ConfirmSignup_InvalidToken_Returns404WithCode()
+    {
+        var response = await _publicClient.PostAsync("/api/signup/manage/not-a-real-token/confirm", null);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("invalid_manage_link", body.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task ConfirmSignup_AlreadyConfirmed_IsIdempotent()
+    {
+        var (_, _, code) = await SeedInviteLinkAsync("Idempotent Org");
+        var page = await GetInvitePageJsonAsync(code);
+        var slotId = page.Slots.First().Id;
+
+        var resp = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+        {
+            slotId,
+            volunteerName = "Idem",
+            email = "idem@example.com"
+        });
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+
+        string rawToken;
+        using (var scope = factory.Services.CreateScope())
+            rawToken = ExtractManageToken(scope.ServiceProvider.GetRequiredService<AppDbContext>(), "idem@example.com");
+
+        var first = await _publicClient.PostAsync($"/api/signup/manage/{rawToken}/confirm", null);
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var firstBody = await first.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("Confirmed", firstBody.GetProperty("status").GetString());
+
+        var second = await _publicClient.PostAsync($"/api/signup/manage/{rawToken}/confirm", null);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        var secondBody = await second.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("Confirmed", secondBody.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task ConfirmSignup_CancelledAndRemoved_Returns200WithStatus()
+    {
+        var (_, _, code) = await SeedInviteLinkAsync("Terminal Confirm Org");
+        var page = await GetInvitePageJsonAsync(code);
+        var slotId = page.Slots.First().Id;
+
+        foreach (var email in new[] { "term-cancel@example.com", "term-remove@example.com" })
+        {
+            var r = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
+            {
+                slotId,
+                volunteerName = email,
+                email
+            });
+            Assert.Equal(HttpStatusCode.Created, r.StatusCode);
+        }
+
+        string cancelToken, removeToken;
+        Guid removeId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            cancelToken = ExtractManageToken(db, "term-cancel@example.com");
+            removeToken = ExtractManageToken(db, "term-remove@example.com");
+            removeId = (await db.Signups.SingleAsync(s => s.Email == "term-remove@example.com")).Id;
+        }
+
+        Assert.Equal(HttpStatusCode.OK,
+            (await _publicClient.PostAsync($"/api/signup/manage/{cancelToken}/cancel", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await _adminClient.DeleteAsync($"/api/signups/{removeId}")).StatusCode);
+
+        var cancelled = await _publicClient.PostAsync($"/api/signup/manage/{cancelToken}/confirm", null);
+        Assert.Equal(HttpStatusCode.OK, cancelled.StatusCode);
+        Assert.Equal("Cancelled",
+            (await cancelled.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions)).GetProperty("status").GetString());
+
+        var removed = await _publicClient.PostAsync($"/api/signup/manage/{removeToken}/confirm", null);
+        Assert.Equal(HttpStatusCode.OK, removed.StatusCode);
+        Assert.Equal("Removed",
+            (await removed.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions)).GetProperty("status").GetString());
     }
 
     [Fact]
@@ -406,7 +539,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
             string token;
             using (var scope = factory.Services.CreateScope())
                 token = ExtractManageToken(scope.ServiceProvider.GetRequiredService<AppDbContext>(), email);
-            var confirm = await _publicClient.GetAsync($"/api/signup/manage/{token}");
+            var confirm = await _publicClient.PostAsync($"/api/signup/manage/{token}/confirm", null);
             Assert.Equal(HttpStatusCode.OK, confirm.StatusCode);
         }
 
@@ -431,12 +564,12 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             // E confirms after D so D is ahead in the queue
-            var confirmD = await _publicClient.GetAsync($"/api/signup/manage/{tokenD}");
+            var confirmD = await _publicClient.PostAsync($"/api/signup/manage/{tokenD}/confirm", null);
             Assert.Equal(HttpStatusCode.OK, confirmD.StatusCode);
         }
         using (var scope = factory.Services.CreateScope())
             tokenE = ExtractManageToken(scope.ServiceProvider.GetRequiredService<AppDbContext>(), "wl-e@example.com");
-        var confirmE = await _publicClient.GetAsync($"/api/signup/manage/{tokenE}");
+        var confirmE = await _publicClient.PostAsync($"/api/signup/manage/{tokenE}/confirm", null);
         Assert.Equal(HttpStatusCode.OK, confirmE.StatusCode);
 
         // A cancels -> D (oldest waitlisted) auto-promotes, E stays queued
@@ -497,12 +630,12 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
         string tokenG;
         using (var scope = factory.Services.CreateScope())
             tokenG = ExtractManageToken(scope.ServiceProvider.GetRequiredService<AppDbContext>(), "late-g@example.com");
-        Assert.Equal(HttpStatusCode.OK, (await _publicClient.GetAsync($"/api/signup/manage/{tokenG}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await _publicClient.PostAsync($"/api/signup/manage/{tokenG}/confirm", null)).StatusCode);
 
         string tokenF;
         using (var scope = factory.Services.CreateScope())
             tokenF = ExtractManageToken(scope.ServiceProvider.GetRequiredService<AppDbContext>(), "late-f@example.com");
-        var confirmF = await _publicClient.GetAsync($"/api/signup/manage/{tokenF}");
+        var confirmF = await _publicClient.PostAsync($"/api/signup/manage/{tokenF}/confirm", null);
         Assert.Equal(HttpStatusCode.OK, confirmF.StatusCode);
         var bodyF = await confirmF.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
         Assert.Equal("Waitlisted", bodyF.GetProperty("status").GetString());
@@ -538,7 +671,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
         string token;
         using (var scope = factory.Services.CreateScope())
             token = ExtractManageToken(scope.ServiceProvider.GetRequiredService<AppDbContext>(), "dup-wl@example.com");
-        Assert.Equal(HttpStatusCode.OK, (await _publicClient.GetAsync($"/api/signup/manage/{token}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await _publicClient.PostAsync($"/api/signup/manage/{token}/confirm", null)).StatusCode);
 
         var again = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
         {
@@ -581,7 +714,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
             string token;
             using (var scope = factory.Services.CreateScope())
                 token = ExtractManageToken(scope.ServiceProvider.GetRequiredService<AppDbContext>(), email);
-            Assert.Equal(HttpStatusCode.OK, (await _publicClient.GetAsync($"/api/signup/manage/{token}")).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await _publicClient.PostAsync($"/api/signup/manage/{token}/confirm", null)).StatusCode);
         }
 
         // +2 capacity promotes both D and E
@@ -616,7 +749,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
             string token;
             using (var scope = factory.Services.CreateScope())
                 token = ExtractManageToken(scope.ServiceProvider.GetRequiredService<AppDbContext>(), email);
-            await _publicClient.GetAsync($"/api/signup/manage/{token}");
+            await _publicClient.PostAsync($"/api/signup/manage/{token}/confirm", null);
         }
 
         var join = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
@@ -629,7 +762,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
         string tokenW;
         using (var scope = factory.Services.CreateScope())
             tokenW = ExtractManageToken(scope.ServiceProvider.GetRequiredService<AppDbContext>(), "rm-w@example.com");
-        Assert.Equal(HttpStatusCode.OK, (await _publicClient.GetAsync($"/api/signup/manage/{tokenW}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await _publicClient.PostAsync($"/api/signup/manage/{tokenW}/confirm", null)).StatusCode);
 
         Guid signupIdA;
         using (var scope = factory.Services.CreateScope())
@@ -713,6 +846,8 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
         string token;
         using (var scope = factory.Services.CreateScope())
             token = ExtractManageToken(scope.ServiceProvider.GetRequiredService<AppDbContext>(), "pos-w@example.com");
+        var confirm = await _publicClient.PostAsync($"/api/signup/manage/{token}/confirm", null);
+        Assert.Equal(HttpStatusCode.OK, confirm.StatusCode);
         var details = await _publicClient.GetAsync($"/api/signup/manage/{token}");
         Assert.Equal(HttpStatusCode.OK, details.StatusCode);
         var body = await details.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
@@ -852,7 +987,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             rawToken = ExtractManageToken(db, "confdup@example.com");
         }
-        var confirm = await _publicClient.GetAsync($"/api/signup/manage/{rawToken}");
+        var confirm = await _publicClient.PostAsync($"/api/signup/manage/{rawToken}/confirm", null);
         Assert.Equal(HttpStatusCode.OK, confirm.StatusCode);
 
         var response = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups", new
@@ -1035,7 +1170,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             rawToken = ExtractManageToken(db, "rc@example.com");
         }
-        var confirm = await _publicClient.GetAsync($"/api/signup/manage/{rawToken}");
+        var confirm = await _publicClient.PostAsync($"/api/signup/manage/{rawToken}/confirm", null);
         Assert.Equal(HttpStatusCode.OK, confirm.StatusCode);
 
         var response = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups/resend", new
@@ -1080,7 +1215,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             rawToken = ExtractManageToken(db, "rw-w@example.com");
         }
-        var confirm = await _publicClient.GetAsync($"/api/signup/manage/{rawToken}");
+        var confirm = await _publicClient.PostAsync($"/api/signup/manage/{rawToken}/confirm", null);
         Assert.Equal(HttpStatusCode.OK, confirm.StatusCode);
 
         var response = await _publicClient.PostAsJsonAsync($"/api/invite/{code}/signups/resend", new

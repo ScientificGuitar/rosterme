@@ -374,6 +374,13 @@ export function createPublicApi() {
       return checkJson<SignupManageData>(res)
     },
 
+    confirmSignup: async (token: string) => {
+      const res = await fetch(`${BASE}/signup/manage/${token}/confirm`, {
+        method: "POST",
+      })
+      return checkJson<SignupManageData>(res)
+    },
+
     cancelSignup: async (token: string) => {
       const res = await fetch(`${BASE}/signup/manage/${token}/cancel`, {
         method: "POST",

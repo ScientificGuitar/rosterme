@@ -38,6 +38,9 @@ public static class PublicEndpoints
         manage.MapGet("/{token}", GetSignupDetails)
             .Produces<SignupManageResponse>()
             .Produces(404);
+        manage.MapPost("/{token}/confirm", ConfirmSignup)
+            .Produces<SignupManageResponse>()
+            .Produces(404);
         manage.MapPost("/{token}/cancel", CancelSignup)
             .Produces(200)
             .Produces(404);
@@ -275,21 +278,57 @@ public static class PublicEndpoints
         if (signup is null)
             return Results.NotFound(new { error = "Signup link not found", code = "invalid_manage_link" });
 
-        if (signup.Status == SignupStatus.Pending)
-        {
-            signup.Status = SignupStatus.Confirmed;
-            signup.ConfirmedAt = DateTime.UtcNow;
-            await db.SaveChangesAsync(ct);
-        }
+        return await BuildSignupManageResult(db, signup, ct);
+    }
 
-        if (signup.Status == SignupStatus.WaitlistPending)
-        {
-            // Late confirmers join the back of the queue ordered by their new ConfirmedAt — never jumping ahead, even if a spot is free.
-            signup.Status = SignupStatus.Waitlisted;
-            signup.ConfirmedAt = DateTime.UtcNow;
-            await db.SaveChangesAsync(ct);
-        }
+    private static async Task<IResult> ConfirmSignup(string token, AppDbContext db, CancellationToken ct)
+    {
+        var hash = TokenService.HashToken(token);
+        var signup = await db.Signups
+            .FirstOrDefaultAsync(s => s.ManagementTokenHash == hash, ct);
 
+        if (signup is null)
+            return Results.NotFound(new { error = "Signup link not found", code = "invalid_manage_link" });
+
+        var strategy = db.Database.CreateExecutionStrategy();
+
+        return await strategy.ExecuteAsync(async () =>
+        {
+            using var tx = await db.Database.BeginTransactionAsync(ct);
+
+            await SlotAdvisoryLock.AcquireAsync(db, signup.TimeSlotId, ct);
+
+            var current = await db.Signups
+                .Include(s => s.TimeSlot)
+                    .ThenInclude(t => t.Event)
+                        .ThenInclude(e => e.Group)
+                .FirstOrDefaultAsync(s => s.Id == signup.Id, ct);
+
+            if (current is null)
+                return Results.NotFound(new { error = "Signup link not found", code = "invalid_manage_link" });
+
+            if (current.Status == SignupStatus.Pending)
+            {
+                current.Status = SignupStatus.Confirmed;
+                current.ConfirmedAt = DateTime.UtcNow;
+                await db.SaveChangesAsync(ct);
+            }
+            else if (current.Status == SignupStatus.WaitlistPending)
+            {
+                // Late confirmers join the back of the queue ordered by their new ConfirmedAt — never jumping ahead, even if a spot is free.
+                current.Status = SignupStatus.Waitlisted;
+                current.ConfirmedAt = DateTime.UtcNow;
+                await db.SaveChangesAsync(ct);
+            }
+
+            await tx.CommitAsync(ct);
+
+            return await BuildSignupManageResult(db, current, ct);
+        });
+    }
+
+    private static async Task<IResult> BuildSignupManageResult(AppDbContext db, Signup signup, CancellationToken ct)
+    {
         int? waitlistPosition = null;
         if (signup.Status == SignupStatus.Waitlisted)
             waitlistPosition = await WaitlistService.GetWaitlistPositionAsync(db, signup.TimeSlotId, signup.Id, ct);
