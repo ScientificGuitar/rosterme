@@ -233,8 +233,11 @@ if (!disableRateLimiting)
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapOpenApi();
-app.MapScalarApiReference();
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    app.MapScalarApiReference();
+}
 
 app.MapAdminEndpoints();
 app.MapPublicEndpoints();
