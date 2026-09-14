@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { createPublicApi, ApiError } from "@/lib/api"
+import { useSeo } from "@/lib/seo"
 import type { PublicSlot, PublicQuestion } from "@/lib/types"
 import { isValidPhone } from "@/lib/eventQuestions"
 import { cn } from "@/lib/utils"
@@ -27,6 +28,13 @@ export function InvitePage() {
     queryFn: () => api.getInvitePage(code!),
     enabled: !!code,
     retry: false,
+  })
+
+  useSeo({
+    title: data?.event?.title
+      ? `${data.event.title} - Volunteer Signup | RosterMe`
+      : "Volunteer Signup | RosterMe",
+    noindex: true,
   })
 
   if (isLoading) {

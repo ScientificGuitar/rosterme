@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom"
 import { OPERATOR_NAME } from "./legal"
+import { useSeo } from "@/lib/seo"
 import {
   ContactLine,
   ExternalLink,
@@ -8,6 +9,12 @@ import {
 } from "./LegalLayout"
 
 export function TermsOfServicePage() {
+  useSeo({
+    title: "Terms of Service - RosterMe",
+    description:
+      "The rules for organizers running events and volunteers signing up through RosterMe.",
+    path: "/terms-of-service",
+  })
   return (
     <LegalLayout
       title="Terms of Service"

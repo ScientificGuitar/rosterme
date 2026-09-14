@@ -302,7 +302,7 @@ public class ValidationTests(IntegrationTestFactory factory) : IDisposable
     [Fact]
     public async Task UpdateSlot_OnlyEndTime_MakesEndBeforeStart_Returns400()
     {
-        // Seed slot 09:00–10:00 then PATCH only the end time. With the cross-field
+        // Seed slot 09:00-10:00 then PATCH only the end time. With the cross-field
         // check in the handler, sending endTime earlier than the stored startTime
         // must fail with 400 — the previously-loaded value matters, not just the
         // values present in the request body.

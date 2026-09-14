@@ -109,7 +109,7 @@ public static class EmailTemplates
 
             Confirm your signup for: {eventTitle}
             Shift: {slotLabel}
-            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}–{endTime:HH:mm}{textLocation}
+            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}-{endTime:HH:mm}{textLocation}
             Name: {volunteerName}
 
             Your spot isn't confirmed until you click the link below:
@@ -201,7 +201,7 @@ public static class EmailTemplates
 
             Confirm to join the waitlist for: {eventTitle}
             Shift: {slotLabel}
-            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}–{endTime:HH:mm}{textLocation}
+            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}-{endTime:HH:mm}{textLocation}
             Name: {volunteerName}
             Current waitlist position: #{waitlistPosition} (may change as others confirm)
 
@@ -322,7 +322,7 @@ public static class EmailTemplates
 
             You're in: {eventTitle}
             Shift: {slotLabel}
-            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}–{endTime:HH:mm}{textLocation}
+            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}-{endTime:HH:mm}{textLocation}
             Name: {volunteerName}
 
             A spot opened up and you've been automatically promoted from the waitlist. You're now confirmed.
@@ -414,7 +414,7 @@ public static class EmailTemplates
 
             Reminder: {eventTitle} is tomorrow
             Shift: {slotLabel}
-            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}–{endTime:HH:mm}{textLocation}
+            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}-{endTime:HH:mm}{textLocation}
             Name: {volunteerName}
 
             You're confirmed for this shift, starting in about 24 hours.
@@ -504,7 +504,7 @@ public static class EmailTemplates
 
             You've been removed from: {eventTitle}
             Shift: {slotLabel}
-            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}–{endTime:HH:mm}{textLocation}
+            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}-{endTime:HH:mm}{textLocation}
             Name: {volunteerName}
 
             The organization has {(wasWaitlisted ? "removed you from the waitlist for this shift" : "removed you from this shift")}. You don't need to take any action.

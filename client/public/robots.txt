@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /events/
+Disallow: /groups
+Disallow: /reports
+Disallow: /admin
+Disallow: /invite/
+Disallow: /signup/
+
+Sitemap: https://rosterme.app/sitemap.xml

@@ -9,10 +9,12 @@ import { Badge } from "@/components/ui/badge"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Separator } from "@/components/ui/separator"
 import { createPublicApi } from "@/lib/api"
+import { useSeo } from "@/lib/seo"
 
 const api = createPublicApi()
 
 export function SignupManagePage() {
+  useSeo({ title: "Manage Your Signup | RosterMe", noindex: true })
   const { token } = useParams<{ token: string }>()
   const queryClient = useQueryClient()
   const [cancelled, setCancelled] = useState(false)

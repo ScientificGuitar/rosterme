@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Toaster } from "sonner"
 import { useAuth, useUser } from "@clerk/react"
 import { Menu } from "lucide-react"
@@ -36,6 +36,19 @@ function EditEventWrapper() {
   return <EditEvent key={id} />
 }
 
+/** Keeps private areas (app + volunteer links) out of Google. */
+function useNoindex() {
+  useEffect(() => {
+    let el = document.head.querySelector<HTMLMetaElement>('meta[name="robots"]')
+    if (!el) {
+      el = document.createElement("meta")
+      el.setAttribute("name", "robots")
+      document.head.appendChild(el)
+    }
+    el.setAttribute("content", "noindex, nofollow")
+  }, [])
+}
+
 function RequireAuth() {
   const { isLoaded, isSignedIn } = useAuth()
 
@@ -69,6 +82,7 @@ function MarketingLayout() {
 
 /** Volunteer-facing pages: minimal brand header, no app or marketing nav. */
 function PublicLayout() {
+  useNoindex()
   return (
     <div className="flex min-h-svh flex-col">
       <header className="border-b">
@@ -89,6 +103,7 @@ function PublicLayout() {
 
 /** Signed-in app: sidebar aside only, no top header. */
 function AppLayout() {
+  useNoindex()
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (

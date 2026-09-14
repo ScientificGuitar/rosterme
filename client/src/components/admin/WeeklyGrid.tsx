@@ -41,7 +41,7 @@ function formatWeekRange(monday: Date): string {
     "Nov",
     "Dec",
   ]
-  return `${months[monday.getMonth()]} ${monday.getDate()} – ${months[sunday.getMonth()]} ${sunday.getDate()}, ${sunday.getFullYear()}`
+  return `${months[monday.getMonth()]} ${monday.getDate()} - ${months[sunday.getMonth()]} ${sunday.getDate()}, ${sunday.getFullYear()}`
 }
 
 export function WeeklyGrid() {
