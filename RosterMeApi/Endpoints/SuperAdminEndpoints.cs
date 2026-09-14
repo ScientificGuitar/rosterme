@@ -80,24 +80,37 @@ public static class SuperAdminEndpoints
         var days = query.Days ?? 30;
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var start = today.AddDays(-(days - 1));
+        var startUtc = start.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
 
-        var signups = await db.Signups
-            .Where(s => s.CreatedAt >= start.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc))
-            .Select(s => new { s.CreatedAt })
+        // Bucket by creation date: activity = what happened in the window.
+        // (Event.Date is the scheduled date, usually in the future, so it
+        // would never land inside a trailing window.)
+        var signupDates = await db.Signups
+            .Where(s => s.CreatedAt >= startUtc)
+            .Select(s => s.CreatedAt)
             .ToListAsync(ct);
-        var events = await db.Events.ToListAsync(ct);
+        var eventDates = await db.Events
+            .Where(e => e.CreatedAt >= startUtc)
+            .Select(e => e.CreatedAt)
+            .ToListAsync(ct);
+
+        // CreatedAt comes back from Postgres as Unspecified kind (timestamp
+        // without time zone, stored as UTC): mark it UTC instead of converting,
+        // so day buckets don't shift on non-UTC servers.
+        static DateOnly Day(DateTime createdAt) =>
+            DateOnly.FromDateTime(DateTime.SpecifyKind(createdAt, DateTimeKind.Utc));
 
         var signupsPerDay = Enumerable.Range(0, days)
             .Select(i => start.AddDays(i))
             .Select(d => new DayCount(
                 d.ToString("yyyy-MM-dd"),
-                signups.Count(s => DateOnly.FromDateTime(s.CreatedAt.ToUniversalTime()) == d)))
+                signupDates.Count(c => Day(c) == d)))
             .ToList();
         var eventsPerDay = Enumerable.Range(0, days)
             .Select(i => start.AddDays(i))
             .Select(d => new DayCount(
                 d.ToString("yyyy-MM-dd"),
-                events.Count(e => e.Date == d)))
+                eventDates.Count(c => Day(c) == d)))
             .ToList();
 
         return Results.Ok(new SuperAdminActivityResponse(signupsPerDay, eventsPerDay));

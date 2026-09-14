@@ -62,6 +62,38 @@ public class SuperAdminEndpointTests : IDisposable
     }
 
     [Fact]
+    public async Task Activity_IncludesNewlyCreatedEvents_RegardlessOfEventDate()
+    {
+        var groupId = Guid.NewGuid();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Groups.Add(new Group
+            {
+                Id = groupId,
+                Name = "Activity Org",
+                GroupOwner = TestAuthHandler.TestUserId,
+                CreatedAt = DateTime.UtcNow
+            });
+            db.Events.Add(new Event
+            {
+                Id = Guid.NewGuid(),
+                GroupId = groupId,
+                Title = "Future Party",
+                Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10)),
+                CreatedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var body = await _superadmin.GetFromJsonAsync<JsonElement>(
+            "/api/superadmin/activity?days=30", _jsonOptions);
+        var total = body.GetProperty("eventsPerDay").EnumerateArray()
+            .Sum(e => e.GetProperty("count").GetInt32());
+        Assert.True(total >= 1);
+    }
+
+    [Fact]
     public async Task Activity_InvalidDays_Returns400()
     {
         var response = await _superadmin.GetAsync("/api/superadmin/activity?days=999");
