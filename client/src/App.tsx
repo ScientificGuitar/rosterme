@@ -21,6 +21,9 @@ import { EditEvent } from "@/pages/admin/EditEvent"
 import { ReportsPage } from "@/pages/admin/ReportsPage"
 import { InvitePage } from "@/pages/public/InvitePage"
 import { LandingPage } from "@/pages/public/LandingPage"
+import { SigninPage } from "@/pages/public/SigninPage"
+import { SignupPage } from "@/pages/public/SignupPage"
+import { SsoCallbackPage } from "@/pages/public/SsoCallbackPage"
 import { FeaturesPage } from "@/pages/public/FeaturesPage"
 import { ResourcesPage } from "@/pages/public/ResourcesPage"
 import { SignupManagePage } from "@/pages/public/SignupManagePage"
@@ -40,7 +43,7 @@ function RequireAuth() {
   const { isLoaded, isSignedIn } = useAuth()
 
   if (!isLoaded) return null
-  if (!isSignedIn) return <Navigate to="/" replace />
+  if (!isSignedIn) return <Navigate to="/signin" replace />
 
   return <Outlet />
 }
@@ -93,7 +96,10 @@ function AppLayout() {
 
   return (
     <div className="flex min-h-svh">
-      <AppSidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
+      <AppSidebar
+        mobileOpen={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="border-b px-4 py-2 md:hidden">
           <Button
@@ -124,6 +130,9 @@ export function App() {
           <Route path="/resources" element={<ResourcesPage />} />
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/signin" element={<SigninPage />} />
+          <Route path="/sso-callback" element={<SsoCallbackPage />} />
           <Route path="*" element={<LandingPage />} />
         </Route>
         <Route element={<RequireAuth />}>

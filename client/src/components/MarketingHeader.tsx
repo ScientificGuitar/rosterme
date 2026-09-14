@@ -1,6 +1,6 @@
 import { useState } from "react"
-import { Link, useLocation } from "react-router-dom"
-import { Show, useClerk } from "@clerk/react"
+import { Link, useLocation, useNavigate } from "react-router-dom"
+import { Show } from "@clerk/react"
 import { Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ThemedUserButton } from "@/components/ThemedUserButton"
@@ -13,7 +13,7 @@ const marketingLinks = [
 ]
 
 export function MarketingHeader() {
-  const { openSignIn, openSignUp } = useClerk()
+  const navigate = useNavigate()
   const location = useLocation()
   const [open, setOpen] = useState(false)
 
@@ -53,17 +53,10 @@ export function MarketingHeader() {
         <div className="hidden items-center gap-2 md:flex">
           <Show when="signed-out">
             <ThemeToggle />
-            <Button
-              variant="outline"
-              onClick={() => openSignIn({ fallbackRedirectUrl: "/dashboard" })}
-            >
+            <Button variant="outline" onClick={() => navigate("/signin")}>
               Sign in
             </Button>
-            <Button
-              onClick={() => openSignUp({ fallbackRedirectUrl: "/dashboard" })}
-            >
-              Sign up
-            </Button>
+            <Button onClick={() => navigate("/signup")}>Sign up</Button>
           </Show>
           <Show when="signed-in">
             <Button asChild>
@@ -113,13 +106,19 @@ export function MarketingHeader() {
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => openSignIn({ fallbackRedirectUrl: "/dashboard" })}
+                onClick={() => {
+                  setOpen(false)
+                  navigate("/signin")
+                }}
               >
                 Sign in
               </Button>
               <Button
                 className="flex-1"
-                onClick={() => openSignUp({ fallbackRedirectUrl: "/dashboard" })}
+                onClick={() => {
+                  setOpen(false)
+                  navigate("/signup")
+                }}
               >
                 Sign up
               </Button>

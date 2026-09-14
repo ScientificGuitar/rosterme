@@ -1,6 +1,5 @@
 import { useEffect } from "react"
-import { useClerk } from "@clerk/react"
-import { useLocation } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import {
   ArrowRight,
   BellRing,
@@ -24,11 +23,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 
-function useStart() {
-  const { openSignUp } = useClerk()
-  return () => openSignUp({ fallbackRedirectUrl: "/dashboard" })
-}
-
 function CtaButton({
   children,
   variant = "default",
@@ -40,12 +34,12 @@ function CtaButton({
   size?: "default" | "lg"
   className?: string
 }) {
-  const start = useStart()
+  const navigate = useNavigate()
   return (
     <Button
       variant={variant}
       size={size}
-      onClick={start}
+      onClick={() => navigate("/signup")}
       className={className}
     >
       {children}
@@ -53,7 +47,6 @@ function CtaButton({
     </Button>
   )
 }
-
 const flowSteps = [
   {
     icon: CalendarPlus,
