@@ -1,28 +1,18 @@
 import type { ReactNode } from "react"
 import { Link } from "react-router-dom"
-import { LEGAL_CONTACT_EMAIL, LEGAL_LAST_UPDATED, OPERATOR_NAME } from "./legal"
+import { LEGAL_CONTACT_EMAIL, LEGAL_LAST_UPDATED } from "./legal"
 
 export function ContactLine() {
-  if (LEGAL_CONTACT_EMAIL) {
-    return (
-      <p>
-        If you have questions about these terms or your data, contact us at{" "}
-        <a
-          href={`mailto:${LEGAL_CONTACT_EMAIL}`}
-          className="font-medium text-primary underline underline-offset-4"
-        >
-          {LEGAL_CONTACT_EMAIL}
-        </a>
-        .
-      </p>
-    )
-  }
   return (
     <p>
-      {OPERATOR_NAME} is operated by {OPERATOR_NAME}. A dedicated contact email
-      for legal and privacy requests will be published here soon — until then,
-      organizers can reach us through the usual support channel for their
-      workspace.
+      If you have questions about these terms or your data, contact us at{" "}
+      <a
+        href={`mailto:${LEGAL_CONTACT_EMAIL}`}
+        className="font-medium text-primary underline underline-offset-4"
+      >
+        {LEGAL_CONTACT_EMAIL}
+      </a>
+      .
     </p>
   )
 }
