@@ -42,7 +42,7 @@ export function EventCard({ event }: EventCardProps) {
                 <div>
                   <div className="font-medium">{slot.label}</div>
                   <div className="text-muted-foreground">
-                    {formatTime(slot.startTime)}–{formatTime(slot.endTime)}
+                    {formatTime(slot.startTime)}-{formatTime(slot.endTime)}
                   </div>
                 </div>
                 <Badge

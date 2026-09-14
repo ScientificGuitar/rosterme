@@ -34,7 +34,7 @@ public static class CalendarInviteBuilder
         var textDescription = new StringBuilder();
         if (!string.IsNullOrWhiteSpace(description))
             textDescription.AppendLine(description);
-        textDescription.AppendLine($"Shift: {slotLabel} ({startTime:HH:mm}–{endTime:HH:mm})");
+        textDescription.AppendLine($"Shift: {slotLabel} ({startTime:HH:mm}-{endTime:HH:mm})");
         textDescription.Append("View or cancel your signup: ");
         textDescription.Append(manageUrl);
 

@@ -1,6 +1,7 @@
 import { useEffect } from "react"
 import { useClerk } from "@clerk/react"
 import { useLocation } from "react-router-dom"
+import { useSeo } from "@/lib/seo"
 import {
   ArrowRight,
   BellRing,
@@ -113,21 +114,21 @@ function FlowStrip() {
 const organizerShifts = [
   {
     label: "Morning",
-    time: "09:00–12:00",
+    time: "09:00-12:00",
     count: "3/6",
     full: false,
     percent: 50,
   },
   {
     label: "Afternoon",
-    time: "13:00–16:00",
+    time: "13:00-16:00",
     count: "6/6",
     full: true,
     percent: 100,
   },
   {
     label: "Collection",
-    time: "16:00–18:00",
+    time: "16:00-18:00",
     count: "2/5",
     full: false,
     percent: 40,
@@ -147,7 +148,7 @@ function OrganizerMockup() {
           <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/30" />
         </span>
         <span className="ml-2 truncate text-xs font-medium text-muted-foreground">
-          RosterMe · Community Food Bank · Mar 9 – Mar 15
+          RosterMe · Community Food Bank · Mar 9 - Mar 15
         </span>
       </div>
       <div className="space-y-3 p-4">
@@ -213,21 +214,21 @@ function OrganizerMockup() {
 const volunteerShifts = [
   {
     label: "Morning",
-    time: "09:00–12:00",
+    time: "09:00-12:00",
     count: "3/6",
     full: false,
     selected: true,
   },
   {
     label: "Afternoon",
-    time: "13:00–16:00",
+    time: "13:00-16:00",
     count: "6/6",
     full: true,
     selected: false,
   },
   {
     label: "Collection",
-    time: "16:00–18:00",
+    time: "16:00-18:00",
     count: "2/5",
     full: false,
     selected: false,
@@ -302,7 +303,7 @@ function VolunteerMockup() {
 const eventDetailShifts = [
   {
     label: "Morning",
-    time: "09:00–12:00",
+    time: "09:00-12:00",
     count: "3/6",
     signups: [
       { name: "Maria Santos", status: "Confirmed" },
@@ -312,7 +313,7 @@ const eventDetailShifts = [
   },
   {
     label: "Collection",
-    time: "16:00–18:00",
+    time: "16:00-18:00",
     count: "2/5",
     signups: [
       { name: "Priya Nair", status: "Pending" },
@@ -454,6 +455,12 @@ const audiences = [
 ]
 
 export function LandingPage() {
+  useSeo({
+    title: "RosterMe - Free Signups for Schools, Volunteer Groups & Community Organizers",
+    description:
+      "RosterMe is free volunteer scheduling for schools, volunteer groups, and community organizers. Create shifts, share one signup link, and see who's coming. No volunteer accounts needed.",
+    path: "/",
+  })
   const { hash } = useLocation()
 
   useEffect(() => {

@@ -62,9 +62,9 @@ Organizers can create events such as:
 ## Shift Slots
 Each event can contain one or more volunteer slots. For example:  
 Saturday Food Bank:  
-- 08:00–10:00 → 4-5 volunteers
-- 10:00–12:00 → 4-6 volunteers
-- 12:00–14:00 → 3 volunteers
+- 08:00-10:00 → 4-5 volunteers
+- 10:00-12:00 → 4-6 volunteers
+- 12:00-14:00 → 3 volunteers
 
 ### Slot fields
 - start time

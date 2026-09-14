@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom"
 import { OPERATOR_NAME } from "./legal"
+import { useSeo } from "@/lib/seo"
 import {
   ContactLine,
   ExternalLink,
@@ -8,6 +9,12 @@ import {
 } from "./LegalLayout"
 
 export function PrivacyPolicyPage() {
+  useSeo({
+    title: "Privacy Policy - RosterMe",
+    description:
+      "How RosterMe collects, uses, and protects organizer and volunteer data.",
+    path: "/privacy-policy",
+  })
   return (
     <LegalLayout
       title="Privacy Policy"
