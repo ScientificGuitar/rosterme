@@ -23,6 +23,7 @@ import {
 import { useGroups } from "@/hooks/useGroups"
 import { useApi } from "@/hooks/useApi"
 import { formatApiError } from "@/lib/api"
+import type { Group } from "@/lib/types"
 
 interface GroupSelectProps {
   value: string
@@ -40,16 +41,26 @@ export function GroupSelect({ value, onChange, disabled = false }: GroupSelectPr
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
+    // The dialog is portalled in the DOM, but React events bubble through the
+    // React tree — without this, submitting here also triggers the outer
+    // event create/edit form's onSubmit (red "Select a group" toast, or even
+    // an unintended event create/update + navigation that drops the selection).
+    e.stopPropagation()
     const trimmed = name.trim()
     if (!trimmed) return
     setCreating(true)
     try {
       const group = await api.createGroup(trimmed)
       toast.success("Group created")
-      await queryClient.invalidateQueries({ queryKey: ["groups"] })
+      // Optimistically add to the cached list so the Select can display the
+      // new value immediately, even before the refetch completes.
+      queryClient.setQueryData<Group[]>(["groups"], (old) =>
+        old ? [...old, group] : [group]
+      )
       onChange(group.id)
       setName("")
       setDialogOpen(false)
+      await queryClient.invalidateQueries({ queryKey: ["groups"] })
     } catch (err) {
       toast.error(formatApiError(err, "Failed to create group"))
     } finally {
