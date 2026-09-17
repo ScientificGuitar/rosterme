@@ -690,7 +690,7 @@ export function LandingPage() {
           ].map((t) => (
             <span
               key={t}
-              className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs text-muted-foreground"
+              className="inline-flex items-center gap-1.5 rounded-3xl border px-3 py-1 text-xs text-muted-foreground"
             >
               <X className="h-3 w-3" />
               {t}
