@@ -48,8 +48,8 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
     <Card>
       <CardContent className="pt-6">
-        <p className="text-2xl font-bold">{value}</p>
-        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="page-title">{value}</p>
+        <p className="muted">{label}</p>
       </CardContent>
     </Card>
   )
@@ -67,11 +67,11 @@ function OverviewTab() {
     })) ?? []
 
   return (
-    <div className="space-y-6">
+    <div className="form-stack">
       {stats.isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading stats…</p>
+        <p className="muted">Loading stats…</p>
       ) : stats.error ? (
-        <p className="text-sm text-destructive">
+        <p className="field-error">
           {formatApiError(stats.error, "Failed to load stats")}
         </p>
       ) : stats.data ? (
@@ -90,13 +90,15 @@ function OverviewTab() {
             />
           </div>
           <div className="flex flex-wrap gap-2">
-            {Object.entries(stats.data.signupsByStatus).map(([status, count]) => (
-              <Badge key={status} variant="secondary">
-                {status}: {count}
-              </Badge>
-            ))}
+            {Object.entries(stats.data.signupsByStatus).map(
+              ([status, count]) => (
+                <Badge key={status} variant="secondary">
+                  {status}: {count}
+                </Badge>
+              )
+            )}
             {Object.keys(stats.data.signupsByStatus).length === 0 && (
-              <span className="text-sm text-muted-foreground">No signups yet</span>
+              <span className="muted">No signups yet</span>
             )}
           </div>
         </>
@@ -108,9 +110,9 @@ function OverviewTab() {
         </CardHeader>
         <CardContent>
           {activity.isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading activity…</p>
+            <p className="muted">Loading activity…</p>
           ) : activity.error ? (
-            <p className="text-sm text-destructive">
+            <p className="field-error">
               {formatApiError(activity.error, "Failed to load activity")}
             </p>
           ) : (
@@ -122,8 +124,18 @@ function OverviewTab() {
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="Signups" stroke="#2563eb" dot={false} />
-                  <Line type="monotone" dataKey="Events" stroke="#16a34a" dot={false} />
+                  <Line
+                    type="monotone"
+                    dataKey="Signups"
+                    stroke="#2563eb"
+                    dot={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="Events"
+                    stroke="#16a34a"
+                    dot={false}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -137,18 +149,17 @@ function OverviewTab() {
 function RecentTab() {
   const recent = useSuperAdminRecent(10)
 
-  if (recent.isLoading)
-    return <p className="text-sm text-muted-foreground">Loading recent items…</p>
+  if (recent.isLoading) return <p className="muted">Loading recent items…</p>
   if (recent.error)
     return (
-      <p className="text-sm text-destructive">
+      <p className="field-error">
         {formatApiError(recent.error, "Failed to load recent items")}
       </p>
     )
   if (!recent.data) return null
 
   return (
-    <div className="space-y-6">
+    <div className="form-stack">
       <Card>
         <CardHeader>
           <h2 className="font-semibold">Recent groups</h2>
@@ -166,8 +177,12 @@ function RecentTab() {
               {recent.data.groups.map((g) => (
                 <TableRow key={g.id}>
                   <TableCell>{g.name}</TableCell>
-                  <TableCell className="max-w-48 truncate">{g.groupOwner}</TableCell>
-                  <TableCell>{new Date(g.createdAt).toLocaleDateString()}</TableCell>
+                  <TableCell className="max-w-48 truncate">
+                    {g.groupOwner}
+                  </TableCell>
+                  <TableCell>
+                    {new Date(g.createdAt).toLocaleDateString()}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -192,7 +207,9 @@ function RecentTab() {
                 <TableRow key={e.id}>
                   <TableCell>{e.title}</TableCell>
                   <TableCell>{e.date}</TableCell>
-                  <TableCell>{new Date(e.createdAt).toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    {new Date(e.createdAt).toLocaleDateString()}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -221,7 +238,9 @@ function RecentTab() {
                   <TableCell>
                     <Badge variant="secondary">{s.status}</Badge>
                   </TableCell>
-                  <TableCell>{new Date(s.createdAt).toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    {new Date(s.createdAt).toLocaleDateString()}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -247,7 +266,9 @@ function OutboxTab() {
       setDeletingId(null)
     } catch (err) {
       if (err instanceof ApiError && err.code === "already_sent") {
-        toast.error("Already sent — sent history is preserved and cannot be deleted")
+        toast.error(
+          "Already sent — sent history is preserved and cannot be deleted"
+        )
       } else {
         toast.error(formatApiError(err, "Failed to delete message"))
       }
@@ -279,7 +300,9 @@ function OutboxTab() {
               variant="outline"
               size="sm"
               onClick={() =>
-                queryClient.invalidateQueries({ queryKey: ["superadmin", "outbox"] })
+                queryClient.invalidateQueries({
+                  queryKey: ["superadmin", "outbox"],
+                })
               }
             >
               <RefreshCw className="h-4 w-4" />
@@ -291,16 +314,14 @@ function OutboxTab() {
       <Separator />
       <CardContent>
         {outbox.isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading outbox…</p>
+          <p className="muted">Loading outbox…</p>
         ) : outbox.error ? (
-          <p className="text-sm text-destructive">
+          <p className="field-error">
             {formatApiError(outbox.error, "Failed to load outbox")}
           </p>
         ) : (
           <>
-            <p className="mb-3 text-sm text-muted-foreground">
-              {outbox.data?.total ?? 0} message(s)
-            </p>
+            <p className="muted mb-3">{outbox.data?.total ?? 0} message(s)</p>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -315,13 +336,17 @@ function OutboxTab() {
                 {outbox.data?.items.map((m) => (
                   <TableRow key={m.id}>
                     <TableCell className="max-w-48 truncate">{m.to}</TableCell>
-                    <TableCell className="max-w-64 truncate">{m.subject}</TableCell>
+                    <TableCell className="max-w-64 truncate">
+                      {m.subject}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={m.sent ? "secondary" : "default"}>
                         {m.sent ? "Sent" : "Pending"}
                       </Badge>
                     </TableCell>
-                    <TableCell>{new Date(m.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      {new Date(m.createdAt).toLocaleDateString()}
+                    </TableCell>
                     <TableCell>
                       {!m.sent && (
                         <Button
@@ -369,9 +394,13 @@ export function SuperAdminPage() {
   ]
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-4">
-      <h1 className="text-2xl font-bold">SuperAdmin</h1>
-      <div role="group" aria-label="Sections" className="inline-flex rounded-lg border p-1">
+    <div className="shell-admin stack-md">
+      <h1 className="page-title">SuperAdmin</h1>
+      <div
+        role="group"
+        aria-label="Sections"
+        className="inline-flex rounded-lg border p-1"
+      >
         {tabs.map((t) => (
           <Button
             key={t.id}

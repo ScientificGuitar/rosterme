@@ -6,10 +6,7 @@ export function ContactLine() {
   return (
     <p>
       If you have questions about these terms or your data, contact us at{" "}
-      <a
-        href={`mailto:${LEGAL_CONTACT_EMAIL}`}
-        className="font-medium text-primary underline underline-offset-4"
-      >
+      <a href={`mailto:${LEGAL_CONTACT_EMAIL}`} className="link-primary">
         {LEGAL_CONTACT_EMAIL}
       </a>
       .
@@ -28,12 +25,10 @@ export function LegalSection({
 }) {
   return (
     <section id={id} aria-labelledby={`${id}-heading`} className="mt-8">
-      <h2 id={`${id}-heading`} className="text-lg font-semibold tracking-tight">
+      <h2 id={`${id}-heading`} className="section-title">
         {title}
       </h2>
-      <div className="mt-2 space-y-3 text-[15px] leading-7 text-muted-foreground">
-        {children}
-      </div>
+      <div className="legal-body">{children}</div>
     </section>
   )
 }
@@ -46,12 +41,7 @@ export function ExternalLink({
   children: ReactNode
 }) {
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      className="font-medium text-primary underline underline-offset-4"
-    >
+    <a href={href} target="_blank" rel="noreferrer" className="link-primary">
       {children}
     </a>
   )
@@ -69,29 +59,17 @@ export function LegalLayout({
   children: ReactNode
 }) {
   return (
-    <div className="mx-auto w-full max-w-3xl px-6 py-10">
-      <Link
-        to="/"
-        className="text-sm font-medium text-primary underline underline-offset-4"
-      >
+    <div className="shell-legal">
+      <Link to="/" className="link-primary text-sm">
         &larr; Back to home
       </Link>
-      <h1 className="mt-4 text-3xl font-bold tracking-tight text-balance">
-        {title}
-      </h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Last updated: {LEGAL_LAST_UPDATED}
-      </p>
-      <p className="mt-4 text-[15px] leading-7 text-muted-foreground">
-        {intro}
-      </p>
+      <h1 className="page-title mt-4 tracking-tight text-balance">{title}</h1>
+      <p className="muted mt-2">Last updated: {LEGAL_LAST_UPDATED}</p>
+      <p className="legal-body mt-4">{intro}</p>
       {children}
-      <p className="mt-10 border-t pt-6 text-sm text-muted-foreground">
+      <p className="muted mt-10 border-t pt-6">
         Also see our{" "}
-        <Link
-          to={sibling.to}
-          className="font-medium text-primary underline underline-offset-4"
-        >
+        <Link to={sibling.to} className="link-primary">
           {sibling.label}
         </Link>
         .

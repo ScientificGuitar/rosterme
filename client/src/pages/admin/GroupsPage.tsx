@@ -122,12 +122,12 @@ export function GroupsPage() {
   }
 
   return (
-    <Card className="mx-auto w-full max-w-5xl">
+    <Card className="shell-admin">
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold">Groups</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="page-title">Groups</h1>
+            <p className="muted">
               Organize your events — rename groups or remove empty ones.
             </p>
           </div>
@@ -152,17 +152,15 @@ export function GroupsPage() {
         </div>
 
         {loading && (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            Loading groups...
-          </p>
+          <p className="loading-state muted py-8">Loading groups...</p>
         )}
         {!loading && error && (
-          <p className="py-8 text-center text-sm text-destructive">
+          <p className="loading-state py-8 text-destructive">
             {formatApiError(error, "Failed to load groups")}
           </p>
         )}
         {!loading && !error && visible.length === 0 && (
-          <div className="py-8 text-center">
+          <div className="loading-state py-8">
             <Users className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
             <p className="text-sm font-medium">
               {search.trim()
@@ -170,7 +168,7 @@ export function GroupsPage() {
                 : "No groups yet."}
             </p>
             {!search.trim() && (
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="muted mt-1">
                 Create your first group to organize events.
               </p>
             )}
@@ -188,7 +186,7 @@ export function GroupsPage() {
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{group.name}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="muted-xs">
                       Created {formatCreatedAt(group.createdAt)}
                     </p>
                   </div>
@@ -244,8 +242,8 @@ export function GroupsPage() {
               Sunday service.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleCreate} className="space-y-4">
-            <div className="space-y-2">
+          <form onSubmit={handleCreate} className="stack-md">
+            <div className="field-stack">
               <Label htmlFor="group-create-name">Group Name</Label>
               <Input
                 id="group-create-name"
@@ -288,8 +286,8 @@ export function GroupsPage() {
               Events in this group are not affected.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleEdit} className="space-y-4">
-            <div className="space-y-2">
+          <form onSubmit={handleEdit} className="stack-md">
+            <div className="field-stack">
               <Label htmlFor="group-edit-name">Group Name</Label>
               <Input
                 id="group-edit-name"

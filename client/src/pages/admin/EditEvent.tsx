@@ -46,15 +46,13 @@ export function EditEvent() {
   const navigate = useNavigate()
 
   if (isPending && !event) {
-    return (
-      <div className="py-12 text-center text-muted-foreground">Loading...</div>
-    )
+    return <div className="loading-state">Loading...</div>
   }
 
   if (error || !event) {
     return (
-      <div className="py-12 text-center">
-        <p className="mb-4 text-muted-foreground">
+      <div className="loading-state">
+        <p className="muted mb-4">
           {error instanceof Error ? error.message : "Event not found"}
         </p>
         <Button variant="outline" onClick={() => navigate("/dashboard")}>
@@ -208,18 +206,18 @@ function EventForm({ event, eventId }: EventFormProps) {
   const isPast = event.date < todayLocal()
 
   return (
-    <Card className="mx-auto w-full max-w-5xl">
+    <Card className="shell-admin">
       <CardHeader>
-        <h1 className="text-2xl font-bold">Edit Event</h1>
+        <h1 className="page-title">Edit Event</h1>
       </CardHeader>
       <Separator />
       <CardContent>
         {isPast && (
-          <p className="mb-6 rounded-md border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
+          <p className="alert-muted mb-6 bg-muted px-4">
             This event has already taken place and can no longer be edited.
           </p>
         )}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="form-stack">
           <GroupSelect
             value={groupId}
             onChange={setGroupId}
@@ -238,12 +236,13 @@ function EventForm({ event, eventId }: EventFormProps) {
             disabled={isPast}
           />
 
-          <div className="space-y-3">
+          <div className="section-stack">
             <Label>Time Slots</Label>
 
             {activeSlotCount === 0 && (
-              <p className="text-sm text-muted-foreground">
-                No time slots yet. Add time slots that volunteers can sign up for.
+              <p className="muted">
+                No time slots yet. Add time slots that volunteers can sign up
+                for.
               </p>
             )}
 
@@ -251,9 +250,9 @@ function EventForm({ event, eventId }: EventFormProps) {
               slot.deleted ? (
                 <div
                   key={slot.key}
-                  className="flex items-center justify-between gap-2 rounded-md border border-dashed p-3 opacity-70"
+                  className="empty-state flex items-center justify-between gap-2 p-3 text-left opacity-70"
                 >
-                  <p className="text-sm text-muted-foreground">
+                  <p className="muted">
                     <span className="font-medium line-through">
                       {slot.label || "Untitled slot"}
                     </span>{" "}
@@ -298,7 +297,9 @@ function EventForm({ event, eventId }: EventFormProps) {
                       ? `${slot.signupCount} active signup(s) on this slot.`
                       : undefined
                   }
-                  onUpdate={(field, value) => updateSlot(slot.key, field, value)}
+                  onUpdate={(field, value) =>
+                    updateSlot(slot.key, field, value)
+                  }
                   onRemove={() => markSlotDeleted(slot.key)}
                   removeLabel={
                     slot.signupCount > 0
@@ -312,9 +313,9 @@ function EventForm({ event, eventId }: EventFormProps) {
             )}
 
             {deletedCount > 0 && (
-              <p className="text-sm text-muted-foreground">
-                {deletedCount} slot(s) marked for deletion — they will be removed
-                when you save.
+              <p className="muted">
+                {deletedCount} slot(s) marked for deletion — they will be
+                removed when you save.
               </p>
             )}
 
@@ -329,11 +330,11 @@ function EventForm({ event, eventId }: EventFormProps) {
             </Button>
           </div>
 
-          <div className="space-y-3">
+          <div className="section-stack">
             <Label>Signup Questions</Label>
 
             {activeQuestionCount === 0 && (
-              <p className="text-sm text-muted-foreground">
+              <p className="muted">
                 No questions yet. Add optional questions volunteers answer when
                 signing up.
               </p>
@@ -343,9 +344,9 @@ function EventForm({ event, eventId }: EventFormProps) {
               question.deleted ? (
                 <div
                   key={question.key}
-                  className="flex items-center justify-between gap-2 rounded-md border border-dashed p-3 opacity-70"
+                  className="empty-state flex items-center justify-between gap-2 p-3 text-left opacity-70"
                 >
-                  <p className="text-sm text-muted-foreground">
+                  <p className="muted">
                     <span className="font-medium line-through">
                       {question.label || "Untitled question"}
                     </span>{" "}

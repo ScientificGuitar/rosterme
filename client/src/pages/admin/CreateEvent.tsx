@@ -138,13 +138,13 @@ export function CreateEvent() {
   }
 
   return (
-    <Card className="mx-auto w-full max-w-5xl">
+    <Card className="shell-admin">
       <CardHeader>
-        <h1 className="text-2xl font-bold">Create Event</h1>
+        <h1 className="page-title">Create Event</h1>
       </CardHeader>
       <Separator />
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="form-stack">
           <GroupSelect value={groupId} onChange={setGroupId} />
           <EventDetailsFields
             title={title}
@@ -158,11 +158,11 @@ export function CreateEvent() {
             dateMin={todayLocal()}
           />
 
-          <div className="space-y-3">
+          <div className="section-stack">
             <Label>Time Slots</Label>
 
             {slots.length === 0 && (
-              <p className="text-sm text-muted-foreground">
+              <p className="muted">
                 No slots yet. Add time slots that volunteers can sign up for.
               </p>
             )}
@@ -184,11 +184,11 @@ export function CreateEvent() {
             </Button>
           </div>
 
-          <div className="space-y-3">
+          <div className="section-stack">
             <Label>Signup Questions</Label>
 
             {questions.length === 0 && (
-              <p className="text-sm text-muted-foreground">
+              <p className="muted">
                 No questions yet. Add optional questions volunteers answer when
                 signing up.
               </p>

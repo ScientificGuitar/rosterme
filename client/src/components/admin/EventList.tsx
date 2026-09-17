@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { CapacityBar } from "@/components/ui/capacity-bar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { MetaRow } from "@/components/ui/layout"
 import { GroupFilter } from "@/components/admin/GroupFilter"
 import { SortControl, type EventSortBy } from "@/components/admin/SortControl"
 import { StatusFilter } from "@/components/admin/StatusFilter"
@@ -142,8 +143,8 @@ export function EventList() {
   }, [events, search, selectedStatusSet, selectedGroupSet, sortBy, today])
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
-      <div className="mb-4 space-y-2">
+    <div className="shell-admin">
+      <div className="field-stack mb-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -227,10 +228,7 @@ export function EventList() {
             ))}
             <span className="ml-auto flex items-center gap-2">
               {!isLoading && !error && events && (
-                <span
-                  className="text-xs text-muted-foreground tabular-nums"
-                  aria-live="polite"
-                >
+                <span className="muted-xs tabular-nums" aria-live="polite">
                   Showing {visible.length} of {events.length}{" "}
                   {events.length === 1 ? "event" : "events"}
                 </span>
@@ -251,19 +249,17 @@ export function EventList() {
       </div>
 
       {isLoading && !events && (
-        <div className="py-12 text-center text-muted-foreground">
-          Loading events...
-        </div>
+        <div className="loading-state">Loading events...</div>
       )}
       {error && (
-        <div className="py-12 text-center text-destructive">
+        <div className="loading-state text-destructive">
           {(error as Error).message}
         </div>
       )}
       {!isLoading && !error && visible.length === 0 && (
-        <div className="py-12 text-center text-muted-foreground">
+        <div className="loading-state">
           {events && events.length > 0 ? (
-            <div className="space-y-3">
+            <div className="section-stack">
               <p>No events match your filters.</p>
               <Button variant="outline" size="sm" onClick={clearAllFilters}>
                 Clear filters
@@ -310,25 +306,22 @@ function EventListItem({
             {status === "active" ? "Active" : "Inactive"}
           </Badge>
         </div>
-        <CardTitle className="text-base font-semibold">
+        <CardTitle className="font-semibold">
           <Link to={`/events/${event.id}`} className="hover:underline">
             {event.title}
           </Link>
         </CardTitle>
-        <p className="text-xs text-muted-foreground">{event.groupName}</p>
+        <p className="muted-xs">{event.groupName}</p>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="field-stack">
         {event.location && (
-          <p
-            className="flex items-center gap-1 truncate text-xs text-muted-foreground"
-            title={event.location}
-          >
+          <MetaRow title={event.location}>
             <MapPin className="h-3 w-3 shrink-0" />
             <span className="truncate">{event.location}</span>
-          </p>
+          </MetaRow>
         )}
         {event.slots.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No slots</p>
+          <p className="muted-xs">No slots</p>
         ) : (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2 text-xs">
@@ -338,7 +331,7 @@ function EventListItem({
               </span>
               <Badge
                 variant={filled >= capacity ? "destructive" : "secondary"}
-                className="text-[10px]"
+                size="xs"
               >
                 {filled}/{capacity} volunteers
               </Badge>

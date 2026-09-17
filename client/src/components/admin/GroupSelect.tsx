@@ -31,7 +31,11 @@ interface GroupSelectProps {
   disabled?: boolean
 }
 
-export function GroupSelect({ value, onChange, disabled = false }: GroupSelectProps) {
+export function GroupSelect({
+  value,
+  onChange,
+  disabled = false,
+}: GroupSelectProps) {
   const { groups, loading } = useGroups()
   const api = useApi()
   const queryClient = useQueryClient()
@@ -69,7 +73,7 @@ export function GroupSelect({ value, onChange, disabled = false }: GroupSelectPr
   }
 
   return (
-    <div className="space-y-2">
+    <div className="field-stack">
       <Label htmlFor="group">Group</Label>
       <div className="flex gap-2">
         <Select
@@ -116,9 +120,7 @@ export function GroupSelect({ value, onChange, disabled = false }: GroupSelectPr
         </Button>
       </div>
       {groups.length === 0 && !loading && (
-        <p className="text-sm text-muted-foreground">
-          No groups yet. Click + to create one first.
-        </p>
+        <p className="muted">No groups yet. Click + to create one first.</p>
       )}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
@@ -129,8 +131,8 @@ export function GroupSelect({ value, onChange, disabled = false }: GroupSelectPr
               Sunday service.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleCreate} className="space-y-4">
-            <div className="space-y-2">
+          <form onSubmit={handleCreate} className="stack-md">
+            <div className="field-stack">
               <Label htmlFor="new-group-name">Group Name</Label>
               <Input
                 id="new-group-name"

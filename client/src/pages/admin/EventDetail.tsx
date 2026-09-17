@@ -16,7 +16,8 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { Badge, badgeVariants } from "@/components/ui/badge"
+import type { VariantProps } from "class-variance-authority"
 import { CapacityBar } from "@/components/ui/capacity-bar"
 import {
   activeSignupCount,
@@ -33,6 +34,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { EmptyState, MetaRow } from "@/components/ui/layout"
 import { useEvent } from "@/hooks/useEvent"
 import { useDeleteSignup } from "@/hooks/useDeleteSignup"
 import { useApi } from "@/hooks/useApi"
@@ -90,15 +92,13 @@ export function EventDetail() {
   }
 
   if (isLoading && !event) {
-    return (
-      <div className="py-12 text-center text-muted-foreground">Loading...</div>
-    )
+    return <div className="loading-state">Loading...</div>
   }
 
   if (error || !event) {
     return (
-      <div className="py-12 text-center">
-        <p className="mb-4 text-muted-foreground">
+      <div className="loading-state">
+        <p className="muted mb-4">
           {error instanceof Error ? error.message : "Event not found"}
         </p>
         <Button variant="outline" onClick={() => navigate("/dashboard")}>
@@ -114,7 +114,7 @@ export function EventDetail() {
   )
 
   return (
-    <Card className="mx-auto w-full max-w-5xl">
+    <Card className="shell-admin">
       <CardHeader>
         <div className="flex flex-wrap items-start gap-2 sm:flex-nowrap sm:items-center sm:gap-4">
           <Button
@@ -127,17 +127,17 @@ export function EventDetail() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-bold break-words sm:text-2xl">
+            <h1 className="page-title text-xl break-words sm:text-2xl">
               {event.title}
             </h1>
-            <p className="truncate text-sm text-muted-foreground">
+            <p className="muted truncate">
               {event.groupName} · {event.date}
             </p>
             {event.location && (
-              <p className="flex items-center gap-1 truncate text-sm text-muted-foreground">
+              <MetaRow className="text-sm">
                 <MapPin className="h-3.5 w-3.5 shrink-0" />
                 <span className="truncate">{event.location}</span>
-              </p>
+              </MetaRow>
             )}
           </div>
           <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:shrink-0 sm:flex-nowrap sm:gap-2">
@@ -199,7 +199,7 @@ export function EventDetail() {
         />
       </CardHeader>
       <Separator />
-      <CardContent className="space-y-6">
+      <CardContent className="form-stack">
         <ConfirmDialog
           open={pendingSignupId !== null}
           onOpenChange={(open) => {
@@ -218,11 +218,9 @@ export function EventDetail() {
 
         <InviteLinkSection eventId={event.id} />
 
-        <div className="space-y-4">
+        <div className="stack-md">
           {event.slots.length === 0 && (
-            <p className="text-center text-muted-foreground">
-              No time slots for this event.
-            </p>
+            <p className="muted text-center">No time slots for this event.</p>
           )}
           {event.slots.map((slot) => {
             const sortedSignups = [...slot.signups].sort(compareSignupsByStatus)
@@ -262,7 +260,7 @@ export function EventDetail() {
                     </span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3 p-4 pt-3">
+                <CardContent className="section-stack p-4 pt-3">
                   <CapacityBar
                     filled={activeSignupCount(slot.signups)}
                     capacity={slot.capacity}
@@ -390,7 +388,7 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
   return (
     <Card>
       <CardHeader className="p-4 pb-2">
-        <CardTitle className="flex items-center justify-between text-base">
+        <CardTitle className="flex items-center justify-between">
           <span className="flex items-center gap-2">
             <Link2 className="h-4 w-4" />
             Invite links
@@ -401,19 +399,17 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
           </Button>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2 p-4 pt-2">
-        {isLoading && (
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        )}
+      <CardContent className="field-stack p-4 pt-2">
+        {isLoading && <p className="muted">Loading...</p>}
         {links && links.length === 0 && (
-          <p className="rounded-md border border-dashed py-4 text-center text-sm text-muted-foreground">
+          <EmptyState>
             No invite links yet. Generate one to share with volunteers.
-          </p>
+          </EmptyState>
         )}
         {links?.map((link) => (
           <div
             key={link.id}
-            className="flex flex-col gap-2 rounded-md border p-2 sm:flex-row sm:items-center"
+            className="row-card-sm flex flex-col gap-2 sm:flex-row sm:items-center"
           >
             <Input
               readOnly
@@ -474,29 +470,13 @@ const STATUS_CONFIG: Record<
   string,
   {
     label: string
-    variant: "default" | "secondary" | "destructive" | "outline"
-    className?: string
+    variant: NonNullable<VariantProps<typeof badgeVariants>["variant"]>
   }
 > = {
   Confirmed: { label: "Confirmed", variant: "default" },
-  Pending: {
-    label: "Pending",
-    variant: "outline",
-    className:
-      "border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400",
-  },
-  Waitlisted: {
-    label: "Waitlisted",
-    variant: "outline",
-    className:
-      "border-sky-300 text-sky-700 dark:border-sky-700 dark:text-sky-400",
-  },
-  WaitlistPending: {
-    label: "Waitlist pending",
-    variant: "outline",
-    className:
-      "border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400",
-  },
+  Pending: { label: "Pending", variant: "pending" },
+  Waitlisted: { label: "Waitlisted", variant: "waitlist" },
+  WaitlistPending: { label: "Waitlist pending", variant: "pending" },
   Cancelled: { label: "Cancelled", variant: "destructive" },
   Removed: { label: "Removed", variant: "secondary" },
 }
@@ -506,11 +486,7 @@ function SignupStatusBadge({ status }: { status: string }) {
     label: status,
     variant: "secondary" as const,
   }
-  return (
-    <Badge variant={cfg.variant} className={cfg.className}>
-      {cfg.label}
-    </Badge>
-  )
+  return <Badge variant={cfg.variant}>{cfg.label}</Badge>
 }
 
 interface SignupRowProps {
@@ -554,7 +530,7 @@ function SignupCard({
 }: SignupCardProps) {
   const questionById = new Map(questions.map((q) => [q.id, q]))
   return (
-    <li className="rounded-md border p-2">
+    <li className="row-card-sm">
       <div className="flex items-start gap-1">
         <Button
           variant="ghost"
