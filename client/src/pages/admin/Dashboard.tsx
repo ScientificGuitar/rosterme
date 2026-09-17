@@ -10,10 +10,10 @@ export function Dashboard() {
   const [view, setView] = useState<"list" | "calendar">("list")
 
   return (
-    <Card className="mx-auto w-full max-w-5xl">
+    <Card className="shell-admin">
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <h1 className="page-title">Dashboard</h1>
           <div
             role="group"
             aria-label="View mode"

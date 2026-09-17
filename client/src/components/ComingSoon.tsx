@@ -16,12 +16,12 @@ export function ComingSoon({
   backLabel = "Back to home",
 }: ComingSoonProps) {
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col items-center px-6 py-20 text-center">
+    <div className="public-narrow flex flex-col items-center px-6 py-20 text-center">
       <span className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <Clock className="h-6 w-6" />
       </span>
-      <h1 className="mt-5 text-2xl font-bold tracking-tight">{title}</h1>
-      <p className="mt-2 text-muted-foreground">{description}</p>
+      <h1 className="page-title mt-5 tracking-tight">{title}</h1>
+      <p className="muted mt-2">{description}</p>
       <Button asChild className="mt-6">
         <Link to={backTo}>
           {backLabel}

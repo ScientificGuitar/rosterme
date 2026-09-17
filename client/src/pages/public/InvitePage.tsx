@@ -15,6 +15,7 @@ import type { PublicSlot, PublicQuestion } from "@/lib/types"
 import { isValidPhone } from "@/lib/eventQuestions"
 import { cn } from "@/lib/utils"
 import { CapacityBar } from "@/components/ui/capacity-bar"
+import { Alert, EmptyState } from "@/components/ui/layout"
 
 const api = createPublicApi()
 
@@ -38,18 +39,14 @@ export function InvitePage() {
   })
 
   if (isLoading) {
-    return (
-      <div className="mx-auto max-w-2xl py-12 text-center text-muted-foreground">
-        Loading...
-      </div>
-    )
+    return <div className="public-wide loading-state">Loading...</div>
   }
 
   if (error || !data) {
     return (
-      <div className="mx-auto max-w-md py-16 text-center">
-        <h1 className="mb-2 text-2xl font-bold">Invalid invite link</h1>
-        <p className="text-muted-foreground">
+      <div className="public-narrow loading-state py-16">
+        <h1 className="page-title mb-2">Invalid invite link</h1>
+        <p className="muted">
           This invite link is invalid, has been revoked, or no longer points to
           an active event.
         </p>
@@ -60,11 +57,9 @@ export function InvitePage() {
   const { groupName, event } = data
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <header className="space-y-1 text-center">
-        <p className="text-sm font-medium text-muted-foreground">
-          {groupName}
-        </p>
+    <div className="public-wide form-stack">
+      <header className="field-stack-sm text-center">
+        <p className="text-sm font-medium text-muted-foreground">{groupName}</p>
         <h1 className="text-3xl font-bold">{event.title}</h1>
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
           <span className="flex items-center gap-1">
@@ -79,9 +74,7 @@ export function InvitePage() {
           )}
         </div>
         {event.description && (
-          <p className="mx-auto mt-2 max-w-prose text-sm text-muted-foreground">
-            {event.description}
-          </p>
+          <p className="muted mx-auto mt-2 max-w-prose">{event.description}</p>
         )}
       </header>
 
@@ -90,22 +83,21 @@ export function InvitePage() {
           <CardContent className="flex flex-col items-center gap-2 p-6 text-center">
             <Calendar className="h-8 w-8 text-muted-foreground" />
             <p className="font-medium">This event has already passed</p>
-            <p className="text-sm text-muted-foreground">
-              Signups are closed. Contact {groupName} if you have any
-              questions.
+            <p className="muted">
+              Signups are closed. Contact {groupName} if you have any questions.
             </p>
           </CardContent>
         </Card>
       ) : (
-        <section className="space-y-3">
-          <h2 className="flex items-center gap-2 text-lg font-semibold">
+        <section className="section-stack">
+          <h2 className="section-title flex items-center gap-2">
             <Users className="h-5 w-5" />
             Volunteer slots
           </h2>
           {event.slots.length === 0 ? (
-            <p className="rounded-md border border-dashed py-8 text-center text-sm text-muted-foreground">
+            <EmptyState className="py-8">
               No slots have been created for this event yet.
-            </p>
+            </EmptyState>
           ) : (
             <SignupForm
               slots={event.slots}
@@ -138,12 +130,13 @@ function SignupForm({
   )
   const [submitting, setSubmitting] = useState(false)
   const [sentEmail, setSentEmail] = useState<string | null>(null)
-  const [sentWaitlistPosition, setSentWaitlistPosition] = useState<number | null>(
-    null
-  )
+  const [sentWaitlistPosition, setSentWaitlistPosition] = useState<
+    number | null
+  >(null)
   const [emailError, setEmailError] = useState<string | null>(null)
   const [duplicatePending, setDuplicatePending] = useState(false)
-  const [duplicateWaitlistPending, setDuplicateWaitlistPending] = useState(false)
+  const [duplicateWaitlistPending, setDuplicateWaitlistPending] =
+    useState(false)
   const [resending, setResending] = useState(false)
 
   const canSubmit = !!selectedSlotId && !!name.trim() && !!email.trim()
@@ -327,9 +320,9 @@ function SignupForm({
   return (
     <Card>
       <CardHeader className="p-4 pb-2">
-        <CardTitle className="text-base">Select a slot</CardTitle>
+        <CardTitle>Select a slot</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4 p-4 pt-2">
+      <CardContent className="stack-md p-4 pt-2">
         <RadioGroup
           value={selectedSlotId}
           onValueChange={(value) => {
@@ -367,9 +360,7 @@ function SignupForm({
                         {formatTime(slot.endTime)}
                       </span>
                     </span>
-                    <Badge
-                      variant={slot.isFull ? "destructive" : "secondary"}
-                    >
+                    <Badge variant={slot.isFull ? "destructive" : "secondary"}>
                       {`${slot.signupCount}/${slot.capacity}`}
                     </Badge>
                   </div>
@@ -380,7 +371,7 @@ function SignupForm({
                     />
                   </div>
                   {slot.isFull && slot.allowWaitlist && (
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <p className="muted-xs mt-1">
                       Full — joining the waitlist
                       {slot.waitlistCount > 0 &&
                         ` (${slot.waitlistCount} waiting)`}
@@ -388,7 +379,7 @@ function SignupForm({
                     </p>
                   )}
                   {slot.isFull && !slot.allowWaitlist && (
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <p className="muted-xs mt-1">
                       Full — no waitlist for this slot.
                     </p>
                   )}
@@ -399,8 +390,8 @@ function SignupForm({
         </RadioGroup>
 
         {duplicatePending || duplicateWaitlistPending ? (
-          <div className="space-y-3 rounded-md border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950">
-            <p className="text-sm text-amber-800 dark:text-amber-300">
+          <Alert tone="warning" className="section-stack p-4">
+            <p>
               {duplicateWaitlistPending
                 ? "You already have a pending waitlist signup for this slot. Check your email to confirm it and secure your place in line."
                 : "You already have a pending signup for this slot. Check your email to confirm it."}
@@ -420,9 +411,9 @@ function SignupForm({
                 Choose another slot
               </Button>
             </div>
-          </div>
+          </Alert>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-3">
+          <form onSubmit={handleSubmit} className="section-stack">
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -443,12 +434,12 @@ function SignupForm({
               aria-invalid={!!emailError}
             />
             {emailError && (
-              <p className="text-sm text-destructive" role="alert">
+              <p className="field-error" role="alert">
                 {emailError}
               </p>
             )}
             {questions.length > 0 && (
-              <div className="space-y-3 rounded-md border p-3">
+              <div className="row-card">
                 <p className="text-sm font-medium">Signup questions</p>
                 {questions.map((question) => (
                   <QuestionField
@@ -486,7 +477,7 @@ function SignupForm({
                   ? "Join Waitlist"
                   : "Sign up"}
             </Button>
-            <p className="text-center text-xs text-muted-foreground">
+            <p className="muted-xs text-center">
               By signing up you agree to our{" "}
               <Link
                 to="/terms-of-service"
@@ -525,7 +516,7 @@ function QuestionField({
 }) {
   const inputId = `question-${question.id}`
   return (
-    <div className="space-y-1">
+    <div className="field-stack-sm">
       <Label htmlFor={inputId} className="text-sm">
         {question.label}
         {question.required && <span className="ml-1 text-destructive">*</span>}
@@ -563,7 +554,7 @@ function QuestionField({
         />
       )}
       {error && (
-        <p className="text-sm text-destructive" role="alert">
+        <p className="field-error" role="alert">
           {error}
         </p>
       )}

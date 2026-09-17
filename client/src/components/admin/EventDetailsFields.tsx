@@ -28,7 +28,7 @@ export function EventDetailsFields({
 }: EventDetailsFieldsProps) {
   return (
     <>
-      <div className="space-y-2">
+      <div className="field-stack">
         <Label htmlFor="title">Event Title</Label>
         <Input
           id="title"
@@ -40,7 +40,7 @@ export function EventDetailsFields({
         />
       </div>
 
-      <div className="space-y-2">
+      <div className="field-stack">
         <Label htmlFor="description">Description (optional)</Label>
         <Input
           id="description"
@@ -52,7 +52,7 @@ export function EventDetailsFields({
         />
       </div>
 
-      <div className="space-y-2">
+      <div className="field-stack">
         <Label htmlFor="location">Location (optional)</Label>
         <Input
           id="location"
@@ -64,7 +64,7 @@ export function EventDetailsFields({
         />
       </div>
 
-      <div className="space-y-2">
+      <div className="field-stack">
         <Label htmlFor="date">Date</Label>
         <Input
           id="date"

@@ -34,7 +34,7 @@ export function SlotRowCard({
   onRemove,
 }: SlotRowCardProps) {
   return (
-    <div className="space-y-2 rounded-md border p-3">
+    <div className="row-card">
       <div className="flex flex-wrap items-end gap-2">
         <div className="flex-1 space-y-1">
           <Label className="text-xs">Label</Label>
@@ -95,7 +95,7 @@ export function SlotRowCard({
           </Button>
         </div>
       </div>
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p className="field-error">{error}</p>}
       <label
         className={cn(
           "flex items-center gap-2 text-xs text-muted-foreground",
@@ -111,9 +111,7 @@ export function SlotRowCard({
         />
         Allow waitlist when full
       </label>
-      {hint && !error && (
-        <p className="text-xs text-muted-foreground">{hint}</p>
-      )}
+      {hint && !error && <p className="muted-xs">{hint}</p>}
     </div>
   )
 }

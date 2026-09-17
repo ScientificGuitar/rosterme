@@ -32,7 +32,7 @@ export function QuestionRowCard({
   onRemove,
 }: QuestionRowCardProps) {
   return (
-    <div className="space-y-2 rounded-md border p-3">
+    <div className="row-card">
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-40 flex-1 space-y-1">
           <Label className="text-xs">Label</Label>
@@ -111,7 +111,7 @@ export function QuestionRowCard({
           />
         </div>
       )}
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p className="field-error">{error}</p>}
     </div>
   )
 }

@@ -36,9 +36,13 @@ export function AppSidebar({
   const { signOut } = useClerk()
   const { user } = useUser()
   const isSuperAdmin =
-    (user?.publicMetadata as { role?: string } | undefined)?.role === "superAdmin"
+    (user?.publicMetadata as { role?: string } | undefined)?.role ===
+    "superAdmin"
   const visibleNavItems = isSuperAdmin
-    ? [...navItems, { to: "/admin", label: "SuperAdmin", icon: ShieldCheck, soon: false }]
+    ? [
+        ...navItems,
+        { to: "/admin", label: "SuperAdmin", icon: ShieldCheck, soon: false },
+      ]
     : navItems
 
   const sidebar = (
@@ -47,14 +51,14 @@ export function AppSidebar({
         <Link
           to="/"
           onClick={onClose}
-          className="text-lg font-semibold hover:underline"
+          className="text-lg font-semibold text-sidebar-foreground hover:underline"
         >
           RosterMe
         </Link>
         <Button
           variant="ghost"
           size="icon"
-          className="md:hidden"
+          className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground md:hidden"
           onClick={onClose}
           aria-label="Close menu"
         >
@@ -81,14 +85,18 @@ export function AppSidebar({
               className={cn(
                 "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
                 active
-                  ? "bg-primary/10 font-medium text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? "bg-sidebar-primary font-medium text-sidebar-primary-foreground"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               )}
             >
               <Icon className="h-4 w-4 shrink-0" />
               {item.label}
               {item.soon && (
-                <Badge variant="secondary" className="ml-auto text-[10px]">
+                <Badge
+                  variant="secondary"
+                  size="xs"
+                  className="ml-auto bg-sidebar-accent text-sidebar-accent-foreground"
+                >
                   Soon
                 </Badge>
               )}
@@ -96,16 +104,15 @@ export function AppSidebar({
           )
         })}
       </nav>
-      <div className="border-t p-3">
+      <div className="border-t border-sidebar-border p-3">
         <div className="flex items-center gap-2">
           <ThemedUserButton />
           <div className="min-w-0 flex-1 leading-tight">
-            <p className="truncate text-sm font-medium">
+            <p className="truncate text-sm font-medium text-sidebar-foreground">
               {user?.fullName ?? "Account"}
             </p>
-            {(user?.primaryEmailAddress?.emailAddress ||
-              user?.username) && (
-              <p className="truncate text-xs text-muted-foreground">
+            {(user?.primaryEmailAddress?.emailAddress || user?.username) && (
+              <p className="truncate text-xs text-sidebar-foreground/60">
                 {user.primaryEmailAddress?.emailAddress ?? user.username}
               </p>
             )}
@@ -113,6 +120,7 @@ export function AppSidebar({
           <Button
             variant="ghost"
             size="icon"
+            className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             onClick={() => signOut({ redirectUrl: "/" })}
             aria-label="Sign out"
           >
@@ -126,7 +134,7 @@ export function AppSidebar({
   return (
     <>
       {/* Desktop */}
-      <aside className="sticky top-0 hidden h-svh w-60 shrink-0 border-r bg-card text-card-foreground md:block">
+      <aside className="sticky top-0 hidden h-svh w-60 shrink-0 border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:block">
         {sidebar}
       </aside>
       {/* Mobile drawer */}
@@ -137,7 +145,7 @@ export function AppSidebar({
             onClick={onClose}
             aria-hidden
           />
-          <aside className="absolute inset-y-0 left-0 w-64 bg-card text-card-foreground shadow-lg">
+          <aside className="absolute inset-y-0 left-0 w-64 border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-lg">
             {sidebar}
           </aside>
         </div>
