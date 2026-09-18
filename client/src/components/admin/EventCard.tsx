@@ -2,8 +2,8 @@ import { Link } from "react-router-dom"
 import { MapPin } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { CapacityBar } from "@/components/ui/capacity-bar"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { MetaRow } from "@/components/ui/layout"
+import { CardHeader, CardTitle } from "@/components/ui/card"
+import { DataCard, DataCardContent, MetaRow } from "@/components/ui/layout"
 import { activeSignupCount, formatTime } from "@/lib/utils"
 import type { RosterEvent } from "@/lib/types"
 
@@ -13,8 +13,8 @@ interface EventCardProps {
 
 export function EventCard({ event }: EventCardProps) {
   return (
-    <Card size="sm">
-      <CardHeader className="pb-0">
+    <DataCard size="sm">
+      <CardHeader className="px-4 pt-3 pb-0">
         <CardTitle className="font-semibold">
           <Link to={`/events/${event.id}`} className="hover:underline">
             {event.title}
@@ -22,7 +22,7 @@ export function EventCard({ event }: EventCardProps) {
         </CardTitle>
         <p className="muted-xs">{event.groupName}</p>
       </CardHeader>
-      <CardContent className="field-stack">
+      <DataCardContent className="field-stack pt-2 pb-3">
         {event.location && (
           <MetaRow title={event.location}>
             <MapPin className="h-3 w-3 shrink-0" />
@@ -51,12 +51,12 @@ export function EventCard({ event }: EventCardProps) {
               <CapacityBar
                 filled={count}
                 capacity={slot.capacity}
-                className="mt-1.5 h-1.5"
+                className="mt-1.5"
               />
             </div>
           )
         })}
-      </CardContent>
-    </Card>
+      </DataCardContent>
+    </DataCard>
   )
 }

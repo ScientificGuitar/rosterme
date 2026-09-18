@@ -1,6 +1,6 @@
 import { useEffect } from "react"
-import { useClerk } from "@clerk/react"
-import { useLocation } from "react-router-dom"
+import { useAuth, useClerk } from "@clerk/react"
+import { useLocation, useNavigate } from "react-router-dom"
 import { useSeo } from "@/lib/seo"
 import {
   ArrowRight,
@@ -23,11 +23,17 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { CapacityFill } from "@/components/ui/capacity-bar"
 import { cn } from "@/lib/utils"
 
 function useStart() {
   const { openSignUp } = useClerk()
-  return () => openSignUp({ fallbackRedirectUrl: "/dashboard" })
+  const { isSignedIn } = useAuth()
+  const navigate = useNavigate()
+  return () => {
+    if (isSignedIn) navigate("/dashboard")
+    else openSignUp({ fallbackRedirectUrl: "/dashboard" })
+  }
 }
 
 function CtaButton({
@@ -43,12 +49,7 @@ function CtaButton({
 }) {
   const start = useStart()
   return (
-    <Button
-      variant={variant}
-      size={size}
-      onClick={start}
-      className={className}
-    >
+    <Button variant={variant} size={size} onClick={start} className={className}>
       {children}
       <ArrowRight className="h-4 w-4" />
     </Button>
@@ -193,14 +194,8 @@ function OrganizerMockup() {
                     {s.count}
                   </Badge>
                 </div>
-                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={cn(
-                      "h-full rounded-full",
-                      s.full ? "bg-red-500" : "bg-primary"
-                    )}
-                    style={{ width: `${s.percent}%` }}
-                  />
+                <div className="mt-1.5 h-2 overflow-hidden rounded-[3px] bg-muted">
+                  <CapacityFill percent={s.percent} isFull={s.full} />
                 </div>
               </div>
             ))}
@@ -456,7 +451,8 @@ const audiences = [
 
 export function LandingPage() {
   useSeo({
-    title: "RosterMe - Free Signups for Schools, Volunteer Groups & Community Organizers",
+    title:
+      "RosterMe - Free Signups for Schools, Volunteer Groups & Community Organizers",
     description:
       "RosterMe is free volunteer scheduling for schools, volunteer groups, and community organizers. Create shifts, share one signup link, and see who's coming. No volunteer accounts needed.",
     path: "/",

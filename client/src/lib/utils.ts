@@ -46,6 +46,11 @@ export function formatTime(iso: string): string {
   })
 }
 
+/** Formats a backend TimeOnly string ("HH:MM:SS") as "HH:MM". */
+export function formatTimeOnly(value: string): string {
+  return value.length >= 5 ? value.slice(0, 5) : value
+}
+
 export function toTimeInputValue(iso: string): string {
   return new Date(iso).toLocaleTimeString("sv-SE", {
     hour: "2-digit",

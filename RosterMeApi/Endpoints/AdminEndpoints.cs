@@ -646,7 +646,7 @@ public static class AdminEndpoints
             .ToListAsync(ct);
 
         return Results.Ok(events.Select(e => new RosterEventResponse(
-            e.Id, e.GroupId, e.Group.Name, e.Title, e.Description, e.Location, e.Date, RosterQuestionResponse.From(e.Questions),
+            e.Id, e.GroupId, e.Group.Name, e.Title, e.Description, e.Location, e.Date, e.CreatedAt, RosterQuestionResponse.From(e.Questions),
             e.TimeSlots.OrderBy(s => s.StartTime).Select(s => new RosterSlotResponse(
                 s.Id, s.Label, e.Date.ToDateTime(s.StartTime), e.Date.ToDateTime(s.EndTime), s.Capacity, s.AllowWaitlist,
                 s.Signups.Select(su => new SignupResponse(su.Id, su.TimeSlotId, su.VolunteerName, su.Email, su.Status.ToString(), su.CreatedAt,
@@ -737,7 +737,7 @@ public static class AdminEndpoints
         if (evt is null) return Results.NotFound();
 
         return Results.Ok(new RosterEventResponse(
-            evt.Id, evt.GroupId, evt.Group.Name, evt.Title, evt.Description, evt.Location, evt.Date, RosterQuestionResponse.From(evt.Questions),
+            evt.Id, evt.GroupId, evt.Group.Name, evt.Title, evt.Description, evt.Location, evt.Date, evt.CreatedAt, RosterQuestionResponse.From(evt.Questions),
             evt.TimeSlots.OrderBy(s => s.StartTime).Select(s => new RosterSlotResponse(
                 s.Id, s.Label, evt.Date.ToDateTime(s.StartTime), evt.Date.ToDateTime(s.EndTime), s.Capacity, s.AllowWaitlist,
                 s.Signups.Select(su => new SignupResponse(su.Id, su.TimeSlotId, su.VolunteerName, su.Email, su.Status.ToString(), su.CreatedAt,
@@ -999,7 +999,7 @@ public record RosterQuestionResponse(Guid Id, string Label, string Type, bool Re
             : options.Split('\n').Select(o => o.Trim()).Where(o => o.Length > 0).ToList();
 }
 
-public record RosterEventResponse(Guid Id, Guid GroupId, string GroupName, string Title, string? Description, string? Location, DateOnly Date, List<RosterQuestionResponse> Questions, IEnumerable<RosterSlotResponse> Slots);
+public record RosterEventResponse(Guid Id, Guid GroupId, string GroupName, string Title, string? Description, string? Location, DateOnly Date, DateTime CreatedAt, List<RosterQuestionResponse> Questions, IEnumerable<RosterSlotResponse> Slots);
 
 public record RosterSlotResponse(Guid Id, string Label, DateTime StartTime, DateTime EndTime, int Capacity, bool AllowWaitlist, IEnumerable<SignupResponse> Signups);
 

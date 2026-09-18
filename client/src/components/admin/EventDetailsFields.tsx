@@ -1,5 +1,6 @@
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { RequiredStar } from "@/components/ui/layout"
 
 interface EventDetailsFieldsProps {
   title: string
@@ -29,7 +30,12 @@ export function EventDetailsFields({
   return (
     <>
       <div className="field-stack">
-        <Label htmlFor="title">Event Title</Label>
+        <Label htmlFor="title">
+          <span>
+            Event Title
+            <RequiredStar />
+          </span>
+        </Label>
         <Input
           id="title"
           value={title}
@@ -41,7 +47,7 @@ export function EventDetailsFields({
       </div>
 
       <div className="field-stack">
-        <Label htmlFor="description">Description (optional)</Label>
+        <Label htmlFor="description">Description</Label>
         <Input
           id="description"
           value={description}
@@ -53,7 +59,7 @@ export function EventDetailsFields({
       </div>
 
       <div className="field-stack">
-        <Label htmlFor="location">Location (optional)</Label>
+        <Label htmlFor="location">Location</Label>
         <Input
           id="location"
           value={location}
@@ -65,7 +71,12 @@ export function EventDetailsFields({
       </div>
 
       <div className="field-stack">
-        <Label htmlFor="date">Date</Label>
+        <Label htmlFor="date">
+          <span>
+            Date
+            <RequiredStar />
+          </span>
+        </Label>
         <Input
           id="date"
           type="date"

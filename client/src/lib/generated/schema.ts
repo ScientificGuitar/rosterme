@@ -1578,6 +1578,8 @@ export interface components {
             location: null | string;
             /** Format: date */
             date: string;
+            /** Format: date-time */
+            createdAt: string;
             questions: components["schemas"]["RosterQuestionResponse"][];
             slots: components["schemas"]["RosterSlotResponse"][];
         };

@@ -60,7 +60,7 @@ public static class EmailTemplates
                           <p style="margin:0 0 4px;font-size:14px;color:#71717a;">{HttpUtility.HtmlEncode(groupName)}</p>
                           <h1 style="margin:0 0 4px;font-size:22px;color:#18181b;">Confirm your signup</h1>
                           <h2 style="margin:0 0 16px;font-size:16px;font-weight:500;color:#3f3f46;">{HttpUtility.HtmlEncode(eventTitle)}</h2>
-                          <p style="margin:0;font-size:14px;color:#3f3f46;">You've signed up as a volunteer for the shift below. Your spot isn't confirmed until you click the button.</p>
+                          <p style="margin:0;font-size:14px;color:#3f3f46;">You've signed up for the shift below. Your spot isn't confirmed until you click the button.</p>
                         </td>
                       </tr>
                       <tr>

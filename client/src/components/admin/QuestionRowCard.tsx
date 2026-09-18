@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { QUESTION_TYPES, MAX_OPTIONS } from "@/lib/eventQuestions"
+import { DataRow, RequiredStar } from "@/components/ui/layout"
 import type { QuestionDraft } from "@/lib/eventQuestions"
 import type { QuestionType } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -32,22 +33,26 @@ export function QuestionRowCard({
   onRemove,
 }: QuestionRowCardProps) {
   return (
-    <div className="row-card">
+    <DataRow className="space-y-2">
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-40 flex-1 space-y-1">
-          <Label className="text-xs">Label</Label>
+          <Label>
+            <span>
+              Label
+              <RequiredStar />
+            </span>
+          </Label>
           <Input
             value={question.label}
             onChange={(e) => onUpdate("label", e.target.value)}
             placeholder="Driver's license number"
             maxLength={200}
             required
-            className="h-8 text-sm"
             disabled={disabled}
           />
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Type</Label>
+          <Label>Type</Label>
           <select
             value={question.type}
             onChange={(e) => onUpdate("type", e.target.value as QuestionType)}
@@ -56,7 +61,7 @@ export function QuestionRowCard({
                 ? "Answers exist — the type can no longer change"
                 : undefined
             }
-            className="h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-9 rounded-md border border-input bg-transparent px-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={disabled || disableTypeChange}
           >
             {QUESTION_TYPES.map((t) => (
@@ -98,20 +103,23 @@ export function QuestionRowCard({
       </div>
       {question.type === "Dropdown" && (
         <div className="space-y-1">
-          <Label className="text-xs">
-            Options (one per line, max {MAX_OPTIONS})
+          <Label>
+            <span>
+              Options
+              <RequiredStar /> (one per line, max {MAX_OPTIONS})
+            </span>
           </Label>
           <textarea
             value={question.optionsText}
             onChange={(e) => onUpdate("optionsText", e.target.value)}
             placeholder={"S\nM\nL\nXL"}
             rows={3}
-            className="w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-md border border-input bg-transparent px-2.5 py-1 text-base shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
             disabled={disabled}
           />
         </div>
       )}
       {error && <p className="field-error">{error}</p>}
-    </div>
+    </DataRow>
   )
 }

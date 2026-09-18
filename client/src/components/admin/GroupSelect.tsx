@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { RequiredStar } from "@/components/ui/layout"
 import {
   Select,
   SelectContent,
@@ -74,7 +75,12 @@ export function GroupSelect({
 
   return (
     <div className="field-stack">
-      <Label htmlFor="group">Group</Label>
+      <Label htmlFor="group">
+        <span>
+          Group
+          <RequiredStar />
+        </span>
+      </Label>
       <div className="flex gap-2">
         <Select
           value={value}
@@ -127,20 +133,25 @@ export function GroupSelect({
           <DialogHeader>
             <DialogTitle>Create Group</DialogTitle>
             <DialogDescription>
-              Groups organize your events — e.g. volunteers, kitchen team, or
+              Groups organize your events — e.g. welcome team, kitchen team, or
               Sunday service.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreate} className="stack-md">
             <div className="field-stack">
-              <Label htmlFor="new-group-name">Group Name</Label>
+              <Label htmlFor="new-group-name">
+                <span>
+                  Group Name
+                  <RequiredStar />
+                </span>
+              </Label>
               <Input
                 id="new-group-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
                 maxLength={200}
-                placeholder="Volunteers"
+                placeholder="Welcome team"
               />
             </div>
             <DialogFooter>

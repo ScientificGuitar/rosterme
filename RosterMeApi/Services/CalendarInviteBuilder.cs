@@ -4,7 +4,7 @@ namespace RosterMeApi.Services;
 
 /// <summary>
 /// Builds RFC 5545 calendar invites (.ics) and "Add to calendar" provider links
-/// for volunteer signups.
+/// for event signups.
 /// </summary>
 /// <remarks>
 /// Event times are stored as timezone-less <see cref="DateOnly"/> + <see cref="TimeOnly"/>
@@ -41,7 +41,7 @@ public static class CalendarInviteBuilder
         var sb = new StringBuilder();
         sb.AppendLine("BEGIN:VCALENDAR");
         sb.AppendLine("VERSION:2.0");
-        sb.AppendLine("PRODID:-//RosterMe//Volunteer Signup//EN");
+        sb.AppendLine("PRODID:-//RosterMe//Signup//EN");
         sb.AppendLine("METHOD:PUBLISH");
         sb.AppendLine("BEGIN:VEVENT");
         AppendProperty(sb, "UID", $"{uid}@rosterme");

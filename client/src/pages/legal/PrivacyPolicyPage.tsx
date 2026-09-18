@@ -12,13 +12,13 @@ export function PrivacyPolicyPage() {
   useSeo({
     title: "Privacy Policy - RosterMe",
     description:
-      "How RosterMe collects, uses, and protects organizer and volunteer data.",
+      "How RosterMe collects, uses, and protects organizer and participant data.",
     path: "/privacy-policy",
   })
   return (
     <LegalLayout
       title="Privacy Policy"
-      intro={`We do not add people to ${OPERATOR_NAME} without permission. A person joins when they create an organizer account themselves, or when they sign up as a volunteer through an invite link. This policy explains in plain terms what we collect, why we collect it, who we share it with, and how to ask for access or deletion.`}
+      intro={`We do not add people to ${OPERATOR_NAME} without permission. A person joins when they create an organizer account themselves, or when they sign up as a participant through an invite link. This policy explains in plain terms what we collect, why we collect it, who we share it with, and how to ask for access or deletion.`}
       sibling={{ to: "/terms-of-service", label: "Terms of Service" }}
     >
       <LegalSection id="who-is-responsible" title="1. Who is responsible">
@@ -28,11 +28,11 @@ export function PrivacyPolicyPage() {
           operating the service. <ContactLine />
         </p>
         <p>
-          For volunteer signup data (names, email addresses, and signup
+          For participant signup data (names, email addresses, and signup
           status), we act as a <strong>processor for the organizer</strong>{" "}
           running the event. The organizer decides which events to run and who
           to invite. We store and email that data only to operate their roster.
-          Volunteers can exercise their rights against the organizer or against
+          Participants can exercise their rights against the organizer or against
           us, as described in section 9.
         </p>
       </LegalSection>
@@ -49,7 +49,7 @@ export function PrivacyPolicyPage() {
           you, via Clerk.
         </p>
         <p>
-          <strong>Volunteers.</strong> When you sign up through an invite link,
+          <strong>Participants.</strong> When you sign up through an invite link,
           we collect the name and email address you type in, the slot you
           chose, your signup status (pending, confirmed, cancelled, or
           removed), and timestamps (created, confirmed, reminder sent). We store
@@ -80,19 +80,19 @@ export function PrivacyPolicyPage() {
           <li>
             <strong>To run the roster.</strong> Storing events, slots, and
             signups, enforcing slot capacity, and showing organizers their
-            volunteer list.
+            participant list.
           </li>
           <li>
             <strong>To confirm signups and stop abuse.</strong> Email
             confirmation links keep mistyped and fake addresses off rosters.
-            Hashed manage tokens let volunteers manage their own signups
+            Hashed manage tokens let participants manage their own signups
             securely.
           </li>
           <li>
             <strong>To send service emails.</strong> Confirmations, reminders
             around 24 hours before a shift, and cancellation notices.
-            Volunteers get these because they asked to sign up. Marketing emails
-            are never sent to volunteers.
+            Participants get these because they asked to sign up. Marketing emails
+            are never sent to participants.
           </li>
           <li>
             <strong>To keep accounts safe.</strong> Checking organizer identity
@@ -131,10 +131,10 @@ export function PrivacyPolicyPage() {
           service, for security, for legal compliance, or with consent.
         </p>
         <p>
-          <strong>Resend, for email delivery (processor).</strong> Volunteer
+          <strong>Resend, for email delivery (processor).</strong> Participant
           emails are sent by Resend (Plus Five Five, Inc., USA) on our behalf.
           What Resend sees per email: the recipient address, subject, message
-          text (which includes the volunteer name, event details, and manage
+          text (which includes the participant name, event details, and manage
           link), and any calendar file attached. Resend processes this under
           its{" "}
           <ExternalLink href="https://resend.com/legal/privacy-policy">
@@ -153,8 +153,8 @@ export function PrivacyPolicyPage() {
         </p>
         <p>
           <strong>Organizers see their own roster.</strong> An organizer can see
-          the names, email addresses, and statuses of volunteers who signed up
-          for their events, and can export that list. By signing up, volunteers
+          the names, email addresses, and statuses of participants who signed up
+          for their events, and can export that list. By signing up, participants
           accept that the organizer running the event receives the details they
           enter. Organizers must use roster data only to run their events (see
           our Terms of Service) and must look after any copies they download.
@@ -176,7 +176,7 @@ export function PrivacyPolicyPage() {
       <LegalSection id="transfers" title="5. International transfers">
         <p>
           Clerk and Resend are based in the United States, so organizer login
-          data and volunteer email content are sent to and processed in the US.
+          data and participant email content are sent to and processed in the US.
           Both providers offer standard contractual clauses for such transfers:
           Clerk through its{" "}
           <ExternalLink href="https://clerk.com/legal">legal hub</ExternalLink>{" "}
@@ -195,7 +195,7 @@ export function PrivacyPolicyPage() {
           We use only cookies that are strictly needed to run the service,
           mainly Clerk session and security cookies that keep organizers signed
           in. We do not set advertising or cross-site tracking cookies, and
-          volunteers who browse or sign up through a public invite link are not
+          participants who browse or sign up through a public invite link are not
           tracked for advertising.
         </p>
         <p>
@@ -211,7 +211,7 @@ export function PrivacyPolicyPage() {
       <LegalSection id="retention" title="7. How long we keep data">
         <ul className="list-disc space-y-1 pl-6">
           <li>
-            <strong>Volunteer signups</strong> stay part of the organizer’s
+            <strong>Participant signups</strong> stay part of the organizer’s
             roster history until the organizer deletes the event or
             organization, or a deletion request is granted.
           </li>
@@ -254,7 +254,7 @@ export function PrivacyPolicyPage() {
           the signup email address.
         </p>
         <p>
-          The fastest route for volunteers: open your manage link to review
+          The fastest route for participants: open your manage link to review
           your signup, or cancel it to release your spot and stop reminders.
           For anything else, including a copy of your data or deletion of a
           signup made in error, contact us and we will help.
@@ -288,7 +288,7 @@ export function PrivacyPolicyPage() {
 
       <LegalSection id="children" title="10. Children">
         <p>
-          {OPERATOR_NAME} is not aimed at children under 16, and volunteers
+          {OPERATOR_NAME} is not aimed at children under 16, and participants
           under 16 may only sign up with a parent or guardian involved (see our{" "}
           <Link
             to="/terms-of-service"

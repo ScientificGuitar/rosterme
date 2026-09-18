@@ -1,10 +1,9 @@
 import { useMemo, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Pencil, Plus, Search, Trash2, Users } from "lucide-react"
+import { Pencil, Trash2, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import {
   Dialog,
@@ -16,7 +15,24 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
+import {
+  AdminHeader,
+  AdminPageBody,
+  AdminPageCenter,
+  AdminPageShell,
+  CardSearchInput,
+  DataCard,
+  DataCardContent,
+  DataCardDivider,
+  DataCardHeader,
+  DataCardTitle,
+  GhostAddRow,
+  MobileRowList,
+  RequiredStar,
+  RowPrimary,
+  RowSecondary,
+  TableBleed,
+} from "@/components/ui/layout"
 import { useGroups } from "@/hooks/useGroups"
 import { useApi } from "@/hooks/useApi"
 import { ApiError, formatApiError } from "@/lib/api"
@@ -122,136 +138,221 @@ export function GroupsPage() {
   }
 
   return (
-    <Card className="shell-admin">
-      <CardHeader>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="page-title">Groups</h1>
-            <p className="muted">
-              Organize your events — rename groups or remove empty ones.
-            </p>
-          </div>
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4" />
-            New Group
-          </Button>
-        </div>
-      </CardHeader>
-      <Separator />
-      <CardContent>
-        <div className="relative mb-4">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search groups..."
-            aria-label="Search groups"
-            className="pl-8"
-          />
-        </div>
-
-        {loading && (
-          <p className="loading-state muted py-8">Loading groups...</p>
-        )}
-        {!loading && error && (
-          <p className="loading-state py-8 text-destructive">
-            {formatApiError(error, "Failed to load groups")}
-          </p>
-        )}
-        {!loading && !error && visible.length === 0 && (
-          <div className="loading-state py-8">
-            <Users className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
-            <p className="text-sm font-medium">
-              {search.trim()
-                ? "No groups match your search."
-                : "No groups yet."}
-            </p>
-            {!search.trim() && (
-              <p className="muted mt-1">
-                Create your first group to organize events.
-              </p>
-            )}
-          </div>
-        )}
-
-        {!loading && !error && visible.length > 0 && (
-          <ul className="divide-y rounded-lg border">
-            {visible.map((group) => {
-              const hasEvents = group.eventCount > 0
-              return (
-                <li
-                  key={group.id}
-                  className="flex flex-wrap items-center gap-2 px-4 py-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{group.name}</p>
-                    <p className="muted-xs">
-                      Created {formatCreatedAt(group.createdAt)}
+    <AdminPageShell>
+      <AdminHeader
+        title="Groups"
+        subtitle="Organize your events — rename groups or remove empty ones."
+      />
+      <AdminPageBody>
+        <AdminPageCenter>
+          <DataCard>
+            <DataCardHeader>
+              <DataCardTitle
+                icon={Users}
+                actions={
+                  <CardSearchInput
+                    value={search}
+                    onChange={setSearch}
+                    placeholder="Search..."
+                    placeholderDesktop="Search groups..."
+                    ariaLabel="Search groups"
+                    clearLabel="Clear group search"
+                  />
+                }
+              >
+                Groups
+              </DataCardTitle>
+            </DataCardHeader>
+            <DataCardDivider />
+            <DataCardContent variant="rows">
+              {loading && (
+                <p className="muted py-8 text-center">Loading groups...</p>
+              )}
+              {!loading && error && (
+                <p className="py-8 text-center text-destructive">
+                  {formatApiError(error, "Failed to load groups")}
+                </p>
+              )}
+              {!loading && !error && visible.length === 0 && (
+                <div className="py-8 text-center">
+                  <Users className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+                  <p className="text-sm font-medium">
+                    {search.trim()
+                      ? "No groups match your search."
+                      : "No groups yet."}
+                  </p>
+                  {!search.trim() && (
+                    <p className="muted mt-1">
+                      Create your first group to organize events.
                     </p>
-                  </div>
-                  <Badge
-                    variant={hasEvents ? "default" : "secondary"}
-                    title={
-                      hasEvents
-                        ? "This group has events and cannot be deleted"
-                        : "No events in this group"
-                    }
-                  >
-                    {group.eventCount}{" "}
-                    {group.eventCount === 1 ? "event" : "events"}
-                  </Badge>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => openEdit(group)}
-                    title="Rename group"
-                    aria-label={`Rename ${group.name}`}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    onClick={() =>
-                      hasEvents ? setBlockedGroup(group) : setDeleting(group)
-                    }
-                    title={
-                      hasEvents
-                        ? "Why can't this group be deleted?"
-                        : `Delete ${group.name}`
-                    }
-                    aria-label={`Delete ${group.name}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </CardContent>
+                  )}
+                </div>
+              )}
+
+              {!loading && !error && visible.length > 0 && (
+                <>
+                  <TableBleed>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-muted-foreground">
+                          <th className="py-2 font-medium">Name</th>
+                          <th className="w-28 py-2 font-medium">Events</th>
+                          <th className="w-20 py-2" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visible.map((group) => {
+                          const hasEvents = group.eventCount > 0
+                          return (
+                            <tr
+                              key={group.id}
+                              className="border-b last:border-0"
+                            >
+                              <td className="py-2">
+                                <RowPrimary>{group.name}</RowPrimary>
+                                <RowSecondary>
+                                  Created {formatCreatedAt(group.createdAt)}
+                                </RowSecondary>
+                              </td>
+                              <td className="py-2">
+                                <Badge
+                                  variant={hasEvents ? "default" : "secondary"}
+                                  title={
+                                    hasEvents
+                                      ? "This group has events and cannot be deleted"
+                                      : "No events in this group"
+                                  }
+                                >
+                                  {group.eventCount}{" "}
+                                  {group.eventCount === 1 ? "event" : "events"}
+                                </Badge>
+                              </td>
+                              <td className="py-2">
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => openEdit(group)}
+                                    title="Rename group"
+                                    aria-label={`Rename ${group.name}`}
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                    onClick={() =>
+                                      hasEvents
+                                        ? setBlockedGroup(group)
+                                        : setDeleting(group)
+                                    }
+                                    title={
+                                      hasEvents
+                                        ? "Why can't this group be deleted?"
+                                        : `Delete ${group.name}`
+                                    }
+                                    aria-label={`Delete ${group.name}`}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </TableBleed>
+                  <MobileRowList>
+                    {visible.map((group) => {
+                      const hasEvents = group.eventCount > 0
+                      return (
+                        <li key={group.id} className="px-4 py-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <RowPrimary>{group.name}</RowPrimary>
+                            <Badge
+                              variant={hasEvents ? "default" : "secondary"}
+                            >
+                              {group.eventCount}{" "}
+                              {group.eventCount === 1 ? "event" : "events"}
+                            </Badge>
+                          </div>
+                          <div className="mt-1 flex items-center justify-between gap-2">
+                            <RowSecondary>
+                              Created {formatCreatedAt(group.createdAt)}
+                            </RowSecondary>
+                            <div className="flex shrink-0 items-center gap-1">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => openEdit(group)}
+                                title="Rename group"
+                                aria-label={`Rename ${group.name}`}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={() =>
+                                  hasEvents
+                                    ? setBlockedGroup(group)
+                                    : setDeleting(group)
+                                }
+                                title={
+                                  hasEvents
+                                    ? "Why can't this group be deleted?"
+                                    : `Delete ${group.name}`
+                                }
+                                aria-label={`Delete ${group.name}`}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </MobileRowList>
+                </>
+              )}
+              {!loading && !error && (
+                <GhostAddRow onClick={() => setCreateOpen(true)}>
+                  New group
+                </GhostAddRow>
+              )}
+            </DataCardContent>
+          </DataCard>
+        </AdminPageCenter>
+      </AdminPageBody>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New Group</DialogTitle>
             <DialogDescription>
-              Groups organize your events — e.g. volunteers, kitchen team, or
+              Groups organize your events — e.g. welcome team, kitchen team, or
               Sunday service.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreate} className="stack-md">
             <div className="field-stack">
-              <Label htmlFor="group-create-name">Group Name</Label>
+              <Label htmlFor="group-create-name">
+                <span>
+                  Group Name <RequiredStar />
+                </span>
+              </Label>
               <Input
                 id="group-create-name"
                 value={createName}
                 onChange={(e) => setCreateName(e.target.value)}
                 required
                 maxLength={200}
-                placeholder="Volunteers"
+                placeholder="Welcome team"
               />
             </div>
             <DialogFooter>
@@ -288,7 +389,11 @@ export function GroupsPage() {
           </DialogHeader>
           <form onSubmit={handleEdit} className="stack-md">
             <div className="field-stack">
-              <Label htmlFor="group-edit-name">Group Name</Label>
+              <Label htmlFor="group-edit-name">
+                <span>
+                  Group Name <RequiredStar />
+                </span>
+              </Label>
               <Input
                 id="group-edit-name"
                 value={editName}
@@ -356,6 +461,6 @@ export function GroupsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </AdminPageShell>
   )
 }

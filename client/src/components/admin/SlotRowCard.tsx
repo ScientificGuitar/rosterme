@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { TimeInput } from "@/components/ui/time-input"
+import { DataRow, RequiredStar } from "@/components/ui/layout"
 import { cn } from "@/lib/utils"
 import type { SlotDraft } from "@/lib/eventSlots"
 
@@ -34,21 +35,30 @@ export function SlotRowCard({
   onRemove,
 }: SlotRowCardProps) {
   return (
-    <div className="row-card">
+    <DataRow className="space-y-2">
       <div className="flex flex-wrap items-end gap-2">
         <div className="flex-1 space-y-1">
-          <Label className="text-xs">Label</Label>
+          <Label>
+            <span>
+              Label
+              <RequiredStar />
+            </span>
+          </Label>
           <Input
             value={slot.label}
             onChange={(e) => onUpdate("label", e.target.value)}
             placeholder="Morning"
             required
-            className="h-8 text-sm"
             disabled={disabled}
           />
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Start</Label>
+          <Label>
+            <span>
+              Start
+              <RequiredStar />
+            </span>
+          </Label>
           <TimeInput
             value={slot.startTime}
             onChange={(val) => onUpdate("startTime", val)}
@@ -57,7 +67,12 @@ export function SlotRowCard({
           />
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">End</Label>
+          <Label>
+            <span>
+              End
+              <RequiredStar />
+            </span>
+          </Label>
           <TimeInput
             value={slot.endTime}
             onChange={(val) => onUpdate("endTime", val)}
@@ -65,8 +80,13 @@ export function SlotRowCard({
             disabled={disabled}
           />
         </div>
-        <div className="w-16 space-y-1">
-          <Label className="text-xs">Cap</Label>
+        <div className="w-24 space-y-1">
+          <Label>
+            <span>
+              Capacity
+              <RequiredStar />
+            </span>
+          </Label>
           <Input
             type="number"
             min={capacityMin}
@@ -75,7 +95,6 @@ export function SlotRowCard({
               onUpdate("capacity", parseInt(e.target.value) || 1)
             }
             required
-            className="h-8 text-sm"
             disabled={disabled}
           />
         </div>
@@ -112,6 +131,6 @@ export function SlotRowCard({
         Allow waitlist when full
       </label>
       {hint && !error && <p className="muted-xs">{hint}</p>}
-    </div>
+    </DataRow>
   )
 }

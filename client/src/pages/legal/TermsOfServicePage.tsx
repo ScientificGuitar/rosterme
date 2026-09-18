@@ -12,13 +12,13 @@ export function TermsOfServicePage() {
   useSeo({
     title: "Terms of Service - RosterMe",
     description:
-      "The rules for organizers running events and volunteers signing up through RosterMe.",
+      "The rules for organizers running events and participants signing up through RosterMe.",
     path: "/terms-of-service",
   })
   return (
     <LegalLayout
       title="Terms of Service"
-      intro={`Please read these Terms of Service carefully before using ${OPERATOR_NAME}. They explain the rules for organizers who run events and for volunteers who sign up through a public invite link.`}
+      intro={`Please read these Terms of Service carefully before using ${OPERATOR_NAME}. They explain the rules for organizers who run events and for participants who sign up through a public invite link.`}
       sibling={{ to: "/privacy-policy", label: "Privacy Policy" }}
     >
       <LegalSection id="agreement" title="1. Agreement to these terms">
@@ -28,26 +28,26 @@ export function TermsOfServicePage() {
           the service.
         </p>
         <p>
-          {OPERATOR_NAME} (“we”, “us”) provides a volunteer scheduling service.
+          {OPERATOR_NAME} (“we”, “us”) provides an event scheduling service.
           An <strong>organizer</strong> creates an organization, sets up events
           with time slots, and shares an invite link. A{" "}
-          <strong>volunteer</strong> opens that link and signs up for a slot. No
-          volunteer account is required. <ContactLine />
+          <strong>participant</strong> opens that link and signs up for a slot.
+          No account is required. <ContactLine />
         </p>
       </LegalSection>
 
       <LegalSection id="service" title="2. What the service does">
         <p>For organizers, {OPERATOR_NAME} lets you:</p>
         <ul className="list-disc space-y-1 pl-6">
-          <li>create an organization and events with volunteer time slots,</li>
-          <li>share a public invite link with volunteers,</li>
+          <li>create an organization and events with time slots,</li>
+          <li>share a public invite link with participants,</li>
           <li>
             see who signed up, which slots are full, and where help is still
             needed,
           </li>
-          <li>manage or remove signups and export the volunteer list.</li>
+          <li>manage or remove signups and export the participant list.</li>
         </ul>
-        <p>For volunteers, {OPERATOR_NAME} lets you:</p>
+        <p>For participants, {OPERATOR_NAME} lets you:</p>
         <ul className="list-disc space-y-1 pl-6">
           <li>pick a slot and sign up with your name and email address,</li>
           <li>confirm your signup through a link sent to your email,</li>
@@ -83,9 +83,9 @@ export function TermsOfServicePage() {
         </p>
       </LegalSection>
 
-      <LegalSection id="volunteer-signup" title="4. Volunteer signups">
+      <LegalSection id="participant-signup" title="4. Participant signups">
         <p>
-          Volunteers do not need an account. You enter your name and email
+          Participants do not need an account. You enter your name and email
           address, and we send a confirmation link to that address. Your spot is
           only confirmed once you click the link. This keeps mistyped or fake
           addresses off the roster.
@@ -100,8 +100,8 @@ export function TermsOfServicePage() {
           the newest link works.
         </p>
         <p>
-          Volunteers must be at least 16 to sign up on their own. Younger
-          volunteers may only sign up with a parent or guardian involved.
+          Participants must be at least 16 to sign up on their own. Younger
+          participants may only sign up with a parent or guardian involved.
         </p>
       </LegalSection>
 
@@ -109,14 +109,14 @@ export function TermsOfServicePage() {
         <ul className="list-disc space-y-1 pl-6">
           <li>
             <strong>Contact people lawfully.</strong> Only invite people you
-            have a proper reason to contact. Use volunteer names and emails only
+            have a proper reason to contact. Use participant names and emails only
             to run your events. Do not add them to marketing lists or pass the
             roster around.
           </li>
           <li>
             <strong>Describe events honestly.</strong> Keep the title, location,
             date, and slots accurate and up to date. If an event changes or is
-            cancelled, tell your volunteers directly.
+            cancelled, tell your participants directly.
           </li>
           <li>
             <strong>Ask only for what you need.</strong> The signup form asks
@@ -124,19 +124,19 @@ export function TermsOfServicePage() {
             extra sensitive details such as health information or ID numbers.
           </li>
           <li>
-            <strong>Respect cancellations.</strong> When a volunteer cancels,
+            <strong>Respect cancellations.</strong> When a participant cancels,
             the spot opens up. Do not re-add people who cancelled and do not
             chase them about it outside {OPERATOR_NAME}.
           </li>
           <li>
-            <strong>Look after exports.</strong> If you download the volunteer
+            <strong>Look after exports.</strong> If you download the participant
             list, you are responsible for that copy. Keep it safe and delete it
             when you no longer need it.
           </li>
         </ul>
       </LegalSection>
 
-      <LegalSection id="volunteer-rules" title="6. Rules for volunteers">
+      <LegalSection id="participant-rules" title="6. Rules for participants">
         <ul className="list-disc space-y-1 pl-6">
           <li>Give your real name and an email address you can open.</li>
           <li>Sign up yourself, unless someone asked you to sign them up.</li>
@@ -201,16 +201,16 @@ export function TermsOfServicePage() {
           and cancellation notices are part of the service. They are sent by our
           email provider,{" "}
           <ExternalLink href="https://resend.com">Resend</ExternalLink>, on our
-          behalf. By signing up as a volunteer or running events as an
+          behalf. By signing up as a participant or running events as an
           organizer, you agree to receive these service emails.
         </p>
-        <p>We do not send marketing emails to volunteers.</p>
+        <p>We do not send marketing emails to participants.</p>
       </LegalSection>
 
       <LegalSection id="availability" title="10. Availability and accuracy">
         <p>
           We work to keep {OPERATOR_NAME} reliable, including safeguards that
-          stop two volunteers taking the last spot at the same time. Still, we
+          stop two participants taking the last spot at the same time. Still, we
           cannot promise the service will always be uninterrupted or free of
           errors. Event details are written by organizers, not by us, so check
           with the organizer if something looks wrong.
@@ -226,14 +226,14 @@ export function TermsOfServicePage() {
         <p>
           Organizers can stop using the service at any time by deleting their
           events and organization or by asking us to delete their account.
-          Volunteers can cancel individual signups through their manage link at
+          Participants can cancel individual signups through their manage link at
           any time. If you want all data in your account removed, contact us and
           we will delete what we hold, subject to legal retention duties.
         </p>
         <p>
           We may suspend or terminate access, including an organizer account or
           a specific event link, with or without prior notice, if these terms
-          are breached, if the law requires it, or to protect volunteers,
+          are breached, if the law requires it, or to protect participants,
           organizers, or the service. Where practical, we will explain what
           happened and how to appeal.
         </p>
@@ -269,7 +269,7 @@ export function TermsOfServicePage() {
           kind, whether express or implied, including implied warranties of
           merchantability, fitness for a particular purpose, and
           non-infringement. {OPERATOR_NAME} coordinates signups. It does not
-          employ, insure, or supervise volunteers, and organizers are solely
+          employ, insure, or supervise participants, and organizers are solely
           responsible for running safe events.
         </p>
         <p>
