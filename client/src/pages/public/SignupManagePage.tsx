@@ -10,6 +10,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Separator } from "@/components/ui/separator"
 import { createPublicApi } from "@/lib/api"
 import { useSeo } from "@/lib/seo"
+import { formatTimeOnly } from "@/lib/utils"
 import { Alert } from "@/components/ui/layout"
 
 const api = createPublicApi()
@@ -126,7 +127,7 @@ export function SignupManagePage() {
             </p>
             <p className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              {formatTime(data.startTime)}&ndash;{formatTime(data.endTime)}
+              {formatTimeOnly(data.startTime)}&ndash;{formatTimeOnly(data.endTime)}
             </p>
             {data.eventLocation && (
               <p className="flex items-center gap-2">
@@ -245,10 +246,6 @@ export function SignupManagePage() {
       </Card>
     </div>
   )
-}
-
-function formatTime(value: string): string {
-  return value.length >= 5 ? value.slice(0, 5) : value
 }
 
 function formatDate(iso: string): string {

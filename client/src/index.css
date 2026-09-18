@@ -16,7 +16,7 @@
     --color-green-700: #4f7a52;
     --color-green-800: #315037;
     --color-green-900: #203b29;
-    --color-green-950: #15281d;
+    --color-green-950: #1f2925;
 }
 
 @theme inline {
@@ -142,6 +142,10 @@
   }
   html {
     background-color: var(--background);
+    /* Global type scale: 106.25% ≈ 17px at default browser settings.
+       All Tailwind sizing is rem-based, so this nudges text (and
+       proportional spacing) down by about 1px everywhere. */
+    font-size: 106.25%;
   }
   body {
     @apply bg-background text-foreground;

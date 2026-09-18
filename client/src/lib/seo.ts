@@ -7,7 +7,7 @@ interface SeoOptions {
   description?: string
   /** Path starting with "/", e.g. "/features". Used for canonical + og:url. */
   path?: string
-  /** Set true for app/volunteer pages that must stay out of Google. */
+  /** Set true for app/public invite pages that must stay out of Google. */
   noindex?: boolean
 }
 

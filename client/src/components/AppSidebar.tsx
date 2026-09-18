@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom"
 import { useClerk, useUser } from "@clerk/react"
+import { Dialog as DialogPrimitive } from "radix-ui"
 import {
   BarChart3,
   LayoutDashboard,
@@ -104,7 +105,7 @@ export function AppSidebar({
           )
         })}
       </nav>
-      <div className="border-t border-sidebar-border p-3">
+      <div className="border-t border-sidebar-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="flex items-center gap-2">
           <ThemedUserButton />
           <div className="min-w-0 flex-1 leading-tight">
@@ -137,19 +138,24 @@ export function AppSidebar({
       <aside className="sticky top-0 hidden h-svh w-60 shrink-0 border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:block">
         {sidebar}
       </aside>
-      {/* Mobile drawer */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={onClose}
-            aria-hidden
-          />
-          <aside className="absolute inset-y-0 left-0 w-64 border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-lg">
+      {/* Mobile drawer: Radix modal dialog gives focus trap, Escape-to-close,
+          body scroll lock, and role=dialog + aria-modal. */}
+      <DialogPrimitive.Root
+        open={mobileOpen}
+        onOpenChange={(open) => {
+          if (!open) onClose()
+        }}
+      >
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 md:hidden" />
+          <DialogPrimitive.Content
+            aria-label="App menu"
+            className="fixed inset-y-0 left-0 z-50 w-64 border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-lg outline-none md:hidden"
+          >
             {sidebar}
-          </aside>
-        </div>
-      )}
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
     </>
   )
 }

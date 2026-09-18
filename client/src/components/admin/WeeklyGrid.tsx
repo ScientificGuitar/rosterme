@@ -1,6 +1,19 @@
 import { useState, useMemo } from "react"
-import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react"
+import { Link } from "react-router-dom"
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  DataCard,
+  DataCardContent,
+  DataCardDivider,
+  DataCardHeader,
+  DataCardTitle,
+} from "@/components/ui/layout"
 import { EventCard } from "@/components/admin/EventCard"
 import { useRoster } from "@/hooks/useRoster"
 
@@ -47,12 +60,7 @@ function formatWeekRange(monday: Date): string {
 export function WeeklyGrid() {
   const [monday, setMonday] = useState(() => getMonday(new Date()))
   const weekStart = formatDate(monday)
-  const {
-    data: events,
-    isLoading,
-    error,
-    refetch,
-  } = useRoster(weekStart)
+  const { data: events, isLoading, error, refetch } = useRoster(weekStart)
 
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday)
@@ -83,57 +91,83 @@ export function WeeklyGrid() {
   }, [events])
 
   return (
-    <div>
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={prevWeek}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="min-w-[14rem] text-center text-sm font-medium">
-            {formatWeekRange(monday)}
-          </span>
-          <Button variant="outline" size="icon" onClick={nextWeek}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-        <Button variant="ghost" size="icon" onClick={() => refetch()}>
-          <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-        </Button>
-      </div>
-
-      {isLoading && !events && (
-        <div className="py-12 text-center text-muted-foreground">
-          Loading roster...
-        </div>
-      )}
-      {error && (
-        <div className="py-12 text-center text-destructive">
-          {(error as Error).message}
-        </div>
-      )}
-      {!isLoading && !error && events?.length === 0 && (
-        <div className="py-12 text-center text-muted-foreground">
-          No events this week.{" "}
-          <a href="/events/new" className="text-primary hover:underline">
-            Create one
-          </a>
-        </div>
-      )}
-
-      <div className="grid grid-cols-7 gap-3">
-        {days.map((day) => (
-          <div key={day.date}>
-            <div className="mb-2 rounded-md bg-muted px-2 py-1 text-center text-xs font-semibold text-muted-foreground">
-              {day.label}
+    <DataCard>
+      <DataCardHeader>
+        <DataCardTitle
+          icon={CalendarDays}
+          actions={
+            <div className="flex shrink-0 items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={prevWeek}
+                aria-label="Previous week"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={nextWeek}
+                aria-label="Next week"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => refetch()}
+                aria-label="Refresh roster"
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+                />
+              </Button>
             </div>
-            <div className="space-y-2">
-              {(eventsByDate.get(day.date) ?? []).map((evt) => (
-                <EventCard key={evt.id} event={evt} />
-              ))}
-            </div>
+          }
+        >
+          {formatWeekRange(monday)}
+        </DataCardTitle>
+      </DataCardHeader>
+      <DataCardDivider />
+      <DataCardContent>
+        {isLoading && !events && (
+          <p className="muted py-8 text-center">Loading roster...</p>
+        )}
+        {error && (
+          <p className="py-8 text-center text-destructive">
+            {(error as Error).message}
+          </p>
+        )}
+        {!isLoading && !error && events?.length === 0 && (
+          <p className="muted py-8 text-center">
+            No events this week.{" "}
+            <Link to="/events/new" className="text-primary hover:underline">
+              Create one
+            </Link>
+          </p>
+        )}
+
+        <div className="-mx-4 overflow-x-auto px-4">
+          <div className="grid min-w-[840px] grid-cols-7 gap-3 lg:min-w-0">
+            {days.map((day) => (
+              <div key={day.date} className="min-w-0">
+                <div className="mb-2 rounded-md bg-muted px-2 py-1 text-center text-xs font-semibold text-muted-foreground">
+                  {day.label}
+                </div>
+                <div className="space-y-2">
+                  {(eventsByDate.get(day.date) ?? []).map((evt) => (
+                    <EventCard key={evt.id} event={evt} />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-    </div>
+        </div>
+      </DataCardContent>
+    </DataCard>
   )
 }

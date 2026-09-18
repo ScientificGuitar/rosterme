@@ -17,14 +17,14 @@ export function escapeCsvField(
   return needsQuotes ? `"${escaped}"` : escaped
 }
 
-const VOLUNTEER_CSV_HEADERS = [
+const SIGNUP_CSV_HEADERS = [
   "Event",
   "Date",
   "Location",
   "Slot",
   "Start",
   "End",
-  "Volunteer Name",
+  "Name",
   "Email",
   "Status",
   "Signed Up At",
@@ -64,7 +64,7 @@ function formatAnswerForCsv(value: string): string {
   return value
 }
 
-export function buildEventVolunteersCsv(
+export function buildEventSignupsCsv(
   event: RosterEvent,
   delimiter = CSV_DELIMITER
 ): string {
@@ -72,7 +72,7 @@ export function buildEventVolunteersCsv(
   const questionColumns = csvQuestionColumns(event)
 
   const lines = [
-    [...VOLUNTEER_CSV_HEADERS, ...questionColumns.map((q) => q.label)]
+    [...SIGNUP_CSV_HEADERS, ...questionColumns.map((q) => q.label)]
       .map(escape)
       .join(delimiter),
   ]
@@ -108,13 +108,13 @@ export function buildEventVolunteersCsv(
   return lines.join("\n")
 }
 
-export function buildVolunteersFilename(title: string, date: string): string {
+export function buildSignupsFilename(title: string, date: string): string {
   const slug =
     title
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "") || "event"
-  return `${slug}-${date}-volunteers.csv`
+  return `${slug}-${date}-signups.csv`
 }
 
 export function downloadCsv(filename: string, csvContent: string): void {

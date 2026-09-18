@@ -7,9 +7,9 @@ import { useGroups } from "@/hooks/useGroups"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CapacityBar } from "@/components/ui/capacity-bar"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { MetaRow } from "@/components/ui/layout"
+import { DataCard, DataCardContent, MetaRow } from "@/components/ui/layout"
 import { GroupFilter } from "@/components/admin/GroupFilter"
 import { SortControl, type EventSortBy } from "@/components/admin/SortControl"
 import { StatusFilter } from "@/components/admin/StatusFilter"
@@ -143,7 +143,7 @@ export function EventList() {
   }, [events, search, selectedStatusSet, selectedGroupSet, sortBy, today])
 
   return (
-    <div className="shell-admin">
+    <div className="space-y-4">
       <div className="field-stack mb-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative flex-1">
@@ -154,7 +154,7 @@ export function EventList() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search events..."
               aria-label="Search events"
-              className="pl-8"
+              className="bg-background pl-8"
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -296,8 +296,8 @@ function EventListItem({
   const filled = event.slots.reduce((sum, s) => sum + Number(s.signupCount), 0)
   const capacity = event.slots.reduce((sum, s) => sum + Number(s.capacity), 0)
   return (
-    <Card>
-      <CardHeader className="pb-0">
+    <DataCard>
+      <CardHeader className="px-4 pt-3 pb-0">
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs font-semibold text-muted-foreground">
             {formatEventDate(event.date)}
@@ -313,7 +313,7 @@ function EventListItem({
         </CardTitle>
         <p className="muted-xs">{event.groupName}</p>
       </CardHeader>
-      <CardContent className="field-stack">
+      <DataCardContent className="field-stack pt-2 pb-3">
         {event.location && (
           <MetaRow title={event.location}>
             <MapPin className="h-3 w-3 shrink-0" />
@@ -333,17 +333,16 @@ function EventListItem({
                 variant={filled >= capacity ? "destructive" : "secondary"}
                 size="xs"
               >
-                {filled}/{capacity} volunteers
+                {filled}/{capacity} signed up
               </Badge>
             </div>
             <CapacityBar
               filled={filled}
               capacity={capacity}
-              className="h-1.5"
             />
           </div>
         )}
-      </CardContent>
-    </Card>
+      </DataCardContent>
+    </DataCard>
   )
 }
