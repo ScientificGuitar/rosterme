@@ -32,6 +32,7 @@ import { SlotRowCard } from "@/components/admin/SlotRowCard"
 import { StickySaveBar } from "@/components/admin/StickySaveBar"
 import { QuestionRowCard } from "@/components/admin/QuestionRowCard"
 import { useApi } from "@/hooks/useApi"
+import { useUnsavedChangesPrompt, confirmNavigation } from "@/hooks/useUnsavedChanges"
 import { formatApiError } from "@/lib/api"
 import {
   createEmptySlot,
@@ -73,6 +74,20 @@ export function CreateEvent() {
     {}
   )
   const nextKey = useRef(0)
+
+  const isDirty =
+    groupId !== "" ||
+    title.trim() !== "" ||
+    description.trim() !== "" ||
+    location.trim() !== "" ||
+    date !== "" ||
+    slots.length > 0 ||
+    questions.length > 0
+  useUnsavedChangesPrompt(isDirty)
+
+  const handleCancel = () => {
+    if (confirmNavigation()) navigate("/dashboard")
+  }
 
   const addSlot = () => {
     setSlots((prev) => [...prev, createEmptySlot(nextKey.current++)])
@@ -191,7 +206,7 @@ export function CreateEvent() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => navigate("/dashboard")}
+                    onClick={handleCancel}
                   >
                     Cancel
                   </Button>
@@ -338,7 +353,7 @@ export function CreateEvent() {
           </TabsContent>
         </Tabs>
         <StickySaveBar
-          onCancel={() => navigate("/dashboard")}
+          onCancel={handleCancel}
           submitLabel="Create Event"
           submittingLabel="Creating..."
           submitting={submitting}

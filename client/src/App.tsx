@@ -33,6 +33,7 @@ import { Footer } from "@/components/Footer"
 import { MarketingHeader } from "@/components/MarketingHeader"
 import { AppSidebar } from "@/components/AppSidebar"
 import { ThemeToggle } from "@/components/ThemeToggle"
+import { confirmNavigation } from "@/hooks/useUnsavedChanges"
 
 function EditEventWrapper() {
   const { id } = useParams()
@@ -150,7 +151,9 @@ function AppLayout() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate(backTo)}
+              onClick={() => {
+                if (confirmNavigation()) navigate(backTo)
+              }}
               aria-label="Back"
             >
               <ArrowLeft className="h-5 w-5" />
