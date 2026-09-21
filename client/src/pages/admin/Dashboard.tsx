@@ -29,7 +29,7 @@ export function Dashboard() {
               <AdminHeaderTitleBlock>
                 <AdminHeaderTitle>Dashboard</AdminHeaderTitle>
               </AdminHeaderTitleBlock>
-              <div className="flex shrink-0 items-start">
+              <div className="flex shrink-0 items-start md:hidden">
                 <Button size="sm" onClick={() => navigate("/events/new")}>
                   <Plus className="mr-1 h-3 w-3" />
                   New Event
