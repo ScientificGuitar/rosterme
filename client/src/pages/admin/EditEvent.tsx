@@ -33,6 +33,7 @@ import { StickySaveBar } from "@/components/admin/StickySaveBar"
 import { QuestionRowCard } from "@/components/admin/QuestionRowCard"
 import { useEvent } from "@/hooks/useEvent"
 import { useApi } from "@/hooks/useApi"
+import { useUnsavedChangesPrompt, confirmNavigation } from "@/hooks/useUnsavedChanges"
 import { formatApiError } from "@/lib/api"
 import {
   createEmptySlot,
@@ -113,6 +114,68 @@ function EventForm({ event, eventId }: EventFormProps) {
   const [questions, setQuestions] = useState<QuestionRow[]>(() =>
     toQuestionDrafts(event, event.slots.length)
   )
+
+  // Snapshot of the pristine form to detect unsaved changes. Derived data
+  // (keys, signup counts, answer presence) is stripped so only user-visible
+  // edits count as dirty. Captured once on mount, like the form state above.
+  const [pristine] = useState(() =>
+    JSON.stringify({
+      title: event.title,
+      groupId: event.groupId,
+      description: event.description ?? "",
+      location: event.location ?? "",
+      date: event.date,
+      slots: toSlotRows(event).map((s) => ({
+        id: s.id ?? null,
+        label: s.label,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        capacity: s.capacity,
+        allowWaitlist: s.allowWaitlist,
+        deleted: s.deleted,
+      })),
+      questions: toQuestionDrafts(event, event.slots.length).map((q) => ({
+        id: q.id ?? null,
+        label: q.label,
+        type: q.type,
+        required: q.required,
+        optionsText: q.optionsText,
+        deleted: q.deleted,
+      })),
+    })
+  )
+
+  const isDirty =
+    pristine !==
+    JSON.stringify({
+      title,
+      groupId,
+      description,
+      location,
+      date,
+      slots: slots.map((s) => ({
+        id: s.id ?? null,
+        label: s.label,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        capacity: s.capacity,
+        allowWaitlist: s.allowWaitlist,
+        deleted: s.deleted,
+      })),
+      questions: questions.map((q) => ({
+        id: q.id ?? null,
+        label: q.label,
+        type: q.type,
+        required: q.required,
+        optionsText: q.optionsText,
+        deleted: q.deleted,
+      })),
+    })
+  useUnsavedChangesPrompt(isDirty)
+
+  const handleCancel = () => {
+    if (confirmNavigation()) navigate(`/events/${eventId}`)
+  }
 
   const invalidateEvent = () =>
     Promise.all([
@@ -252,7 +315,7 @@ function EventForm({ event, eventId }: EventFormProps) {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => navigate(`/events/${eventId}`)}
+                    onClick={handleCancel}
                   >
                     Cancel
                   </Button>
@@ -516,7 +579,7 @@ function EventForm({ event, eventId }: EventFormProps) {
           </TabsContent>
         </Tabs>
         <StickySaveBar
-          onCancel={() => navigate(`/events/${eventId}`)}
+          onCancel={handleCancel}
           submitLabel="Save Changes"
           submittingLabel="Saving..."
           submitting={submitting}
