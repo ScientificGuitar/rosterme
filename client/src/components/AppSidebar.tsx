@@ -67,7 +67,7 @@ export function AppSidebar({
         </Button>
       </div>
       <div className="px-3 pb-2">
-        <Button asChild className="w-full justify-start" size="sm">
+        <Button asChild className="w-full justify-start gap-2.5 border-0 px-3">
           <Link to="/events/new" onClick={onClose}>
             <Plus className="h-4 w-4" />
             Create Event
