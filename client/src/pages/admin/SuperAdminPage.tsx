@@ -70,6 +70,7 @@ import {
   useSuperAdminStats,
   type OutboxSentFilter,
 } from "@/hooks/useSuperAdmin"
+import { LoadingState } from "@/components/ui/spinner"
 import { ApiError, formatApiError } from "@/lib/api"
 
 type Tab = "overview" | "recent" | "outbox"
@@ -88,7 +89,11 @@ function OverviewTab() {
   return (
     <div className="space-y-4">
       {stats.isLoading ? (
-        <p className="muted">Loading stats…</p>
+        <LoadingState
+          className="py-8"
+          spinnerClassName="h-5 w-5"
+          label="Loading stats..."
+        />
       ) : stats.error ? (
         <p className="field-error">
           {formatApiError(stats.error, "Failed to load stats")}
@@ -140,7 +145,11 @@ function OverviewTab() {
         <DataCardDivider />
         <DataCardContent>
           {activity.isLoading ? (
-            <p className="muted">Loading activity…</p>
+            <LoadingState
+              className="py-8"
+              spinnerClassName="h-5 w-5"
+              label="Loading activity..."
+            />
           ) : activity.error ? (
             <p className="field-error">
               {formatApiError(activity.error, "Failed to load activity")}
@@ -179,7 +188,8 @@ function OverviewTab() {
 function RecentTab() {
   const recent = useSuperAdminRecent(10)
 
-  if (recent.isLoading) return <p className="muted">Loading recent items…</p>
+  if (recent.isLoading)
+    return <LoadingState className="py-8" label="Loading recent items..." />
   if (recent.error)
     return (
       <p className="field-error">
@@ -407,7 +417,11 @@ function OutboxTab() {
       <DataCardDivider />
       <DataCardContent variant="rows">
         {outbox.isLoading ? (
-          <p className="muted py-3">Loading outbox…</p>
+          <LoadingState
+            className="py-3"
+            spinnerClassName="h-5 w-5"
+            label="Loading outbox..."
+          />
         ) : outbox.error ? (
           <p className="field-error py-3">
             {formatApiError(outbox.error, "Failed to load outbox")}

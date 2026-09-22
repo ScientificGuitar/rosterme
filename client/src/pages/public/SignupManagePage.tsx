@@ -12,6 +12,7 @@ import { createPublicApi } from "@/lib/api"
 import { useSeo } from "@/lib/seo"
 import { formatTimeOnly } from "@/lib/utils"
 import { Alert } from "@/components/ui/layout"
+import { LoadingState } from "@/components/ui/spinner"
 
 const api = createPublicApi()
 
@@ -58,7 +59,7 @@ export function SignupManagePage() {
   }
 
   if (isLoading) {
-    return <div className="public-narrow loading-state py-16">Loading...</div>
+    return <LoadingState className="public-narrow min-h-[50svh] py-16" label="Loading signup..." />
   }
 
   if (error || !data) {
