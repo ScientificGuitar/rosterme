@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useParams } from "react-router-dom"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Calendar, CalendarPlus, Clock, Mail, MapPin, CalendarX2 } from "lucide-react"
+import { Calendar, CalendarPlus, Clock, Mail, MapPin, CalendarX2, Tag } from "lucide-react"
 import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -108,23 +108,27 @@ export function SignupManagePage() {
   }
 
   return (
-    <div className="public-narrow stack-md py-8">
-      <Card>
-        <CardHeader className="p-6 pb-3">
+    <div className="public-narrow">
+      <Card size="sm">
+        <CardHeader>
           <CardTitle className="text-xl">Your signup</CardTitle>
         </CardHeader>
-        <CardContent className="stack-md p-6 pt-2">
+        <CardContent className="stack-md">
           <div className="field-stack">
             <p className="muted">{data.groupName}</p>
             <p className="text-lg font-semibold">{data.eventTitle}</p>
           </div>
 
-          <Separator />
+          <Separator className="-mx-4" />
 
           <div className="field-stack text-sm">
             <p className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               {formatDate(data.eventDate)}
+            </p>
+            <p className="flex items-center gap-2">
+              <Tag className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">{data.slotLabel}</span>
             </p>
             <p className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
@@ -142,7 +146,7 @@ export function SignupManagePage() {
             </p>
           </div>
 
-          <Separator />
+          <Separator className="-mx-4" />
 
           <div className="flex items-center justify-between">
             <span className="muted">Status</span>
@@ -236,9 +240,23 @@ export function SignupManagePage() {
                 onOpenChange={setConfirmOpen}
                 title={isWaitlisted ? "Leave waitlist?" : "Cancel signup?"}
                 description={
-                  isWaitlisted
-                    ? "This will remove you from the waitlist. This action cannot be undone."
-                    : "This will release your spot for this shift. This action cannot be undone."
+                  isWaitlisted ? (
+                    <>
+                      This will remove you from the waitlist for{" "}
+                      <strong>&ldquo;{data.slotLabel}&rdquo;</strong> (
+                      {formatTimeOnly(data.startTime)}&ndash;
+                      {formatTimeOnly(data.endTime)}). This action cannot be
+                      undone.
+                    </>
+                  ) : (
+                    <>
+                      This will release your spot for{" "}
+                      <strong>&ldquo;{data.slotLabel}&rdquo;</strong> (
+                      {formatTimeOnly(data.startTime)}&ndash;
+                      {formatTimeOnly(data.endTime)}). This action cannot be
+                      undone.
+                    </>
+                  )
                 }
                 confirmLabel={
                   isWaitlisted ? "Yes, leave waitlist" : "Yes, cancel signup"
