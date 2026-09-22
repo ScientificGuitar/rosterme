@@ -41,9 +41,9 @@ export function AppSidebar({
     "superAdmin"
   const visibleNavItems = isSuperAdmin
     ? [
-        ...navItems,
-        { to: "/admin", label: "SuperAdmin", icon: ShieldCheck, soon: false },
-      ]
+      ...navItems,
+      { to: "/admin", label: "SuperAdmin", icon: ShieldCheck, soon: false },
+    ]
     : navItems
 
   const sidebar = (

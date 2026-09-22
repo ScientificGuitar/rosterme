@@ -28,6 +28,17 @@ export default defineConfig([
     },
   },
   {
+    files: [
+      "src/components/ui/badge.tsx",
+      "src/components/ui/button.tsx",
+      "src/components/ui/tabs.tsx",
+      "src/components/ui/time-input.tsx",
+    ],
+    rules: {
+      "react-refresh/only-export-components": "off",
+    },
+  },
+  {
     rules: {
       "@stylistic/semi": ["error", "never"],
       "@stylistic/indent": ["error", 2],
