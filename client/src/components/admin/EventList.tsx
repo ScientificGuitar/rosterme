@@ -10,6 +10,7 @@ import { CapacityBar } from "@/components/ui/capacity-bar"
 import { CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { DataCard, DataCardContent, MetaRow } from "@/components/ui/layout"
+import { LoadingState } from "@/components/ui/spinner"
 import { GroupFilter } from "@/components/admin/GroupFilter"
 import { SortControl, type EventSortBy } from "@/components/admin/SortControl"
 import { StatusFilter } from "@/components/admin/StatusFilter"
@@ -248,9 +249,7 @@ export function EventList() {
         )}
       </div>
 
-      {isLoading && !events && (
-        <div className="loading-state">Loading events...</div>
-      )}
+      {isLoading && !events && <LoadingState label="Loading events..." />}
       {error && (
         <div className="loading-state text-destructive">
           {(error as Error).message}

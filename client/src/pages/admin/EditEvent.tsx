@@ -31,6 +31,7 @@ import { GroupSelect } from "@/components/admin/GroupSelect"
 import { SlotRowCard } from "@/components/admin/SlotRowCard"
 import { StickySaveBar } from "@/components/admin/StickySaveBar"
 import { QuestionRowCard } from "@/components/admin/QuestionRowCard"
+import { LoadingState } from "@/components/ui/spinner"
 import { useEvent } from "@/hooks/useEvent"
 import { useApi } from "@/hooks/useApi"
 import { useUnsavedChangesPrompt, confirmNavigation } from "@/hooks/useUnsavedChanges"
@@ -66,7 +67,7 @@ export function EditEvent() {
   const navigate = useNavigate()
 
   if (isPending && !event) {
-    return <div className="loading-state">Loading...</div>
+    return <LoadingState className="min-h-[50svh]" label="Loading event..." />
   }
 
   if (error || !event) {

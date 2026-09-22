@@ -15,6 +15,7 @@ import {
   DataCardTitle,
 } from "@/components/ui/layout"
 import { EventCard } from "@/components/admin/EventCard"
+import { LoadingState } from "@/components/ui/spinner"
 import { useRoster } from "@/hooks/useRoster"
 
 function getMonday(date: Date): Date {
@@ -134,9 +135,7 @@ export function WeeklyGrid() {
       </DataCardHeader>
       <DataCardDivider />
       <DataCardContent>
-        {isLoading && !events && (
-          <p className="muted py-8 text-center">Loading roster...</p>
-        )}
+        {isLoading && !events && <LoadingState label="Loading roster..." />}
         {error && (
           <p className="py-8 text-center text-destructive">
             {(error as Error).message}

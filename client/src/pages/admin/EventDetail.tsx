@@ -71,6 +71,7 @@ import {
   TableBleed,
 } from "@/components/ui/layout"
 import { SlotDialog, type SlotDialogSlot } from "@/components/admin/SlotDialog"
+import { LoadingState } from "@/components/ui/spinner"
 import { useEvent } from "@/hooks/useEvent"
 import { useDeleteSignup } from "@/hooks/useDeleteSignup"
 import { useApi } from "@/hooks/useApi"
@@ -97,7 +98,7 @@ export function EventDetail() {
   }
 
   if (isLoading && !event) {
-    return <div className="loading-state">Loading...</div>
+    return <LoadingState className="min-h-[50svh]" label="Loading event..." />
   }
 
   if (error || !event) {
@@ -894,7 +895,13 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
         </DataCardHeader>
         <DataCardDivider />
         <DataCardContent variant="rows">
-          {isLoading && <p className="muted px-4 py-2">Loading...</p>}
+          {isLoading && (
+            <LoadingState
+              className="px-4 py-2"
+              spinnerClassName="h-4 w-4"
+              label="Loading invite links..."
+            />
+          )}
           {!isLoading && (
             <>
               <TableBleed>

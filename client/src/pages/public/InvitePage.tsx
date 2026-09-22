@@ -14,6 +14,7 @@ import type { PublicSlot, PublicQuestion } from "@/lib/types"
 import { isValidPhone } from "@/lib/eventQuestions"
 import { cn, formatTimeOnly } from "@/lib/utils"
 import { CapacityBar } from "@/components/ui/capacity-bar"
+import { LoadingState } from "@/components/ui/spinner"
 import {
   Alert,
   DataCard,
@@ -47,7 +48,7 @@ export function InvitePage() {
   })
 
   if (isLoading) {
-    return <div className="public-wide loading-state">Loading...</div>
+    return <LoadingState className="public-wide min-h-[50svh]" label="Loading signup form..." />
   }
 
   if (error || !data) {

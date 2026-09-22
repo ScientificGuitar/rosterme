@@ -33,6 +33,7 @@ import {
   RowSecondary,
   TableBleed,
 } from "@/components/ui/layout"
+import { LoadingState } from "@/components/ui/spinner"
 import { useGroups } from "@/hooks/useGroups"
 import { useApi } from "@/hooks/useApi"
 import { ApiError, formatApiError } from "@/lib/api"
@@ -165,9 +166,7 @@ export function GroupsPage() {
             </DataCardHeader>
             <DataCardDivider />
             <DataCardContent variant="rows">
-              {loading && (
-                <p className="muted py-8 text-center">Loading groups...</p>
-              )}
+              {loading && <LoadingState label="Loading groups..." />}
               {!loading && error && (
                 <p className="py-8 text-center text-destructive">
                   {formatApiError(error, "Failed to load groups")}
