@@ -387,6 +387,9 @@ export function createPublicApi() {
       })
       await checkVoid(res)
     },
+
+    getSignupCalendarUrl: (token: string) =>
+      `${BASE}/signup/manage/${encodeURIComponent(token)}/calendar.ics`,
   }
 }
 
