@@ -38,6 +38,9 @@ public static class PublicEndpoints
         manage.MapGet("/{token}", GetSignupDetails)
             .Produces<SignupManageResponse>()
             .Produces(404);
+        manage.MapGet("/{token}/calendar.ics", GetSignupCalendar)
+            .Produces(200, contentType: "text/calendar")
+            .Produces(404);
         manage.MapPost("/{token}/confirm", ConfirmSignup)
             .Produces<SignupManageResponse>()
             .Produces(404);
@@ -279,6 +282,39 @@ public static class PublicEndpoints
             return Results.NotFound(new { error = "Signup link not found", code = "invalid_manage_link" });
 
         return await BuildSignupManageResult(db, signup, ct);
+    }
+
+    private static async Task<IResult> GetSignupCalendar(
+        string token,
+        AppDbContext db,
+        IOptions<EmailOptions> emailOptions,
+        CancellationToken ct)
+    {
+        var hash = TokenService.HashToken(token);
+        var signup = await db.Signups
+            .Include(s => s.TimeSlot)
+                .ThenInclude(t => t.Event)
+                    .ThenInclude(e => e.Group)
+            .FirstOrDefaultAsync(s => s.ManagementTokenHash == hash, ct);
+
+        if (signup is null)
+            return Results.NotFound(new { error = "Signup link not found", code = "invalid_manage_link" });
+
+        var evt = signup.TimeSlot.Event;
+        var manageUrl = $"{emailOptions.Value.BaseUrl.TrimEnd('/')}/signup/manage/{token}";
+        var ics = CalendarInviteBuilder.BuildIcs(
+            evt.Title,
+            evt.Description,
+            evt.Location,
+            evt.Date,
+            signup.TimeSlot.StartTime,
+            signup.TimeSlot.EndTime,
+            signup.TimeSlot.Label,
+            manageUrl,
+            signup.Id.ToString());
+
+        var bytes = System.Text.Encoding.UTF8.GetBytes(ics);
+        return Results.File(bytes, "text/calendar", CalendarInviteBuilder.IcsFileName(evt.Title));
     }
 
     private static async Task<IResult> ConfirmSignup(string token, AppDbContext db, CancellationToken ct)

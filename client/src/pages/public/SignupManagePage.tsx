@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useParams } from "react-router-dom"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Calendar, Clock, Mail, MapPin, CalendarX2 } from "lucide-react"
+import { Calendar, CalendarPlus, Clock, Mail, MapPin, CalendarX2 } from "lucide-react"
 import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -215,6 +215,14 @@ export function SignupManagePage() {
             </Alert>
           ) : (
             <>
+              {!isCancelled && !isRemoved && token && (
+                <Button variant="outline" className="w-full" asChild>
+                  <a href={api.getSignupCalendarUrl(token)} download>
+                    <CalendarPlus className="h-4 w-4" />
+                    Add to calendar (.ics)
+                  </a>
+                </Button>
+              )}
               <Button
                 variant="destructive"
                 className="w-full"
