@@ -26,6 +26,7 @@ import { InvitePage } from "@/pages/public/InvitePage"
 import { LandingPage } from "@/pages/public/LandingPage"
 import { FeaturesPage } from "@/pages/public/FeaturesPage"
 import { ResourcesPage } from "@/pages/public/ResourcesPage"
+import { NotFoundPage } from "@/pages/public/NotFoundPage"
 import { SignupManagePage } from "@/pages/public/SignupManagePage"
 import { TermsOfServicePage } from "@/pages/legal/TermsOfServicePage"
 import { PrivacyPolicyPage } from "@/pages/legal/PrivacyPolicyPage"
@@ -121,8 +122,7 @@ function useMobileBar(): { title: string; backTo: string | null } {
   if (matchPath("/events/:id", pathname))
     return { title: "Event Details", backTo: "/dashboard" }
   if (matchPath("/groups", pathname)) return { title: "Groups", backTo: null }
-  if (matchPath("/reports", pathname))
-    return { title: "Reports", backTo: null }
+  if (matchPath("/reports", pathname)) return { title: "Reports", backTo: null }
   if (matchPath("/admin", pathname)) return { title: "Admin", backTo: null }
   return { title: "Dashboard", backTo: null }
 }
@@ -136,7 +136,10 @@ function AppLayout() {
 
   return (
     <div className="flex min-h-svh">
-      <AppSidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
+      <AppSidebar
+        mobileOpen={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="sticky top-0 z-10 flex items-center gap-1 border-b bg-background px-2 py-1.5 md:hidden">
           <Button
@@ -182,7 +185,8 @@ export function App() {
           <Route path="/resources" element={<ResourcesPage />} />
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-          <Route path="*" element={<LandingPage />} />
+          <Route path="/404" element={<NotFoundPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
         <Route element={<RequireAuth />}>
           <Route element={<AppLayout />}>

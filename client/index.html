@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
@@ -31,7 +34,10 @@
       content="Create volunteer shifts, share one signup link, and see who's coming. Free, no volunteer accounts needed."
     />
     <meta property="og:url" content="https://rosterme.app/" />
-    <meta property="og:image" content="https://rosterme.app/og-image.svg" />
+    <meta property="og:image" content="https://rosterme.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="image/png" />
     <meta property="og:image:alt" content="RosterMe - volunteer scheduling without the spreadsheet chase" />
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
@@ -43,19 +49,39 @@
       name="twitter:description"
       content="Create volunteer shifts, share one signup link, and see who's coming. Free, no volunteer accounts needed."
     />
-    <meta name="twitter:image" content="https://rosterme.app/og-image.svg" />
+    <meta name="twitter:image" content="https://rosterme.app/og-image.png" />
+    <meta
+      name="twitter:image:alt"
+      content="RosterMe - volunteer scheduling without the spreadsheet chase"
+    />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "WebSite",
-        "name": "RosterMe",
-        "url": "https://rosterme.app/",
-        "description": "Free volunteer scheduling for schools, volunteer groups, and community organizers.",
-        "publisher": {
-          "@type": "Organization",
-          "name": "RosterMe",
-          "url": "https://rosterme.app/"
-        }
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://rosterme.app/#website",
+            "name": "RosterMe",
+            "url": "https://rosterme.app/",
+            "description": "Free volunteer scheduling for schools, volunteer groups, and community organizers."
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://rosterme.app/#organization",
+            "name": "RosterMe",
+            "url": "https://rosterme.app/",
+            "logo": "https://rosterme.app/og-image.png"
+          },
+          {
+            "@type": "SoftwareApplication",
+            "name": "RosterMe",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web",
+            "url": "https://rosterme.app/",
+            "description": "Free volunteer scheduling: create shifts, share one signup link, and see who's coming. No volunteer accounts needed.",
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+          }
+        ]
       }
     </script>
     <style>
