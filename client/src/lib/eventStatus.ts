@@ -1,11 +1,11 @@
-export type EventStatus = "active" | "inactive"
+export type EventStatus = "upcoming" | "past"
 
 export const STATUS_OPTIONS: { value: EventStatus; label: string }[] = [
-  { value: "active", label: "Active" },
-  { value: "inactive", label: "Inactive" },
+  { value: "upcoming", label: "Upcoming" },
+  { value: "past", label: "Past" },
 ]
 
 export const STATUS_LABELS: Record<EventStatus, string> = {
-  active: "Active",
-  inactive: "Inactive",
+  upcoming: "Upcoming",
+  past: "Past",
 }
