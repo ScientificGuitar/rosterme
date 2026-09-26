@@ -746,7 +746,11 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CreateInviteLinkRequest"];
+                };
+            };
             responses: {
                 /** @description OK */
                 200: {
@@ -773,6 +777,68 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/invite-links/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateInviteLinkRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["InviteLinkResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1511,12 +1577,23 @@ export interface components {
             id: string;
             /** Format: uuid */
             eventId: null | string;
+            name: string;
             code: string;
             isActive: boolean;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             expiresAt: null | string;
+            /** Format: int32 */
+            signupCount: number | string;
+        };
+        CreateInviteLinkRequest: {
+            name: null | string;
+            /** Format: date-time */
+            expiresAt: null | string;
+        };
+        UpdateInviteLinkRequest: {
+            name: string;
         };
         InvitePageResponse: {
             /** Format: uuid */

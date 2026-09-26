@@ -237,6 +237,7 @@ public static class PublicEndpoints
             {
                 Id = Guid.NewGuid(),
                 TimeSlotId = request.SlotId,
+                InviteLinkId = link.Id,
                 VolunteerName = Norm(request.VolunteerName),
                 Email = email,
                 Status = isWaitlist ? SignupStatus.WaitlistPending : SignupStatus.Pending,
