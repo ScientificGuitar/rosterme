@@ -469,6 +469,75 @@ public class AdminEndpointTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateEvent_WithSlots_PersistsSlotsInProvidedOrder()
+    {
+        var orgId = await SeedOrgAsync("Ordered Slots Org");
+
+        // Provided order is NOT sorted by start time — the server must keep it.
+        var create = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId,
+            title = "Ordered Event",
+            date = FutureDate(),
+            slots = new[]
+            {
+                new { label = "Late", startTime = "18:00", endTime = "19:00", capacity = 2 },
+                new { label = "Early", startTime = "08:00", endTime = "09:00", capacity = 2 },
+                new { label = "Mid", startTime = "12:00", endTime = "13:00", capacity = 2 }
+            }
+        });
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+        var created = await create.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var eventId = created.GetProperty("id").GetGuid();
+
+        var evt = await _client.GetFromJsonAsync<JsonElement>($"/api/events/{eventId}", _jsonOptions);
+        var labels = evt.GetProperty("slots").EnumerateArray()
+            .Select(s => s.GetProperty("label").GetString()).ToList();
+        Assert.Equal(["Late", "Early", "Mid"], labels);
+    }
+
+    [Fact]
+    public async Task UpdateEvent_WithSlots_ReordersSlots()
+    {
+        var orgId = await SeedOrgAsync("Reorder Slots Org");
+        var create = await _client.PostAsJsonAsync("/api/events", new { groupId = orgId,
+            title = "Reorder Event",
+            date = FutureDate(),
+            slots = new[]
+            {
+                new { label = "A", startTime = "08:00", endTime = "09:00", capacity = 2 },
+                new { label = "B", startTime = "10:00", endTime = "11:00", capacity = 2 },
+                new { label = "C", startTime = "12:00", endTime = "13:00", capacity = 2 }
+            }
+        });
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+        var created = await create.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var eventId = created.GetProperty("id").GetGuid();
+
+        var before = await _client.GetFromJsonAsync<JsonElement>($"/api/events/{eventId}", _jsonOptions);
+        var slots = before.GetProperty("slots").EnumerateArray().ToList();
+        var labelsBefore = slots.Select(s => s.GetProperty("label").GetString()).ToList();
+        Assert.Equal(["A", "B", "C"], labelsBefore);
+
+        // Reorder to C, A, B by sending a different array order.
+        var byLabel = slots.ToDictionary(s => s.GetProperty("label").GetString()!, s => s.GetProperty("id").GetGuid());
+        var response = await _client.PutAsJsonAsync($"/api/events/{eventId}", new
+        {
+            slots = new object[]
+            {
+                new { id = byLabel["C"], label = "C", startTime = "12:00", endTime = "13:00", capacity = 2 },
+                new { id = byLabel["A"], label = "A", startTime = "08:00", endTime = "09:00", capacity = 2 },
+                new { id = byLabel["B"], label = "B", startTime = "10:00", endTime = "11:00", capacity = 2 }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var after = await _client.GetFromJsonAsync<JsonElement>($"/api/events/{eventId}", _jsonOptions);
+        var labelsAfter = after.GetProperty("slots").EnumerateArray()
+            .Select(s => s.GetProperty("label").GetString()).ToList();
+        Assert.Equal(["C", "A", "B"], labelsAfter);
+    }
+
+    [Fact]
     public async Task UpdateEvent_WithSlots_CapacityBelowSignupCount_Returns400()
     {
         var (_, eventId, slotId) = await SeedSlotAsync("Sync Cap Org");

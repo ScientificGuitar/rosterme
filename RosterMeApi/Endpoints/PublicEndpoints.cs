@@ -89,7 +89,8 @@ public static class PublicEndpoints
                             : null)
                     ),
                 evt.TimeSlots
-                    .OrderBy(s => s.StartTime)
+                    .OrderBy(s => s.SortOrder)
+                    .ThenBy(s => s.StartTime)
                     .Select(s => new SlotAvailabilityResponse(
                         s.Id, s.Label, s.StartTime, s.EndTime, s.Capacity,
                         s.Signups.Count(sg => sg.Status == SignupStatus.Pending || sg.Status == SignupStatus.Confirmed),

@@ -40,6 +40,38 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
     }
 
     [Fact]
+    public async Task GetInvitePage_SlotsRespectCustomOrder()
+    {
+        // Create an event with slots in a non-time order and an invite link.
+        var resp = await _adminClient.PostAsJsonAsync("/api/groups", new { name = "Ordered Invite Org" });
+        var org = await resp.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var orgId = org.GetProperty("id").GetGuid();
+        var futureDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30));
+
+        var evtResp = await _adminClient.PostAsJsonAsync("/api/events", new { groupId = orgId,
+            title = "Ordered Invite Event",
+            date = futureDate.ToString("yyyy-MM-dd"),
+            slots = new[]
+            {
+                new { label = "Evening", startTime = "18:00", endTime = "19:00", capacity = 2 },
+                new { label = "Morning", startTime = "08:00", endTime = "09:00", capacity = 2 }
+            }
+        });
+        Assert.Equal(HttpStatusCode.Created, evtResp.StatusCode);
+        var evt = await evtResp.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var eventId = evt.GetProperty("id").GetGuid();
+
+        var linkResp = await _adminClient.PostAsJsonAsync($"/api/events/{eventId}/invite-links", new { });
+        var link = await linkResp.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var code = link.GetProperty("code").GetString()!;
+
+        var page = await _publicClient.GetFromJsonAsync<JsonElement>($"/api/invite/{code}", _jsonOptions);
+        var labels = page.GetProperty("event").GetProperty("slots").EnumerateArray()
+            .Select(s => s.GetProperty("label").GetString()).ToList();
+        Assert.Equal(["Evening", "Morning"], labels);
+    }
+
+    [Fact]
     public async Task GetInvitePage_InvalidCode_Returns404()
     {
         var response = await _publicClient.GetAsync("/api/invite/nonexistent");

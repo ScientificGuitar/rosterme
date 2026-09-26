@@ -8,6 +8,7 @@ public class TimeSlot
     public TimeOnly StartTime { get; set; }
     public TimeOnly EndTime { get; set; }
     public int Capacity { get; set; }
+    public int SortOrder { get; set; }
     public bool AllowWaitlist { get; set; } = true;
     public DateTime CreatedAt { get; set; }
 

@@ -1,4 +1,7 @@
 import type { ReactNode } from "react"
+import { useSortable } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import { GripVertical } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -32,9 +35,37 @@ export function QuestionRowCard({
   onUpdate,
   onRemove,
 }: QuestionRowCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: question.key, disabled })
+
   return (
-    <DataRow className="space-y-2">
+    <DataRow
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn("space-y-2", isDragging && "relative z-10 opacity-30")}
+    >
       <div className="flex flex-wrap items-end gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          ref={setActivatorNodeRef}
+          {...attributes}
+          {...listeners}
+          className="h-8 w-8 shrink-0 cursor-grab touch-none self-center text-muted-foreground hover:text-foreground active:cursor-grabbing disabled:cursor-not-allowed"
+          title="Drag to reorder"
+          aria-label="Drag to reorder"
+          disabled={disabled}
+        >
+          <GripVertical className="h-4 w-4" />
+        </Button>
         <div className="min-w-40 flex-1 space-y-1">
           <Label>
             <span>
