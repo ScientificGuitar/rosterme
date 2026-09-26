@@ -291,8 +291,9 @@ public static class AdminEndpoints
 
         if (request.Slots is not null)
         {
-            foreach (var s in request.Slots)
+            for (var i = 0; i < request.Slots.Count; i++)
             {
+                var s = request.Slots[i];
                 db.TimeSlots.Add(new TimeSlot
                 {
                     Id = Guid.NewGuid(),
@@ -302,6 +303,7 @@ public static class AdminEndpoints
                     EndTime = s.EndTime,
                     Capacity = s.Capacity,
                     AllowWaitlist = s.AllowWaitlist ?? true,
+                    SortOrder = i,
                     CreatedAt = DateTime.UtcNow
                 });
             }
@@ -327,7 +329,7 @@ public static class AdminEndpoints
 
         return Results.Ok(events.Select(e => new EventWithSlotsResponse(
             e.Id, e.GroupId, e.Group.Name, e.Title, e.Description, e.Location, e.Date, e.RemovalEmailPolicy, e.CreatedAt,
-            e.TimeSlots.OrderBy(s => s.StartTime).Select(s => new TimeSlotResponse(s.Id, s.EventId, s.Label, SlotTimes.ResolveStart(e.Date, s.StartTime), SlotTimes.ResolveEnd(e.Date, s.StartTime, s.EndTime), s.Capacity, s.Signups.Count(sg => sg.Status == SignupStatus.Pending || sg.Status == SignupStatus.Confirmed), s.AllowWaitlist))
+            e.TimeSlots.OrderBy(s => s.SortOrder).ThenBy(s => s.StartTime).Select(s => new TimeSlotResponse(s.Id, s.EventId, s.Label, SlotTimes.ResolveStart(e.Date, s.StartTime), SlotTimes.ResolveEnd(e.Date, s.StartTime, s.EndTime), s.Capacity, s.Signups.Count(sg => sg.Status == SignupStatus.Pending || sg.Status == SignupStatus.Confirmed), s.AllowWaitlist))
         )));
     }
 
@@ -504,6 +506,7 @@ public static class AdminEndpoints
                     slot.StartTime = s.StartTime;
                     slot.EndTime = s.EndTime;
                     slot.Capacity = s.Capacity;
+                    slot.SortOrder = i;
                     if (s.AllowWaitlist.HasValue) slot.AllowWaitlist = s.AllowWaitlist.Value;
                     if (slot.Capacity > oldCapacity)
                         increasedSlotIds.Add(slot.Id);
@@ -519,6 +522,7 @@ public static class AdminEndpoints
                         EndTime = s.EndTime,
                         Capacity = s.Capacity,
                         AllowWaitlist = s.AllowWaitlist ?? true,
+                        SortOrder = i,
                         CreatedAt = DateTime.UtcNow
                     });
                 }
@@ -647,6 +651,9 @@ public static class AdminEndpoints
             EndTime = request.EndTime,
             Capacity = request.Capacity,
             AllowWaitlist = request.AllowWaitlist ?? true,
+            SortOrder = (await db.TimeSlots
+                .Where(s => s.EventId == eventId)
+                .MaxAsync(s => (int?)s.SortOrder, ct) ?? -1) + 1,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -787,7 +794,7 @@ public static class AdminEndpoints
 
         return Results.Ok(events.Select(e => new RosterEventResponse(
             e.Id, e.GroupId, e.Group.Name, e.Title, e.Description, e.Location, e.Date, e.RemovalEmailPolicy, e.CreatedAt, RosterQuestionResponse.From(e.Questions),
-            e.TimeSlots.OrderBy(s => s.StartTime).Select(s => new RosterSlotResponse(
+            e.TimeSlots.OrderBy(s => s.SortOrder).ThenBy(s => s.StartTime).Select(s => new RosterSlotResponse(
                 s.Id, s.Label, SlotTimes.ResolveStart(e.Date, s.StartTime), SlotTimes.ResolveEnd(e.Date, s.StartTime, s.EndTime), s.Capacity, s.AllowWaitlist,
                 s.Signups.Select(su => new SignupResponse(su.Id, su.TimeSlotId, su.VolunteerName, su.Email, su.Status.ToString(), su.CreatedAt,
                     su.Answers.Select(a => new SignupAnswerResponse(a.QuestionId, a.Value)).ToList()))
@@ -1014,7 +1021,7 @@ public static class AdminEndpoints
 
         return Results.Ok(new RosterEventResponse(
             evt.Id, evt.GroupId, evt.Group.Name, evt.Title, evt.Description, evt.Location, evt.Date, evt.RemovalEmailPolicy, evt.CreatedAt, RosterQuestionResponse.From(evt.Questions),
-            evt.TimeSlots.OrderBy(s => s.StartTime).Select(s => new RosterSlotResponse(
+            evt.TimeSlots.OrderBy(s => s.SortOrder).ThenBy(s => s.StartTime).Select(s => new RosterSlotResponse(
                 s.Id, s.Label, SlotTimes.ResolveStart(evt.Date, s.StartTime), SlotTimes.ResolveEnd(evt.Date, s.StartTime, s.EndTime), s.Capacity, s.AllowWaitlist,
                 s.Signups.Select(su => new SignupResponse(su.Id, su.TimeSlotId, su.VolunteerName, su.Email, su.Status.ToString(), su.CreatedAt,
                     su.Answers.Select(a => new SignupAnswerResponse(a.QuestionId, a.Value)).ToList()))

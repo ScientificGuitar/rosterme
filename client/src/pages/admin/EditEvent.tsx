@@ -3,6 +3,19 @@ import { useParams, useNavigate } from "react-router-dom"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Clock, Info, ListChecks, Settings, Trash2, Undo2 } from "lucide-react"
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
@@ -69,6 +82,7 @@ import {
   activeRows,
   clearDraftError,
   markRowDeleted,
+  reorderActiveRows,
   undoRowDeleted,
   updateDraftRow,
 } from "@/lib/eventDrafts"
@@ -257,6 +271,29 @@ function EventForm({ event, eventId }: EventFormProps) {
     setQuestions((prev) => undoRowDeleted(prev, key))
   }
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  const handleSlotDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e
+    if (!over || active.id === over.id || isPast) return
+    setSlots((prev) =>
+      reorderActiveRows(prev, Number(active.id), Number(over.id))
+    )
+  }
+
+  const handleQuestionDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e
+    if (!over || active.id === over.id || isPast) return
+    setQuestions((prev) =>
+      reorderActiveRows(prev, Number(active.id), Number(over.id))
+    )
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) {
@@ -442,74 +479,86 @@ function EventForm({ event, eventId }: EventFormProps) {
 
                     {slots.length > 0 && (
                       <DataRowList>
-                        {slots.map((slot) =>
-                          slot.deleted ? (
-                            <div
-                              key={slot.key}
-                              className="flex items-center justify-between gap-2 border-b border-border px-4 py-3 text-left opacity-70 last:border-0"
-                            >
-                              <p className="muted">
-                                <span className="font-medium line-through">
-                                  {slot.label || "Untitled slot"}
-                                </span>{" "}
-                                will be deleted on save.
-                                {slot.signupCount > 0 && (
-                                  <span className="font-medium text-destructive">
-                                    {" "}
-                                    {slot.signupCount} signup(s) will be
-                                    removed.
-                                  </span>
-                                )}
-                              </p>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => undoDeleteSlot(slot.key)}
-                              >
-                                <Undo2 className="mr-1 h-4 w-4" /> Undo
-                              </Button>
-                            </div>
-                          ) : (
-                            <SlotRowCard
-                              key={slot.key}
-                              slot={slot}
-                              error={slotErrors[slot.key]}
-                              capacityMin={
-                                slot.signupCount > 0 ? slot.signupCount : 1
-                              }
-                              badge={
-                                slot.id && (
-                                  <Badge
-                                    variant={
-                                      slot.signupCount >= slot.capacity
-                                        ? "destructive"
-                                        : "secondary"
-                                    }
+                        <DndContext
+                          sensors={sensors}
+                          onDragEnd={handleSlotDragEnd}
+                        >
+                          <SortableContext
+                            items={slots
+                              .filter((s) => !s.deleted)
+                              .map((s) => s.key)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            {slots.map((slot) =>
+                              slot.deleted ? (
+                                <div
+                                  key={slot.key}
+                                  className="flex items-center justify-between gap-2 border-b border-border px-4 py-3 text-left opacity-70 last:border-0"
+                                >
+                                  <p className="muted">
+                                    <span className="font-medium line-through">
+                                      {slot.label || "Untitled slot"}
+                                    </span>{" "}
+                                    will be deleted on save.
+                                    {slot.signupCount > 0 && (
+                                      <span className="font-medium text-destructive">
+                                        {" "}
+                                        {slot.signupCount} signup(s) will be
+                                        removed.
+                                      </span>
+                                    )}
+                                  </p>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => undoDeleteSlot(slot.key)}
                                   >
-                                    {slot.signupCount}/{slot.capacity}
-                                  </Badge>
-                                )
-                              }
-                              hint={
-                                slot.id && slot.signupCount > 0
-                                  ? `${slot.signupCount} active signup(s) on this slot.`
-                                  : undefined
-                              }
-                              onUpdate={(field, value) =>
-                                updateSlot(slot.key, field, value)
-                              }
-                              onRemove={() => markSlotDeleted(slot.key)}
-                              removeLabel={
-                                slot.signupCount > 0
-                                  ? `Mark for deletion (${slot.signupCount} signup(s) will be removed on save)`
-                                  : "Remove slot"
-                              }
-                              removeIcon={<Trash2 className="h-4 w-4" />}
-                              disabled={isPast}
-                            />
-                          )
-                        )}
+                                    <Undo2 className="mr-1 h-4 w-4" /> Undo
+                                  </Button>
+                                </div>
+                              ) : (
+                                <SlotRowCard
+                                  key={slot.key}
+                                  slot={slot}
+                                  error={slotErrors[slot.key]}
+                                  capacityMin={
+                                    slot.signupCount > 0 ? slot.signupCount : 1
+                                  }
+                                  badge={
+                                    slot.id && (
+                                      <Badge
+                                        variant={
+                                          slot.signupCount >= slot.capacity
+                                            ? "destructive"
+                                            : "secondary"
+                                        }
+                                      >
+                                        {slot.signupCount}/{slot.capacity}
+                                      </Badge>
+                                    )
+                                  }
+                                  hint={
+                                    slot.id && slot.signupCount > 0
+                                      ? `${slot.signupCount} active signup(s) on this slot.`
+                                      : undefined
+                                  }
+                                  onUpdate={(field, value) =>
+                                    updateSlot(slot.key, field, value)
+                                  }
+                                  onRemove={() => markSlotDeleted(slot.key)}
+                                  removeLabel={
+                                    slot.signupCount > 0
+                                      ? `Mark for deletion (${slot.signupCount} signup(s) will be removed on save)`
+                                      : "Remove slot"
+                                  }
+                                  removeIcon={<Trash2 className="h-4 w-4" />}
+                                  disabled={isPast}
+                                />
+                              )
+                            )}
+                          </SortableContext>
+                        </DndContext>
                       </DataRowList>
                     )}
 
@@ -570,50 +619,66 @@ function EventForm({ event, eventId }: EventFormProps) {
 
                     {questions.length > 0 && (
                       <DataRowList>
-                        {questions.map((question) =>
-                          question.deleted ? (
-                            <div
-                              key={question.key}
-                              className="flex items-center justify-between gap-2 border-b border-border px-4 py-3 text-left opacity-70 last:border-0"
-                            >
-                              <p className="muted">
-                                <span className="font-medium line-through">
-                                  {question.label || "Untitled question"}
-                                </span>{" "}
-                                will be deleted on save.
-                                {question.hasAnswers && (
-                                  <span className="font-medium">
-                                    {" "}
-                                    Existing answers will be kept and shown in
-                                    the roster.
-                                  </span>
-                                )}
-                              </p>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => undoDeleteQuestion(question.key)}
-                              >
-                                <Undo2 className="mr-1 h-4 w-4" /> Undo
-                              </Button>
-                            </div>
-                          ) : (
-                            <QuestionRowCard
-                              key={question.key}
-                              question={question}
-                              error={questionErrors[question.key]}
-                              disableTypeChange={question.hasAnswers}
-                              onUpdate={(field, value) =>
-                                updateQuestion(question.key, field, value)
-                              }
-                              onRemove={() => markQuestionDeleted(question.key)}
-                              removeLabel="Remove question"
-                              removeIcon={<Trash2 className="h-4 w-4" />}
-                              disabled={isPast}
-                            />
-                          )
-                        )}
+                        <DndContext
+                          sensors={sensors}
+                          onDragEnd={handleQuestionDragEnd}
+                        >
+                          <SortableContext
+                            items={questions
+                              .filter((q) => !q.deleted)
+                              .map((q) => q.key)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            {questions.map((question) =>
+                              question.deleted ? (
+                                <div
+                                  key={question.key}
+                                  className="flex items-center justify-between gap-2 border-b border-border px-4 py-3 text-left opacity-70 last:border-0"
+                                >
+                                  <p className="muted">
+                                    <span className="font-medium line-through">
+                                      {question.label || "Untitled question"}
+                                    </span>{" "}
+                                    will be deleted on save.
+                                    {question.hasAnswers && (
+                                      <span className="font-medium">
+                                        {" "}
+                                        Existing answers will be kept and shown
+                                        in the roster.
+                                      </span>
+                                    )}
+                                  </p>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      undoDeleteQuestion(question.key)
+                                    }
+                                  >
+                                    <Undo2 className="mr-1 h-4 w-4" /> Undo
+                                  </Button>
+                                </div>
+                              ) : (
+                                <QuestionRowCard
+                                  key={question.key}
+                                  question={question}
+                                  error={questionErrors[question.key]}
+                                  disableTypeChange={question.hasAnswers}
+                                  onUpdate={(field, value) =>
+                                    updateQuestion(question.key, field, value)
+                                  }
+                                  onRemove={() =>
+                                    markQuestionDeleted(question.key)
+                                  }
+                                  removeLabel="Remove question"
+                                  removeIcon={<Trash2 className="h-4 w-4" />}
+                                  disabled={isPast}
+                                />
+                              )
+                            )}
+                          </SortableContext>
+                        </DndContext>
                       </DataRowList>
                     )}
 

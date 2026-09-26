@@ -3,6 +3,19 @@ import { useNavigate } from "react-router-dom"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Clock, Info, ListChecks, Settings, X } from "lucide-react"
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -49,6 +62,7 @@ import {
 import {
   clearDraftError,
   removeDraftRow,
+  reorderDraftRow,
   updateDraftRow,
 } from "@/lib/eventDrafts"
 import {
@@ -81,6 +95,29 @@ export function CreateEvent() {
     {}
   )
   const nextKey = useRef(0)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  const handleSlotDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+    setSlots((prev) =>
+      reorderDraftRow(prev, Number(active.id), Number(over.id))
+    )
+  }
+
+  const handleQuestionDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+    setQuestions((prev) =>
+      reorderDraftRow(prev, Number(active.id), Number(over.id))
+    )
+  }
 
   const isDirty =
     groupId !== "" ||
@@ -286,19 +323,29 @@ export function CreateEvent() {
                       </p>
                     ) : (
                       <DataRowList>
-                        {slots.map((slot) => (
-                          <SlotRowCard
-                            key={slot.key}
-                            slot={slot}
-                            error={slotErrors[slot.key]}
-                            onUpdate={(field, value) =>
-                              updateSlot(slot.key, field, value)
-                            }
-                            onRemove={() => removeSlot(slot.key)}
-                            removeLabel="Remove slot"
-                            removeIcon={<X className="h-4 w-4" />}
-                          />
-                        ))}
+                        <DndContext
+                          sensors={sensors}
+                          onDragEnd={handleSlotDragEnd}
+                        >
+                          <SortableContext
+                            items={slots.map((s) => s.key)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            {slots.map((slot) => (
+                              <SlotRowCard
+                                key={slot.key}
+                                slot={slot}
+                                error={slotErrors[slot.key]}
+                                onUpdate={(field, value) =>
+                                  updateSlot(slot.key, field, value)
+                                }
+                                onRemove={() => removeSlot(slot.key)}
+                                removeLabel="Remove slot"
+                                removeIcon={<X className="h-4 w-4" />}
+                              />
+                            ))}
+                          </SortableContext>
+                        </DndContext>
                       </DataRowList>
                     )}
                     <GhostAddRow onClick={addSlot}>Add slot</GhostAddRow>
@@ -346,19 +393,29 @@ export function CreateEvent() {
                       </p>
                     ) : (
                       <DataRowList>
-                        {questions.map((question) => (
-                          <QuestionRowCard
-                            key={question.key}
-                            question={question}
-                            error={questionErrors[question.key]}
-                            onUpdate={(field, value) =>
-                              updateQuestion(question.key, field, value)
-                            }
-                            onRemove={() => removeQuestion(question.key)}
-                            removeLabel="Remove question"
-                            removeIcon={<X className="h-4 w-4" />}
-                          />
-                        ))}
+                        <DndContext
+                          sensors={sensors}
+                          onDragEnd={handleQuestionDragEnd}
+                        >
+                          <SortableContext
+                            items={questions.map((q) => q.key)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            {questions.map((question) => (
+                              <QuestionRowCard
+                                key={question.key}
+                                question={question}
+                                error={questionErrors[question.key]}
+                                onUpdate={(field, value) =>
+                                  updateQuestion(question.key, field, value)
+                                }
+                                onRemove={() => removeQuestion(question.key)}
+                                removeLabel="Remove question"
+                                removeIcon={<X className="h-4 w-4" />}
+                              />
+                            ))}
+                          </SortableContext>
+                        </DndContext>
                       </DataRowList>
                     )}
                     <GhostAddRow
