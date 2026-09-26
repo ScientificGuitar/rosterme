@@ -130,6 +130,29 @@ public static class AdminEndpoints
             ? []
             : options.Split('\n').Select(o => o.Trim()).Where(o => o.Length > 0).ToList();
 
+    private static bool? ResolveRemovalNotify(RemovalEmailPolicy policy, bool? notifyParam) =>
+        policy switch
+        {
+            RemovalEmailPolicy.Always => true,
+            RemovalEmailPolicy.Never => false,
+            _ => notifyParam
+        };
+
+    private static bool IsNotifiable(SignupStatus status) =>
+        status is SignupStatus.Pending or SignupStatus.Confirmed
+            or SignupStatus.WaitlistPending or SignupStatus.Waitlisted;
+
+    private static IResult MissingNotifyChoice() =>
+        Results.BadRequest(new
+        {
+            error = "Specify whether to notify volunteers of this removal.",
+            code = "missing_notify_choice"
+        });
+
+    private sealed record RemovedSlotNotification(
+        string VolunteerName, string Email, bool WasWaitlisted,
+        string SlotLabel, TimeOnly StartTime, TimeOnly EndTime);
+
     private static async Task<Group?> GetOwnedGroup(AppDbContext db, Guid groupId, string userId, CancellationToken ct)
     {
         return await db.Groups
@@ -241,6 +264,7 @@ public static class AdminEndpoints
             Description = NormNull(request.Description),
             Location = NormNull(request.Location),
             Date = request.Date,
+            RemovalEmailPolicy = request.RemovalEmailPolicy ?? RemovalEmailPolicy.Ask,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -286,7 +310,7 @@ public static class AdminEndpoints
         await db.SaveChangesAsync(ct);
 
         return Results.Created($"/api/events/{evt.Id}", new EventResponse(
-            evt.Id, evt.GroupId, evt.Title, evt.Description, evt.Location, evt.Date, evt.CreatedAt
+            evt.Id, evt.GroupId, evt.Title, evt.Description, evt.Location, evt.Date, evt.RemovalEmailPolicy, evt.CreatedAt
         ));
     }
 
@@ -302,7 +326,7 @@ public static class AdminEndpoints
             .ToListAsync(ct);
 
         return Results.Ok(events.Select(e => new EventWithSlotsResponse(
-            e.Id, e.GroupId, e.Group.Name, e.Title, e.Description, e.Location, e.Date, e.CreatedAt,
+            e.Id, e.GroupId, e.Group.Name, e.Title, e.Description, e.Location, e.Date, e.RemovalEmailPolicy, e.CreatedAt,
             e.TimeSlots.OrderBy(s => s.StartTime).Select(s => new TimeSlotResponse(s.Id, s.EventId, s.Label, SlotTimes.ResolveStart(e.Date, s.StartTime), SlotTimes.ResolveEnd(e.Date, s.StartTime, s.EndTime), s.Capacity, s.Signups.Count(sg => sg.Status == SignupStatus.Pending || sg.Status == SignupStatus.Confirmed), s.AllowWaitlist))
         )));
     }
@@ -331,8 +355,12 @@ public static class AdminEndpoints
             if (newGroup is null) return Results.NotFound();
             evt.GroupId = newGroupId;
         }
+        if (request.RemovalEmailPolicy.HasValue)
+            evt.RemovalEmailPolicy = request.RemovalEmailPolicy.Value;
 
         var increasedSlotIds = new List<Guid>();
+        var removedSlotNotifications = new List<RemovedSlotNotification>();
+        bool notifyRemovedSlots = false;
 
         if (request.Questions is not null)
         {
@@ -498,7 +526,21 @@ public static class AdminEndpoints
 
             foreach (var slot in originalSlots.Where(s => !requestedIds.Contains(s.Id)))
             {
+                foreach (var sg in slot.Signups.Where(sg => IsNotifiable(sg.Status)))
+                {
+                    removedSlotNotifications.Add(new RemovedSlotNotification(
+                        sg.VolunteerName, sg.Email,
+                        sg.Status is SignupStatus.WaitlistPending or SignupStatus.Waitlisted,
+                        slot.Label, slot.StartTime, slot.EndTime));
+                }
                 db.TimeSlots.Remove(slot);
+            }
+
+            if (removedSlotNotifications.Count > 0)
+            {
+                var resolved = ResolveRemovalNotify(evt.RemovalEmailPolicy, request.NotifyOnRemove);
+                if (resolved is null) return MissingNotifyChoice();
+                notifyRemovedSlots = resolved.Value;
             }
         }
 
@@ -517,26 +559,72 @@ public static class AdminEndpoints
             foreach (var slotId in increasedSlotIds)
                 await WaitlistService.PromoteWaitlistAsync(db, outbox, emailOptions, slotId, ct);
 
+            if (notifyRemovedSlots)
+            {
+                foreach (var n in removedSlotNotifications)
+                {
+                    var (subject, html, text) = EmailTemplates.BuildSlotDeleted(
+                        n.VolunteerName, evt.Group.Name, evt.Title,
+                        n.SlotLabel, evt.Date, n.StartTime, n.EndTime,
+                        evt.Location, n.WasWaitlisted);
+                    await outbox.EnqueueAsync(n.Email, subject, html, text, ct: ct);
+                }
+            }
+
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
 
-            return Results.Ok(new EventResponse(evt.Id, evt.GroupId, evt.Title, evt.Description, evt.Location, evt.Date, evt.CreatedAt));
+            return Results.Ok(new EventResponse(evt.Id, evt.GroupId, evt.Title, evt.Description, evt.Location, evt.Date, evt.RemovalEmailPolicy, evt.CreatedAt));
         });
     }
 
-    private static async Task<IResult> DeleteEvent(Guid id, AppDbContext db, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> DeleteEvent(Guid id, bool? notify, AppDbContext db, EmailOutboxService outbox, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
         var evt = await db.Events
             .Include(e => e.Group)
+            .Include(e => e.TimeSlots).ThenInclude(s => s.Signups)
             .FirstOrDefaultAsync(e => e.Id == id && e.Group.GroupOwner == userId, ct);
 
         if (evt is null) return Results.NotFound();
 
-        db.Events.Remove(evt);
-        await db.SaveChangesAsync(ct);
+        var recipients = evt.TimeSlots
+            .SelectMany(s => s.Signups)
+            .Where(sg => IsNotifiable(sg.Status))
+            .GroupBy(sg => sg.Email, StringComparer.OrdinalIgnoreCase)
+            .Select(g => (VolunteerName: g.First().VolunteerName, Email: g.Key))
+            .ToList();
 
-        return Results.NoContent();
+        var shouldNotify = false;
+        if (recipients.Count > 0)
+        {
+            var resolved = ResolveRemovalNotify(evt.RemovalEmailPolicy, notify);
+            if (resolved is null) return MissingNotifyChoice();
+            shouldNotify = resolved.Value;
+        }
+
+        var strategy = db.Database.CreateExecutionStrategy();
+
+        return await strategy.ExecuteAsync(async () =>
+        {
+            using var tx = await db.Database.BeginTransactionAsync(ct);
+
+            if (shouldNotify)
+            {
+                foreach (var r in recipients)
+                {
+                    var (subject, html, text) = EmailTemplates.BuildEventCancelled(
+                        r.VolunteerName, evt.Group.Name, evt.Title, evt.Date, evt.Location);
+                    await outbox.EnqueueAsync(r.Email, subject, html, text, ct: ct);
+                }
+            }
+
+            db.Events.Remove(evt);
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+
+            return Results.NoContent();
+        });
     }
 
     // --- Time Slots ---
@@ -626,19 +714,59 @@ public static class AdminEndpoints
         });
     }
 
-    private static async Task<IResult> DeleteSlot(Guid eventId, Guid slotId, AppDbContext db, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> DeleteSlot(Guid eventId, Guid slotId, bool? notify, AppDbContext db, EmailOutboxService outbox, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
         var slot = await db.TimeSlots
             .Include(s => s.Event).ThenInclude(e => e.Group)
+            .Include(s => s.Signups)
             .FirstOrDefaultAsync(s => s.Id == slotId && s.EventId == eventId && s.Event.Group.GroupOwner == userId, ct);
 
         if (slot is null) return Results.NotFound();
 
-        db.TimeSlots.Remove(slot);
-        await db.SaveChangesAsync(ct);
+        var affected = slot.Signups.Where(sg => IsNotifiable(sg.Status)).ToList();
 
-        return Results.NoContent();
+        var shouldNotify = false;
+        if (affected.Count > 0)
+        {
+            var resolved = ResolveRemovalNotify(slot.Event.RemovalEmailPolicy, notify);
+            if (resolved is null) return MissingNotifyChoice();
+            shouldNotify = resolved.Value;
+        }
+
+        // Snapshot before the cascade delete wipes the signups.
+        var notifications = affected
+            .Select(sg => new RemovedSlotNotification(
+                sg.VolunteerName, sg.Email,
+                sg.Status is SignupStatus.WaitlistPending or SignupStatus.Waitlisted,
+                slot.Label, slot.StartTime, slot.EndTime))
+            .ToList();
+        var evt = slot.Event;
+
+        var strategy = db.Database.CreateExecutionStrategy();
+
+        return await strategy.ExecuteAsync(async () =>
+        {
+            using var tx = await db.Database.BeginTransactionAsync(ct);
+
+            if (shouldNotify)
+            {
+                foreach (var n in notifications)
+                {
+                    var (subject, html, text) = EmailTemplates.BuildSlotDeleted(
+                        n.VolunteerName, evt.Group.Name, evt.Title,
+                        n.SlotLabel, evt.Date, n.StartTime, n.EndTime,
+                        evt.Location, n.WasWaitlisted);
+                    await outbox.EnqueueAsync(n.Email, subject, html, text, ct: ct);
+                }
+            }
+
+            db.TimeSlots.Remove(slot);
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+
+            return Results.NoContent();
+        });
     }
 
     // --- Roster ---
@@ -658,7 +786,7 @@ public static class AdminEndpoints
             .ToListAsync(ct);
 
         return Results.Ok(events.Select(e => new RosterEventResponse(
-            e.Id, e.GroupId, e.Group.Name, e.Title, e.Description, e.Location, e.Date, e.CreatedAt, RosterQuestionResponse.From(e.Questions),
+            e.Id, e.GroupId, e.Group.Name, e.Title, e.Description, e.Location, e.Date, e.RemovalEmailPolicy, e.CreatedAt, RosterQuestionResponse.From(e.Questions),
             e.TimeSlots.OrderBy(s => s.StartTime).Select(s => new RosterSlotResponse(
                 s.Id, s.Label, SlotTimes.ResolveStart(e.Date, s.StartTime), SlotTimes.ResolveEnd(e.Date, s.StartTime, s.EndTime), s.Capacity, s.AllowWaitlist,
                 s.Signups.Select(su => new SignupResponse(su.Id, su.TimeSlotId, su.VolunteerName, su.Email, su.Status.ToString(), su.CreatedAt,
@@ -669,7 +797,7 @@ public static class AdminEndpoints
 
     // --- Signups ---
 
-    private static async Task<IResult> DeleteSignup(Guid id, AppDbContext db, EmailOutboxService outbox, IOptions<EmailOptions> emailOptions, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> DeleteSignup(Guid id, bool? notify, AppDbContext db, EmailOutboxService outbox, IOptions<EmailOptions> emailOptions, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
         var signup = await db.Signups
@@ -681,6 +809,11 @@ public static class AdminEndpoints
         // Already inactive: idempotent, no email.
         if (signup.Status is SignupStatus.Cancelled or SignupStatus.Removed)
             return Results.NoContent();
+
+        // Resolve the notify choice up-front so Ask without an explicit
+        // choice fails fast instead of flipping status first.
+        var shouldNotify = ResolveRemovalNotify(signup.TimeSlot.Event.RemovalEmailPolicy, notify);
+        if (shouldNotify is null) return MissingNotifyChoice();
 
         var slotId = signup.TimeSlotId;
 
@@ -711,19 +844,22 @@ public static class AdminEndpoints
 
             var slot = signup.TimeSlot;
             var evt = slot.Event;
-            var (subject, html, text) = EmailTemplates.BuildSignupRemoved(
-                signup.VolunteerName,
-                evt.Group.Name,
-                evt.Title,
-                slot.Label,
-                evt.Date,
-                slot.StartTime,
-                slot.EndTime,
-                evt.Location,
-                wasWaitlisted);
+            if (shouldNotify.Value)
+            {
+                var (subject, html, text) = EmailTemplates.BuildSignupRemoved(
+                    signup.VolunteerName,
+                    evt.Group.Name,
+                    evt.Title,
+                    slot.Label,
+                    evt.Date,
+                    slot.StartTime,
+                    slot.EndTime,
+                    evt.Location,
+                    wasWaitlisted);
 
-            // EnqueueAsync saves changes, persisting the status flip and the outbox row atomically.
-            await outbox.EnqueueAsync(signup.Email, subject, html, text, ct: ct);
+                // EnqueueAsync saves changes, persisting the status flip and the outbox row atomically.
+                await outbox.EnqueueAsync(signup.Email, subject, html, text, ct: ct);
+            }
 
             if (wasOccupying)
                 await WaitlistService.PromoteWaitlistAsync(db, outbox, emailOptions, slotId, ct);
@@ -877,7 +1013,7 @@ public static class AdminEndpoints
         if (evt is null) return Results.NotFound();
 
         return Results.Ok(new RosterEventResponse(
-            evt.Id, evt.GroupId, evt.Group.Name, evt.Title, evt.Description, evt.Location, evt.Date, evt.CreatedAt, RosterQuestionResponse.From(evt.Questions),
+            evt.Id, evt.GroupId, evt.Group.Name, evt.Title, evt.Description, evt.Location, evt.Date, evt.RemovalEmailPolicy, evt.CreatedAt, RosterQuestionResponse.From(evt.Questions),
             evt.TimeSlots.OrderBy(s => s.StartTime).Select(s => new RosterSlotResponse(
                 s.Id, s.Label, SlotTimes.ResolveStart(evt.Date, s.StartTime), SlotTimes.ResolveEnd(evt.Date, s.StartTime, s.EndTime), s.Capacity, s.AllowWaitlist,
                 s.Signups.Select(su => new SignupResponse(su.Id, su.TimeSlotId, su.VolunteerName, su.Email, su.Status.ToString(), su.CreatedAt,
@@ -1006,6 +1142,7 @@ public record CreateEventRequest(
     [property: NotWhitespace, StringLength(2000)] string? Description,
     [property: NotWhitespace, StringLength(500)] string? Location,
     DateOnly Date,
+    RemovalEmailPolicy? RemovalEmailPolicy,
     [property: MaxLength(50)] List<CreateSlotRequest>? Slots,
     [property: MaxLength(10)] List<QuestionUpsert>? Questions) : IValidatableObject
 {
@@ -1038,6 +1175,8 @@ public record UpdateEventRequest(
     [property: StringLength(2000)] string? Description,
     [property: StringLength(500)] string? Location,
     DateOnly? Date,
+    RemovalEmailPolicy? RemovalEmailPolicy,
+    bool? NotifyOnRemove,
     [property: MaxLength(50)] List<EventSlotUpsert>? Slots,
     [property: MaxLength(10)] List<QuestionUpsert>? Questions) : IValidatableObject
 {
@@ -1163,9 +1302,9 @@ public record GroupResponse(Guid Id, string Name, DateTime CreatedAt, int EventC
 
 public record InviteLinkResponse(Guid Id, Guid? EventId, string Name, string Code, bool IsActive, DateTime CreatedAt, DateTime? ExpiresAt, int SignupCount);
 
-public record EventResponse(Guid Id, Guid GroupId, string Title, string? Description, string? Location, DateOnly Date, DateTime CreatedAt);
+public record EventResponse(Guid Id, Guid GroupId, string Title, string? Description, string? Location, DateOnly Date, RemovalEmailPolicy RemovalEmailPolicy, DateTime CreatedAt);
 
-public record EventWithSlotsResponse(Guid Id, Guid GroupId, string GroupName, string Title, string? Description, string? Location, DateOnly Date, DateTime CreatedAt, IEnumerable<TimeSlotResponse> Slots);
+public record EventWithSlotsResponse(Guid Id, Guid GroupId, string GroupName, string Title, string? Description, string? Location, DateOnly Date, RemovalEmailPolicy RemovalEmailPolicy, DateTime CreatedAt, IEnumerable<TimeSlotResponse> Slots);
 
 public record TimeSlotResponse(Guid Id, Guid EventId, string Label, DateTime StartTime, DateTime EndTime, int Capacity, int SignupCount, bool AllowWaitlist);
 
@@ -1182,7 +1321,7 @@ public record RosterQuestionResponse(Guid Id, string Label, string Type, bool Re
             : options.Split('\n').Select(o => o.Trim()).Where(o => o.Length > 0).ToList();
 }
 
-public record RosterEventResponse(Guid Id, Guid GroupId, string GroupName, string Title, string? Description, string? Location, DateOnly Date, DateTime CreatedAt, List<RosterQuestionResponse> Questions, IEnumerable<RosterSlotResponse> Slots);
+public record RosterEventResponse(Guid Id, Guid GroupId, string GroupName, string Title, string? Description, string? Location, DateOnly Date, RemovalEmailPolicy RemovalEmailPolicy, DateTime CreatedAt, List<RosterQuestionResponse> Questions, IEnumerable<RosterSlotResponse> Slots);
 
 public record RosterSlotResponse(Guid Id, string Label, DateTime StartTime, DateTime EndTime, int Capacity, bool AllowWaitlist, IEnumerable<SignupResponse> Signups);
 

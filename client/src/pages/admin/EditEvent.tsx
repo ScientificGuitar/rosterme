@@ -2,7 +2,7 @@ import { useRef, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Clock, Info, ListChecks, Trash2, Undo2 } from "lucide-react"
+import { Clock, Info, ListChecks, Settings, Trash2, Undo2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
@@ -28,13 +28,26 @@ import {
 } from "@/components/ui/layout"
 import { EventDetailsFields } from "@/components/admin/EventDetailsFields"
 import { GroupSelect } from "@/components/admin/GroupSelect"
+import { RemovalEmailSetting } from "@/components/admin/RemovalEmailSetting"
+import type { RemovalEmailPolicy } from "@/lib/removalEmailPolicy"
 import { SlotRowCard } from "@/components/admin/SlotRowCard"
 import { StickySaveBar } from "@/components/admin/StickySaveBar"
 import { QuestionRowCard } from "@/components/admin/QuestionRowCard"
 import { LoadingState } from "@/components/ui/spinner"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { useEvent } from "@/hooks/useEvent"
 import { useApi } from "@/hooks/useApi"
-import { useUnsavedChangesPrompt, confirmNavigation } from "@/hooks/useUnsavedChanges"
+import {
+  useUnsavedChangesPrompt,
+  confirmNavigation,
+} from "@/hooks/useUnsavedChanges"
 import { formatApiError } from "@/lib/api"
 import {
   createEmptySlot,
@@ -104,7 +117,10 @@ function EventForm({ event, eventId }: EventFormProps) {
   const [description, setDescription] = useState(event.description ?? "")
   const [location, setLocation] = useState(event.location ?? "")
   const [date, setDate] = useState(event.date)
+  const [removalEmailPolicy, setRemovalEmailPolicy] =
+    useState<RemovalEmailPolicy>(event.removalEmailPolicy ?? "Ask")
   const [submitting, setSubmitting] = useState(false)
+  const [notifyPromptOpen, setNotifyPromptOpen] = useState(false)
   const [slotErrors, setSlotErrors] = useState<Record<number, string>>({})
   const [questionErrors, setQuestionErrors] = useState<Record<number, string>>(
     {}
@@ -126,6 +142,7 @@ function EventForm({ event, eventId }: EventFormProps) {
       description: event.description ?? "",
       location: event.location ?? "",
       date: event.date,
+      removalEmailPolicy: event.removalEmailPolicy ?? "Ask",
       slots: toSlotRows(event).map((s) => ({
         id: s.id ?? null,
         label: s.label,
@@ -154,6 +171,7 @@ function EventForm({ event, eventId }: EventFormProps) {
       description,
       location,
       date,
+      removalEmailPolicy,
       slots: slots.map((s) => ({
         id: s.id ?? null,
         label: s.label,
@@ -265,6 +283,20 @@ function EventForm({ event, eventId }: EventFormProps) {
       setTab("settings")
       return
     }
+    // "Ask every time" needs an explicit notify choice when the save
+    // removes slots that still have signups.
+    const removedSignupCount = slots
+      .filter((s) => s.deleted)
+      .reduce((n, s) => n + (s.signupCount ?? 0), 0)
+    if (removalEmailPolicy === "Ask" && removedSignupCount > 0) {
+      setNotifyPromptOpen(true)
+      return
+    }
+    await doSubmit()
+  }
+
+  const doSubmit = async (notifyOnRemove?: boolean) => {
+    setNotifyPromptOpen(false)
     setSubmitting(true)
 
     try {
@@ -276,6 +308,8 @@ function EventForm({ event, eventId }: EventFormProps) {
         // Empty string clears the location; the backend normalizes it to null.
         location: location.trim(),
         date,
+        removalEmailPolicy,
+        notifyOnRemove: notifyOnRemove ?? null,
         slots: buildSlotUpdatePayload(activeRows(slots)),
         questions: buildQuestionPayload(activeRows(questions)),
       })
@@ -290,6 +324,9 @@ function EventForm({ event, eventId }: EventFormProps) {
   }
 
   const deletedCount = slots.filter((s) => s.deleted).length
+  const removedSignupCount = slots
+    .filter((s) => s.deleted)
+    .reduce((n, s) => n + (s.signupCount ?? 0), 0)
   const activeSlotCount = activeRows(slots).length
   const activeQuestionCount = activeRows(questions).length
   const isPast = event.date < todayLocal()
@@ -398,8 +435,8 @@ function EventForm({ event, eventId }: EventFormProps) {
                   <DataCardContent variant="rows">
                     {activeSlotCount === 0 && (
                       <p className="muted py-3">
-                        No time slots yet. Add time slots that people can
-                        sign up for.
+                        No time slots yet. Add time slots that people can sign
+                        up for.
                       </p>
                     )}
 
@@ -496,6 +533,19 @@ function EventForm({ event, eventId }: EventFormProps) {
               <AdminPageCenter>
                 <DataCard>
                   <DataCardHeader>
+                    <DataCardTitle icon={Settings}>General</DataCardTitle>
+                  </DataCardHeader>
+                  <DataCardDivider />
+                  <DataCardContent className="space-y-4">
+                    <RemovalEmailSetting
+                      value={removalEmailPolicy}
+                      onChange={setRemovalEmailPolicy}
+                      disabled={isPast}
+                    />
+                  </DataCardContent>
+                </DataCard>
+                <DataCard>
+                  <DataCardHeader>
                     <DataCardTitle
                       icon={ListChecks}
                       actions={
@@ -586,6 +636,29 @@ function EventForm({ event, eventId }: EventFormProps) {
           submitting={submitting}
           disabled={isPast}
         />
+        <Dialog open={notifyPromptOpen} onOpenChange={setNotifyPromptOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Notify volunteers?</DialogTitle>
+              <DialogDescription>
+                {removedSignupCount} signup(s) on {deletedCount} deleted slot(s)
+                will be removed. Email them that their shift was removed?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => void doSubmit(false)}
+                disabled={submitting}
+              >
+                Don&apos;t notify
+              </Button>
+              <Button onClick={() => void doSubmit(true)} disabled={submitting}>
+                {submitting ? "Saving..." : "Notify volunteers"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </form>
     </AdminPageShell>
   )

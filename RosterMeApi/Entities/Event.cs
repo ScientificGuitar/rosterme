@@ -9,6 +9,7 @@ public class Event
     public string? Location { get; set; }
     public DateOnly Date { get; set; }
     public DateTime CreatedAt { get; set; }
+    public RemovalEmailPolicy RemovalEmailPolicy { get; set; } = RemovalEmailPolicy.Ask;
 
     public Group Group { get; set; } = null!;
     public ICollection<TimeSlot> TimeSlots { get; set; } = [];

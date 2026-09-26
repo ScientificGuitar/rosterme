@@ -47,7 +47,7 @@ public class CascadeDeleteTests(IntegrationTestFactory factory) : IDisposable
         await _client.PostAsJsonAsync($"/api/invite/{code}/signups", new { slotId, volunteerName = "Bob", email = "bob@example.com" });
 
         // Delete the event
-        var deleteResp = await _client.DeleteAsync($"/api/events/{eventId}");
+        var deleteResp = await _client.DeleteAsync($"/api/events/{eventId}?notify=false");
         Assert.Equal(HttpStatusCode.NoContent, deleteResp.StatusCode);
 
         // Verify slots and signups are gone
@@ -78,7 +78,7 @@ public class CascadeDeleteTests(IntegrationTestFactory factory) : IDisposable
         var linkId = link.GetProperty("id").GetGuid();
 
         // Delete the event
-        var deleteResp = await _client.DeleteAsync($"/api/events/{eventId}");
+        var deleteResp = await _client.DeleteAsync($"/api/events/{eventId}?notify=false");
         Assert.Equal(HttpStatusCode.NoContent, deleteResp.StatusCode);
 
         // Invite link row still exists but EventId is null

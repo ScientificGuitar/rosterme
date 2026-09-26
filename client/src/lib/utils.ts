@@ -16,6 +16,20 @@ export function waitlistCount(signups: SignupInfo[]): number {
   return signups.filter((s) => s.status === "Waitlisted").length
 }
 
+/** Signups that would be emailed on removal (excludes Cancelled/Removed). */
+export function notifiableSignupCount(signups: SignupInfo[]): number {
+  return signups.filter((s) => isNotifiableStatus(s.status)).length
+}
+
+export function isNotifiableStatus(status: string): boolean {
+  return (
+    status === "Pending" ||
+    status === "Confirmed" ||
+    status === "Waitlisted" ||
+    status === "WaitlistPending"
+  )
+}
+
 const SIGNUP_STATUS_RANK: Record<string, number> = {
   Confirmed: 0,
   Pending: 1,
@@ -25,16 +39,11 @@ const SIGNUP_STATUS_RANK: Record<string, number> = {
   Removed: 5,
 }
 
-export function compareSignupsByStatus(
-  a: SignupInfo,
-  b: SignupInfo
-): number {
+export function compareSignupsByStatus(a: SignupInfo, b: SignupInfo): number {
   const rankA = SIGNUP_STATUS_RANK[a.status] ?? 99
   const rankB = SIGNUP_STATUS_RANK[b.status] ?? 99
   if (rankA !== rankB) return rankA - rankB
-  return (
-    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-  )
+  return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
 }
 
 export function formatTime(iso: string): string {

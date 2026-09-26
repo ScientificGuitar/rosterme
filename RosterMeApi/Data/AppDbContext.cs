@@ -39,6 +39,7 @@ public class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(e => new { e.GroupId, e.Date });
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+            entity.Property(e => e.RemovalEmailPolicy).HasConversion<string>().HasMaxLength(20).IsRequired().HasDefaultValue(RemovalEmailPolicy.Ask);
         });
 
         modelBuilder.Entity<TimeSlot>(entity =>

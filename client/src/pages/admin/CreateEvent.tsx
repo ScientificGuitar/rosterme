@@ -2,7 +2,7 @@ import { useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Clock, Info, ListChecks, X } from "lucide-react"
+import { Clock, Info, ListChecks, Settings, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -28,11 +28,16 @@ import {
 } from "@/components/ui/layout"
 import { EventDetailsFields } from "@/components/admin/EventDetailsFields"
 import { GroupSelect } from "@/components/admin/GroupSelect"
+import { RemovalEmailSetting } from "@/components/admin/RemovalEmailSetting"
+import type { RemovalEmailPolicy } from "@/lib/removalEmailPolicy"
 import { SlotRowCard } from "@/components/admin/SlotRowCard"
 import { StickySaveBar } from "@/components/admin/StickySaveBar"
 import { QuestionRowCard } from "@/components/admin/QuestionRowCard"
 import { useApi } from "@/hooks/useApi"
-import { useUnsavedChangesPrompt, confirmNavigation } from "@/hooks/useUnsavedChanges"
+import {
+  useUnsavedChangesPrompt,
+  confirmNavigation,
+} from "@/hooks/useUnsavedChanges"
 import { formatApiError } from "@/lib/api"
 import {
   createEmptySlot,
@@ -68,6 +73,8 @@ export function CreateEvent() {
   const [date, setDate] = useState("")
   const [slots, setSlots] = useState<SlotDraft[]>([])
   const [questions, setQuestions] = useState<QuestionDraft[]>([])
+  const [removalEmailPolicy, setRemovalEmailPolicy] =
+    useState<RemovalEmailPolicy>("Ask")
   const [submitting, setSubmitting] = useState(false)
   const [slotErrors, setSlotErrors] = useState<Record<number, string>>({})
   const [questionErrors, setQuestionErrors] = useState<Record<number, string>>(
@@ -81,6 +88,7 @@ export function CreateEvent() {
     description.trim() !== "" ||
     location.trim() !== "" ||
     date !== "" ||
+    removalEmailPolicy !== "Ask" ||
     slots.length > 0 ||
     questions.length > 0
   useUnsavedChangesPrompt(isDirty)
@@ -169,6 +177,7 @@ export function CreateEvent() {
         description: description.trim() || null,
         location: location.trim() || null,
         date,
+        removalEmailPolicy,
         slots: slots.length > 0 ? buildSlotCreatePayload(slots) : null,
         questions:
           questions.length > 0 ? buildQuestionPayload(questions) : null,
@@ -301,6 +310,18 @@ export function CreateEvent() {
           <TabsContent value="settings">
             <AdminPageBody>
               <AdminPageCenter>
+                <DataCard>
+                  <DataCardHeader>
+                    <DataCardTitle icon={Settings}>General</DataCardTitle>
+                  </DataCardHeader>
+                  <DataCardDivider />
+                  <DataCardContent className="space-y-4">
+                    <RemovalEmailSetting
+                      value={removalEmailPolicy}
+                      onChange={setRemovalEmailPolicy}
+                    />
+                  </DataCardContent>
+                </DataCard>
                 <DataCard>
                   <DataCardHeader>
                     <DataCardTitle

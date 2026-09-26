@@ -349,7 +349,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
         Assert.Equal(HttpStatusCode.OK,
             (await _publicClient.PostAsync($"/api/signup/manage/{cancelToken}/cancel", null)).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent,
-            (await _adminClient.DeleteAsync($"/api/signups/{removeId}")).StatusCode);
+            (await _adminClient.DeleteAsync($"/api/signups/{removeId}?notify=true")).StatusCode);
 
         var cancelled = await _publicClient.PostAsync($"/api/signup/manage/{cancelToken}/confirm", null);
         Assert.Equal(HttpStatusCode.OK, cancelled.StatusCode);
@@ -769,7 +769,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
             signupIdA = (await scope.ServiceProvider.GetRequiredService<AppDbContext>().Signups
                 .SingleAsync(s => s.Email == "rm-a@example.com")).Id;
 
-        var remove = await _adminClient.DeleteAsync($"/api/signups/{signupIdA}");
+        var remove = await _adminClient.DeleteAsync($"/api/signups/{signupIdA}?notify=true");
         Assert.Equal(HttpStatusCode.NoContent, remove.StatusCode);
 
         using var verifyScope = factory.Services.CreateScope();
@@ -803,7 +803,7 @@ public class PublicEndpointTests(IntegrationTestFactory factory) : IDisposable
             rawToken = ExtractManageToken(db, "cancel-removed@example.com");
         }
 
-        var remove = await _adminClient.DeleteAsync($"/api/signups/{signupId}");
+        var remove = await _adminClient.DeleteAsync($"/api/signups/{signupId}?notify=true");
         Assert.Equal(HttpStatusCode.NoContent, remove.StatusCode);
 
         var cancel = await _publicClient.PostAsync($"/api/signup/manage/{rawToken}/cancel", null);

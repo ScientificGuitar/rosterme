@@ -7,7 +7,13 @@ export function useDeleteSignup() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (signupId: string) => api.deleteSignup(signupId),
+    mutationFn: ({
+      signupId,
+      notify,
+    }: {
+      signupId: string
+      notify?: boolean
+    }) => api.deleteSignup(signupId, notify),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] })
       queryClient.invalidateQueries({ queryKey: ["event"] })
