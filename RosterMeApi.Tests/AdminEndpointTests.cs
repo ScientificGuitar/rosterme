@@ -799,6 +799,91 @@ public class AdminEndpointTests : IDisposable
         Assert.Equal(emailCount, await verifyDb.EmailMessages.CountAsync(m => m.To == "gone@example.com"));
     }
 
+    [Fact]
+    public async Task AdminResendSignup_Pending_Returns204RotatesTokenAndEnqueuesEmail()
+    {
+        var (_, eventId, slotId) = await SeedSlotAsync("Admin Resend");
+
+        var code = await SeedInviteLinkForEventAsync(eventId);
+        var signupResp = await _client.PostAsJsonAsync($"/api/invite/{code}/signups",
+            new { slotId, volunteerName = "Pending Pam", email = "pam@example.com" });
+        Assert.Equal(HttpStatusCode.Created, signupResp.StatusCode);
+        var signup = await signupResp.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var signupId = signup.GetProperty("id").GetGuid();
+
+        string originalHash;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            originalHash = (await db.Signups.SingleAsync(s => s.Id == signupId)).ManagementTokenHash;
+        }
+
+        var resendResp = await _client.PostAsync($"/api/signups/{signupId}/resend", null);
+        Assert.Equal(HttpStatusCode.NoContent, resendResp.StatusCode);
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var stored = await verifyDb.Signups.SingleAsync(s => s.Id == signupId);
+        Assert.Equal(SignupStatus.Pending, stored.Status);
+        Assert.NotEqual(originalHash, stored.ManagementTokenHash);
+        Assert.Equal(2, await verifyDb.EmailMessages.CountAsync(m => m.To == "pam@example.com"));
+    }
+
+    [Fact]
+    public async Task AdminResendSignup_Confirmed_Returns409()
+    {
+        var (_, eventId, slotId) = await SeedSlotAsync("Admin Resend Confirmed");
+
+        var code = await SeedInviteLinkForEventAsync(eventId);
+        var signupResp = await _client.PostAsJsonAsync($"/api/invite/{code}/signups",
+            new { slotId, volunteerName = "Conf Carl", email = "carl@example.com" });
+        var signup = await signupResp.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var signupId = signup.GetProperty("id").GetGuid();
+
+        string rawToken;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var message = await db.EmailMessages.SingleAsync(m => m.To == "carl@example.com");
+            rawToken = message.HtmlBody
+                .Substring(message.HtmlBody.IndexOf("/signup/manage/", StringComparison.Ordinal) + "/signup/manage/".Length)
+                .Split('"')[0];
+        }
+
+        var confirmResp = await _client.PostAsync($"/api/signup/manage/{rawToken}/confirm", null);
+        Assert.Equal(HttpStatusCode.OK, confirmResp.StatusCode);
+
+        var resendResp = await _client.PostAsync($"/api/signups/{signupId}/resend", null);
+        Assert.Equal(HttpStatusCode.Conflict, resendResp.StatusCode);
+        var body = await resendResp.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("already_confirmed", body.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task AdminResendSignup_OtherOwnersSignup_Returns404()
+    {
+        var (_, eventId, slotId) = await SeedSlotAsync("Admin Resend Other");
+
+        var code = await SeedInviteLinkForEventAsync(eventId);
+        var signupResp = await _client.PostAsJsonAsync($"/api/invite/{code}/signups",
+            new { slotId, volunteerName = "Other Ollie", email = "ollie@example.com" });
+        var signup = await signupResp.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var signupId = signup.GetProperty("id").GetGuid();
+
+        // Move the group to another owner so the signup is no longer ours.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var stored = await db.Signups.Include(s => s.TimeSlot).ThenInclude(s => s.Event).ThenInclude(e => e.Group)
+                .SingleAsync(s => s.Id == signupId);
+            stored.TimeSlot.Event.Group.GroupOwner = TestAuthHandler.OtherUserId;
+            await db.SaveChangesAsync();
+        }
+
+        var resendResp = await _client.PostAsync($"/api/signups/{signupId}/resend", null);
+        Assert.Equal(HttpStatusCode.NotFound, resendResp.StatusCode);
+    }
+
     // --- Invite Links ---
 
     [Fact]

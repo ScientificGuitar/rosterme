@@ -198,6 +198,14 @@ export function createAdminApi(getToken: () => Promise<string | null>) {
       await checkVoid(res)
     },
 
+    resendSignup: async (signupId: string) => {
+      const res = await fetch(`${BASE}/signups/${signupId}/resend`, {
+        method: "POST",
+        headers: await h(),
+      })
+      await checkVoid(res)
+    },
+
     createInviteLink: async (eventId: string) => {
       const res = await fetch(`${BASE}/events/${eventId}/invite-links`, {
         method: "POST",

@@ -21,6 +21,7 @@ import {
   Info,
   ListChecks,
   Wrench,
+  Mail,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -75,6 +76,7 @@ import { SlotDialog, type SlotDialogSlot } from "@/components/admin/SlotDialog"
 import { LoadingState } from "@/components/ui/spinner"
 import { useEvent } from "@/hooks/useEvent"
 import { useDeleteSignup } from "@/hooks/useDeleteSignup"
+import { useResendSignup } from "@/hooks/useResendSignup"
 import { useApi } from "@/hooks/useApi"
 import { formatApiError } from "@/lib/api"
 import { QUESTION_TYPES } from "@/lib/eventQuestions"
@@ -409,6 +411,13 @@ function SignupsTab({ event }: { event: RosterEvent }) {
   >(null)
   const [deletingSlotBusy, setDeletingSlotBusy] = useState(false)
   const deleteSignup = useDeleteSignup()
+  const resendSignup = useResendSignup()
+  const [pendingResendSignupId, setPendingResendSignupId] = useState<
+    string | null
+  >(null)
+  const [resendingSignupId, setResendingSignupId] = useState<string | null>(
+    null
+  )
   const api = useApi()
   const queryClient = useQueryClient()
   const isPast = event.date < todayLocal()
@@ -438,6 +447,19 @@ function SignupsTab({ event }: { event: RosterEvent }) {
       setPendingSignupId(null)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to delete signup")
+    }
+  }
+
+  const handleResendSignup = async (signupId: string) => {
+    setResendingSignupId(signupId)
+    try {
+      await resendSignup.mutateAsync(signupId)
+      toast.success("Confirmation email resent")
+      setPendingResendSignupId(null)
+    } catch (e) {
+      toast.error(formatApiError(e, "Failed to resend confirmation email"))
+    } finally {
+      setResendingSignupId(null)
     }
   }
 
@@ -473,6 +495,11 @@ function SignupsTab({ event }: { event: RosterEvent }) {
     (s) => (s.answers?.length ?? 0) > 0
   )
   const activeCount = selectedSlot ? activeSignupCount(selectedSlot.signups) : 0
+  const pendingResendSignup =
+    pendingResendSignupId === null
+      ? null
+      : (selectedSlot?.signups.find((s) => s.id === pendingResendSignupId) ??
+        null)
 
   return (
     <>
@@ -489,6 +516,32 @@ function SignupsTab({ event }: { event: RosterEvent }) {
         loadingLabel="Removing..."
         onConfirm={() => {
           if (pendingSignupId) handleDeleteSignup(pendingSignupId)
+        }}
+      />
+      <ConfirmDialog
+        open={pendingResendSignupId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingResendSignupId(null)
+        }}
+        title="Resend confirmation email?"
+        description={
+          pendingResendSignup ? (
+            <>
+              This will send a new confirmation email to{" "}
+              <strong>{pendingResendSignup.volunteerName}</strong> (
+              {pendingResendSignup.email}). Any earlier confirmation link for
+              this signup will stop working.
+            </>
+          ) : (
+            "This will send a new confirmation email. Any earlier confirmation link for this signup will stop working."
+          )
+        }
+        confirmLabel="Resend"
+        variant="default"
+        isLoading={resendingSignupId !== null}
+        loadingLabel="Resending..."
+        onConfirm={() => {
+          if (pendingResendSignupId) handleResendSignup(pendingResendSignupId)
         }}
       />
       <SlotDialog
@@ -754,7 +807,7 @@ function SignupsTab({ event }: { event: RosterEvent }) {
                               <th className="py-2 font-medium">Email</th>
                               <th className="py-2 font-medium">Signed up</th>
                               <th className="py-2 font-medium">Status</th>
-                              <th className="w-10 py-2" />
+                              <th className="w-20 py-2" />
                             </tr>
                           </thead>
                           <tbody>
@@ -775,6 +828,8 @@ function SignupsTab({ event }: { event: RosterEvent }) {
                                     setExpandedSignupId(expanded ? null : s.id)
                                   }
                                   onRemove={() => setPendingSignupId(s.id)}
+                                  onResend={() => setPendingResendSignupId(s.id)}
+                                  isResending={resendingSignupId === s.id}
                                 />
                               )
                             })}
@@ -797,6 +852,8 @@ function SignupsTab({ event }: { event: RosterEvent }) {
                                 setExpandedSignupId(expanded ? null : s.id)
                               }
                               onRemove={() => setPendingSignupId(s.id)}
+                              onResend={() => setPendingResendSignupId(s.id)}
+                              isResending={resendingSignupId === s.id}
                             />
                           )
                         })}
@@ -1326,6 +1383,8 @@ interface SignupRowProps {
   expanded: boolean
   onToggle: () => void
   onRemove: () => void
+  onResend: () => void
+  isResending: boolean
 }
 
 interface SignupCardProps {
@@ -1342,6 +1401,12 @@ interface SignupCardProps {
   expanded: boolean
   onToggle: () => void
   onRemove: () => void
+  onResend: () => void
+  isResending: boolean
+}
+
+function canResendConfirmation(status: string): boolean {
+  return status === "Pending" || status === "WaitlistPending"
 }
 
 function SignupCard({
@@ -1352,6 +1417,8 @@ function SignupCard({
   expanded,
   onToggle,
   onRemove,
+  onResend,
+  isResending,
 }: SignupCardProps) {
   const questionById = new Map(questions.map((q) => [q.id, q]))
   return (
@@ -1398,6 +1465,17 @@ function SignupCard({
         >
           <Trash2 className="h-4 w-4" />
         </RowIconButton>
+        {canResendConfirmation(signup.status) && (
+          <RowIconButton
+            className="shrink-0"
+            onClick={onResend}
+            title="Resend confirmation email"
+            aria-label={`Resend confirmation email to ${signup.volunteerName}`}
+            disabled={isResending}
+          >
+            <Mail className="h-4 w-4" />
+          </RowIconButton>
+        )}
       </div>
       {expanded && hasAnswers && (
         <dl className="-mx-4 -mb-2 mt-2 space-y-1 border-t border-border bg-muted/40 px-4 pt-2 pb-2 text-sm">
@@ -1436,6 +1514,8 @@ function SignupRow({
   expanded,
   onToggle,
   onRemove,
+  onResend,
+  isResending,
 }: SignupRowProps) {
   const questionById = new Map(questions.map((q) => [q.id, q]))
   return (
@@ -1469,15 +1549,29 @@ function SignupRow({
           <SignupStatusBadge status={signup.status} />
         </td>
         <td className="py-2">
-          <RowIconButton
-            className="hover:text-destructive"
-            onClick={onRemove}
-            disabled={
-              signup.status === "Cancelled" || signup.status === "Removed"
-            }
-          >
-            <Trash2 className="h-3 w-3" />
-          </RowIconButton>
+          <div className="flex items-center justify-end gap-1">
+            {canResendConfirmation(signup.status) && (
+              <RowIconButton
+                onClick={onResend}
+                title="Resend confirmation email"
+                aria-label={`Resend confirmation email to ${signup.volunteerName}`}
+                disabled={isResending}
+              >
+                <Mail className="h-3 w-3" />
+              </RowIconButton>
+            )}
+            <RowIconButton
+              className="hover:text-destructive"
+              onClick={onRemove}
+              title="Remove signup"
+              aria-label={`Remove signup for ${signup.volunteerName}`}
+              disabled={
+                signup.status === "Cancelled" || signup.status === "Removed"
+              }
+            >
+              <Trash2 className="h-3 w-3" />
+            </RowIconButton>
+          </div>
         </td>
       </tr>
       {expanded && hasAnswers && (
