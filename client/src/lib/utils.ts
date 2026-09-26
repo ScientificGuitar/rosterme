@@ -51,6 +51,26 @@ export function formatTimeOnly(value: string): string {
   return value.length >= 5 ? value.slice(0, 5) : value
 }
 
+function toHHmm(value: string): string {
+  // Admin roster slots arrive as ISO date-times; public slots and drafts
+  // are TimeOnly strings. Normalize both to "HH:mm" for comparison.
+  if (value.includes("T")) return toTimeInputValue(value)
+  return value.slice(0, 5)
+}
+
+/**
+ * True when the end wall-time is earlier than the start, meaning the slot
+ * rolls over to the next day (e.g. 22:00-02:00).
+ */
+export function isOvernightSlot(startTime: string, endTime: string): boolean {
+  return toHHmm(endTime) < toHHmm(startTime)
+}
+
+/** " (+1 day)" suffix for overnight slots, else "". */
+export function overnightSuffix(startTime: string, endTime: string): string {
+  return isOvernightSlot(startTime, endTime) ? " (+1 day)" : ""
+}
+
 export function toTimeInputValue(iso: string): string {
   return new Date(iso).toLocaleTimeString("sv-SE", {
     hour: "2-digit",

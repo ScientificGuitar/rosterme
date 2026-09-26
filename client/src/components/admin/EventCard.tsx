@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { CapacityBar } from "@/components/ui/capacity-bar"
 import { CardHeader, CardTitle } from "@/components/ui/card"
 import { DataCard, DataCardContent, MetaRow } from "@/components/ui/layout"
-import { activeSignupCount, formatTime } from "@/lib/utils"
+import { activeSignupCount, formatTime, overnightSuffix } from "@/lib/utils"
 import type { RosterEvent } from "@/lib/types"
 
 interface EventCardProps {
@@ -39,6 +39,7 @@ export function EventCard({ event }: EventCardProps) {
                   <div className="font-medium">{slot.label}</div>
                   <div className="text-muted-foreground">
                     {formatTime(slot.startTime)}-{formatTime(slot.endTime)}
+                    {overnightSuffix(slot.startTime, slot.endTime)}
                   </div>
                 </div>
                 <Badge

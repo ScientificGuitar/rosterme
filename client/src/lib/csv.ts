@@ -1,4 +1,4 @@
-import { formatTime } from "@/lib/utils"
+import { formatTime, overnightSuffix } from "@/lib/utils"
 import type { RosterEvent, SignupAnswer } from "@/lib/types"
 
 export const CSV_DELIMITER = ","
@@ -89,7 +89,8 @@ export function buildEventSignupsCsv(
           event.location ?? "",
           slot.label,
           formatTime(slot.startTime),
-          formatTime(slot.endTime),
+          formatTime(slot.endTime) +
+            overnightSuffix(slot.startTime, slot.endTime),
           s.volunteerName,
           s.email,
           s.status,

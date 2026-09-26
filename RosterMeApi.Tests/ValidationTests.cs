@@ -172,14 +172,43 @@ public class ValidationTests(IntegrationTestFactory factory) : IDisposable
     }
 
     [Fact]
-    public async Task CreateEvent_EndBeforeStart_Returns400()
+    public async Task CreateEvent_OvernightSlot_Returns201WithNextDayEnd()
+    {
+        // An end time earlier than the start time means the slot rolls over
+        // to the next day.
+        var orgId = await SeedOrgAsync();
+
+        var response = await _admin.PostAsJsonAsync("/api/events", new { groupId = orgId,
+            title = "Service",
+            date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)).ToString("yyyy-MM-dd"),
+            slots = new[] { new { label = "Overnight", startTime = "22:00", endTime = "02:00", capacity = 2 } }
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var created = await response.Content.ReadFromJsonAsync<JsonElement>(_json);
+        var eventId = created.GetProperty("id").GetGuid();
+
+        var get = await _admin.GetAsync($"/api/events/{eventId}");
+        Assert.Equal(HttpStatusCode.OK, get.StatusCode);
+        var evt = await get.Content.ReadFromJsonAsync<JsonElement>(_json);
+        var slot = evt.GetProperty("slots").EnumerateArray().First();
+        var start = slot.GetProperty("startTime").GetDateTime();
+        var end = slot.GetProperty("endTime").GetDateTime();
+
+        Assert.Equal(22, start.Hour);
+        Assert.Equal(2, end.Hour);
+        Assert.Equal(start.Date.AddDays(1), end.Date);
+    }
+
+    [Fact]
+    public async Task CreateEvent_EndEqualsStart_Returns400()
     {
         var orgId = await SeedOrgAsync();
 
-        var response = await _admin.PostAsJsonAsync("/api/events", new { groupId = orgId, 
+        var response = await _admin.PostAsJsonAsync("/api/events", new { groupId = orgId,
             title = "Service",
             date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)).ToString("yyyy-MM-dd"),
-            slots = new[] { new { label = "Backwards", startTime = "10:00", endTime = "09:00", capacity = 2 } }
+            slots = new[] { new { label = "Zero", startTime = "10:00", endTime = "10:00", capacity = 2 } }
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -300,12 +329,12 @@ public class ValidationTests(IntegrationTestFactory factory) : IDisposable
     }
 
     [Fact]
-    public async Task UpdateSlot_OnlyEndTime_MakesEndBeforeStart_Returns400()
+    public async Task UpdateSlot_OnlyEndTime_MakesOvernight_Returns200WithNextDayEnd()
     {
-        // Seed slot 09:00-10:00 then PATCH only the end time. With the cross-field
-        // check in the handler, sending endTime earlier than the stored startTime
-        // must fail with 400 — the previously-loaded value matters, not just the
-        // values present in the request body.
+        // Seed slot 09:00-10:00 then PATCH only the end time. With the
+        // cross-field check in the handler, sending an endTime earlier than
+        // the stored startTime means the slot rolls over to the next day —
+        // only equal times are rejected.
         var eventId = await SeedEventAsync();
         var create = await _admin.PostAsJsonAsync($"/api/events/{eventId}/slots", new
         {
@@ -322,8 +351,19 @@ public class ValidationTests(IntegrationTestFactory factory) : IDisposable
             endTime = "08:00"
         });
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        await AssertProblemDetailsAsync(response, "EndTime");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var updated = await response.Content.ReadFromJsonAsync<JsonElement>(_json);
+        var start = updated.GetProperty("startTime").GetDateTime();
+        var end = updated.GetProperty("endTime").GetDateTime();
+        Assert.Equal(start.Date.AddDays(1), end.Date);
+
+        var equal = await _admin.PutAsJsonAsync($"/api/events/{eventId}/slots/{slotId}", new
+        {
+            endTime = "09:00"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, equal.StatusCode);
+        await AssertProblemDetailsAsync(equal, "EndTime");
     }
 
     [Fact]

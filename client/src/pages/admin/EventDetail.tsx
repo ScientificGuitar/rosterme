@@ -33,6 +33,7 @@ import {
   cn,
   compareSignupsByStatus,
   formatTime,
+  overnightSuffix,
   waitlistCount,
 } from "@/lib/utils"
 import {
@@ -270,6 +271,10 @@ export function EventDetail() {
                                   <td className="py-2 text-sm text-muted-foreground">
                                     {formatTime(slot.startTime)}&ndash;
                                     {formatTime(slot.endTime)}
+                                    {overnightSuffix(
+                                      slot.startTime,
+                                      slot.endTime
+                                    )}
                                   </td>
                                   <td className="py-2 text-right">
                                     <Badge
@@ -303,6 +308,7 @@ export function EventDetail() {
                                 <RowSecondary>
                                   {formatTime(slot.startTime)}&ndash;
                                   {formatTime(slot.endTime)}
+                                  {overnightSuffix(slot.startTime, slot.endTime)}
                                 </RowSecondary>
                               </div>
                               <Badge
@@ -605,6 +611,7 @@ function SignupsTab({ event }: { event: RosterEvent }) {
                         <div className="text-xs text-muted-foreground">
                           {formatTime(slot.startTime)}&ndash;
                           {formatTime(slot.endTime)}
+                          {overnightSuffix(slot.startTime, slot.endTime)}
                         </div>
                       </div>
                       <Badge
@@ -695,6 +702,10 @@ function SignupsTab({ event }: { event: RosterEvent }) {
                   <p className="muted-xs mt-0.5">
                     {formatTime(selectedSlot.startTime)}&ndash;
                     {formatTime(selectedSlot.endTime)}
+                    {overnightSuffix(
+                      selectedSlot.startTime,
+                      selectedSlot.endTime
+                    )}
                   </p>
                 </DataCardHeader>
                 <DataCardContent className="pt-2 pb-3">

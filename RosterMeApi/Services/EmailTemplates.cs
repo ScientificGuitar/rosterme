@@ -18,6 +18,7 @@ public static class EmailTemplates
         bool hasCalendarAttachment = false)
     {
         var subject = $"Confirm your signup: {eventTitle}";
+        var overnightSuffix = SlotTimes.OvernightSuffix(startTime, endTime);
         var encodedSlotLabel = HttpUtility.HtmlEncode(slotLabel);
         var encodedLocation = string.IsNullOrWhiteSpace(location)
             ? null
@@ -70,7 +71,7 @@ public static class EmailTemplates
                               <td style="padding:16px;">
                                 <p style="margin:0 0 4px;font-size:14px;color:#18181b;"><strong>{encodedSlotLabel}</strong></p>
                                 <p style="margin:0 0 4px;font-size:14px;color:#18181b;">{eventDate:dddd d MMMM yyyy}</p>
-                                <p style="margin:0;font-size:14px;color:#3f3f46;">{startTime:HH:mm}&ndash;{endTime:HH:mm}</p>
+                                <p style="margin:0;font-size:14px;color:#3f3f46;">{startTime:HH:mm}&ndash;{endTime:HH:mm}{overnightSuffix}</p>
                                 {locationHtml}
                                 <p style="margin:12px 0 0;font-size:14px;color:#3f3f46;">Name: <strong>{HttpUtility.HtmlEncode(volunteerName)}</strong></p>
                               </td>
@@ -109,7 +110,7 @@ public static class EmailTemplates
 
             Confirm your signup for: {eventTitle}
             Shift: {slotLabel}
-            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}-{endTime:HH:mm}{textLocation}
+            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}-{endTime:HH:mm}{overnightSuffix}{textLocation}
             Name: {volunteerName}
 
             Your spot isn't confirmed until you click the link below:
@@ -135,6 +136,7 @@ public static class EmailTemplates
         string? location = null)
     {
         var subject = $"You're on the waitlist: {eventTitle}";
+        var overnightSuffix = SlotTimes.OvernightSuffix(startTime, endTime);
         var encodedSlotLabel = HttpUtility.HtmlEncode(slotLabel);
         var encodedLocation = string.IsNullOrWhiteSpace(location)
             ? null
@@ -169,7 +171,7 @@ public static class EmailTemplates
                               <td style="padding:16px;">
                                 <p style="margin:0 0 4px;font-size:14px;color:#18181b;"><strong>{encodedSlotLabel}</strong></p>
                                 <p style="margin:0 0 4px;font-size:14px;color:#18181b;">{eventDate:dddd d MMMM yyyy}</p>
-                                <p style="margin:0;font-size:14px;color:#3f3f46;">{startTime:HH:mm}&ndash;{endTime:HH:mm}</p>
+                                <p style="margin:0;font-size:14px;color:#3f3f46;">{startTime:HH:mm}&ndash;{endTime:HH:mm}{overnightSuffix}</p>
                                 {locationHtml}
                                 <p style="margin:12px 0 0;font-size:14px;color:#3f3f46;">Name: <strong>{HttpUtility.HtmlEncode(volunteerName)}</strong></p>
                                 <p style="margin:8px 0 0;font-size:14px;color:#3f3f46;">Current waitlist position: <strong>#{waitlistPosition}</strong> (may change as others confirm)</p>
@@ -201,7 +203,7 @@ public static class EmailTemplates
 
             Confirm to join the waitlist for: {eventTitle}
             Shift: {slotLabel}
-            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}-{endTime:HH:mm}{textLocation}
+            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}-{endTime:HH:mm}{overnightSuffix}{textLocation}
             Name: {volunteerName}
             Current waitlist position: #{waitlistPosition} (may change as others confirm)
 
@@ -230,6 +232,7 @@ public static class EmailTemplates
         bool hasCalendarAttachment = false)
     {
         var subject = $"You're in: {eventTitle}";
+        var overnightSuffix = SlotTimes.OvernightSuffix(startTime, endTime);
         var encodedSlotLabel = HttpUtility.HtmlEncode(slotLabel);
         var encodedLocation = string.IsNullOrWhiteSpace(location)
             ? null
@@ -282,7 +285,7 @@ public static class EmailTemplates
                               <td style="padding:16px;">
                                 <p style="margin:0 0 4px;font-size:14px;color:#18181b;"><strong>{encodedSlotLabel}</strong></p>
                                 <p style="margin:0 0 4px;font-size:14px;color:#18181b;">{eventDate:dddd d MMMM yyyy}</p>
-                                <p style="margin:0;font-size:14px;color:#3f3f46;">{startTime:HH:mm}&ndash;{endTime:HH:mm}</p>
+                                <p style="margin:0;font-size:14px;color:#3f3f46;">{startTime:HH:mm}&ndash;{endTime:HH:mm}{overnightSuffix}</p>
                                 {locationHtml}
                                 <p style="margin:12px 0 0;font-size:14px;color:#3f3f46;">Name: <strong>{HttpUtility.HtmlEncode(volunteerName)}</strong></p>
                               </td>
@@ -322,7 +325,7 @@ public static class EmailTemplates
 
             You're in: {eventTitle}
             Shift: {slotLabel}
-            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}-{endTime:HH:mm}{textLocation}
+            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}-{endTime:HH:mm}{overnightSuffix}{textLocation}
             Name: {volunteerName}
 
             A spot opened up and you've been automatically promoted from the waitlist. You're now confirmed.
@@ -348,6 +351,7 @@ public static class EmailTemplates
         string? location = null)
     {
         var subject = $"Reminder: {eventTitle} is tomorrow";
+        var overnightSuffix = SlotTimes.OvernightSuffix(startTime, endTime);
         var encodedSlotLabel = HttpUtility.HtmlEncode(slotLabel);
         var encodedLocation = string.IsNullOrWhiteSpace(location)
             ? null
@@ -382,7 +386,7 @@ public static class EmailTemplates
                               <td style="padding:16px;">
                                 <p style="margin:0 0 4px;font-size:14px;color:#18181b;"><strong>{encodedSlotLabel}</strong></p>
                                 <p style="margin:0 0 4px;font-size:14px;color:#18181b;">{eventDate:dddd d MMMM yyyy}</p>
-                                <p style="margin:0;font-size:14px;color:#3f3f46;">{startTime:HH:mm}&ndash;{endTime:HH:mm}</p>
+                                <p style="margin:0;font-size:14px;color:#3f3f46;">{startTime:HH:mm}&ndash;{endTime:HH:mm}{overnightSuffix}</p>
                                 {locationHtml}
                                 <p style="margin:12px 0 0;font-size:14px;color:#3f3f46;">Name: <strong>{HttpUtility.HtmlEncode(volunteerName)}</strong></p>
                               </td>
@@ -414,7 +418,7 @@ public static class EmailTemplates
 
             Reminder: {eventTitle} is tomorrow
             Shift: {slotLabel}
-            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}-{endTime:HH:mm}{textLocation}
+            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}-{endTime:HH:mm}{overnightSuffix}{textLocation}
             Name: {volunteerName}
 
             You're confirmed for this shift, starting in about 24 hours.
@@ -440,6 +444,7 @@ public static class EmailTemplates
         bool wasWaitlisted = false)
     {
         var subject = $"Update on your signup: {eventTitle}";
+        var overnightSuffix = SlotTimes.OvernightSuffix(startTime, endTime);
         var encodedSlotLabel = HttpUtility.HtmlEncode(slotLabel);
         var encodedLocation = string.IsNullOrWhiteSpace(location)
             ? null
@@ -474,7 +479,7 @@ public static class EmailTemplates
                               <td style="padding:16px;">
                                 <p style="margin:0 0 4px;font-size:14px;color:#18181b;"><strong>{encodedSlotLabel}</strong></p>
                                 <p style="margin:0 0 4px;font-size:14px;color:#18181b;">{eventDate:dddd d MMMM yyyy}</p>
-                                <p style="margin:0;font-size:14px;color:#3f3f46;">{startTime:HH:mm}&ndash;{endTime:HH:mm}</p>
+                                <p style="margin:0;font-size:14px;color:#3f3f46;">{startTime:HH:mm}&ndash;{endTime:HH:mm}{overnightSuffix}</p>
                                 {locationHtml}
                                 <p style="margin:12px 0 0;font-size:14px;color:#3f3f46;">Name: <strong>{HttpUtility.HtmlEncode(volunteerName)}</strong></p>
                               </td>
@@ -504,7 +509,7 @@ public static class EmailTemplates
 
             You've been removed from: {eventTitle}
             Shift: {slotLabel}
-            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}-{endTime:HH:mm}{textLocation}
+            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}-{endTime:HH:mm}{overnightSuffix}{textLocation}
             Name: {volunteerName}
 
             The organization has {(wasWaitlisted ? "removed you from the waitlist for this shift" : "removed you from this shift")}. You don't need to take any action.

@@ -27,14 +27,14 @@ public static class CalendarInviteBuilder
         string manageUrl,
         string uid)
     {
-        var start = eventDate.ToDateTime(startTime);
-        var end = eventDate.ToDateTime(endTime);
+        var start = SlotTimes.ResolveStart(eventDate, startTime);
+        var end = SlotTimes.ResolveEnd(eventDate, startTime, endTime);
         var stamp = DateTime.UtcNow;
 
         var textDescription = new StringBuilder();
         if (!string.IsNullOrWhiteSpace(description))
             textDescription.AppendLine(description);
-        textDescription.AppendLine($"Shift: {slotLabel} ({startTime:HH:mm}-{endTime:HH:mm})");
+        textDescription.AppendLine($"Shift: {slotLabel} ({startTime:HH:mm}-{endTime:HH:mm}{SlotTimes.OvernightSuffix(startTime, endTime)})");
         textDescription.Append("View or cancel your signup: ");
         textDescription.Append(manageUrl);
 
@@ -68,8 +68,8 @@ public static class CalendarInviteBuilder
         string slotLabel,
         string manageUrl)
     {
-        var start = eventDate.ToDateTime(startTime);
-        var end = eventDate.ToDateTime(endTime);
+        var start = SlotTimes.ResolveStart(eventDate, startTime);
+        var end = SlotTimes.ResolveEnd(eventDate, startTime, endTime);
         var dates = $"{FormatFloating(start)}/{FormatFloating(end)}";
         var details = string.IsNullOrWhiteSpace(description)
             ? $"Shift: {slotLabel}. View or cancel: {manageUrl}"

@@ -17,7 +17,7 @@ import { RequiredStar } from "@/components/ui/layout"
 import { useApi } from "@/hooks/useApi"
 import { formatApiError } from "@/lib/api"
 import { buildSlotCreatePayload, validateSlotBasics } from "@/lib/eventSlots"
-import { toTimeInputValue } from "@/lib/utils"
+import { isOvernightSlot, toTimeInputValue } from "@/lib/utils"
 
 export interface SlotDialogSlot {
   id: string
@@ -233,6 +233,9 @@ export function SlotDialog({
             <p className="muted-xs">
               {slot.signupCount} active signup(s) on this slot.
             </p>
+          )}
+          {!error && isOvernightSlot(startTime, endTime) && (
+            <p className="muted-xs">Ends next day (+1 day).</p>
           )}
           <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
             <input
