@@ -580,11 +580,11 @@ function SignupsTab({ event }: { event: RosterEvent }) {
   const scopedSignups: ScopedSignup[] = []
   if (isAllSelected || !selectedSlot) {
     for (const slot of event.slots) {
-      const sorted = [...slot.signups].sort(compareSignupsByStatus)
-      for (const s of sorted) {
+      for (const s of slot.signups) {
         scopedSignups.push({ ...s, slotId: slot.id, slotLabel: slot.label })
       }
     }
+    scopedSignups.sort(compareSignupsByStatus)
   } else {
     const sorted = [...selectedSlot.signups].sort(compareSignupsByStatus)
     for (const s of sorted) {
