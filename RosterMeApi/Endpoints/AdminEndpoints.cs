@@ -81,6 +81,12 @@ public static class AdminEndpoints
             .Produces(401)
             .Produces(404);
 
+        admin.MapPost("/signups/{id}/resend", ResendSignupConfirmation)
+            .Produces(204)
+            .Produces(401)
+            .Produces(404)
+            .Produces(409);
+
         admin.MapGet("/events/{id}", GetEvent)
             .Produces<RosterEventResponse>()
             .Produces(401)
@@ -721,6 +727,134 @@ public static class AdminEndpoints
 
             return Results.NoContent();
         });
+    }
+
+    private static async Task<IResult> ResendSignupConfirmation(Guid id, AppDbContext db, EmailOutboxService outbox, IOptions<EmailOptions> emailOptions, HttpContext http, CancellationToken ct)
+    {
+        var userId = GetUserId(http);
+        var signup = await db.Signups
+            .Include(s => s.TimeSlot).ThenInclude(s => s.Event).ThenInclude(e => e.Group)
+            .FirstOrDefaultAsync(s => s.Id == id && s.TimeSlot.Event.Group.GroupOwner == userId, ct);
+
+        if (signup is null) return Results.NotFound();
+
+        if (signup.Status == SignupStatus.Confirmed)
+            return Results.Conflict(new { error = "This signup is already confirmed.", code = "already_confirmed" });
+
+        if (signup.Status == SignupStatus.Waitlisted)
+            return Results.Conflict(new { error = "This signup is already on the waitlist.", code = "already_waitlisted" });
+
+        if (signup.Status == SignupStatus.Cancelled)
+            return Results.Conflict(new { error = "This signup was cancelled and cannot receive a confirmation email.", code = "signup_cancelled" });
+
+        if (signup.Status == SignupStatus.Removed)
+            return Results.Conflict(new { error = "This signup was removed and cannot receive a confirmation email.", code = "signup_removed" });
+
+        if (signup.Status != SignupStatus.Pending && signup.Status != SignupStatus.WaitlistPending)
+            return Results.Conflict(new { error = "Only pending signups can receive a confirmation email.", code = "signup_not_pending" });
+
+        var rawToken = TokenService.GenerateToken();
+        signup.ManagementTokenHash = TokenService.HashToken(rawToken);
+
+        var slot = signup.TimeSlot;
+        if (signup.Status == SignupStatus.WaitlistPending)
+        {
+            var position = await WaitlistService.GetWaitlistCountAsync(db, slot.Id, ct) + 1;
+            await EnqueueWaitlistConfirmationEmail(db, outbox, emailOptions, signup, slot, rawToken, position, ct);
+        }
+        else
+        {
+            await EnqueueConfirmationEmail(db, outbox, emailOptions, signup, slot, rawToken, null, ct);
+        }
+
+        // EnqueueAsync saves changes, persisting the token rotation and the outbox row atomically.
+        return Results.NoContent();
+    }
+
+    private static async Task EnqueueConfirmationEmail(
+        AppDbContext db,
+        EmailOutboxService outbox,
+        IOptions<EmailOptions> emailOptions,
+        Signup signup,
+        TimeSlot slot,
+        string rawToken,
+        int? waitlistPosition,
+        CancellationToken ct)
+    {
+        if (waitlistPosition.HasValue)
+        {
+            await EnqueueWaitlistConfirmationEmail(db, outbox, emailOptions, signup, slot, rawToken, waitlistPosition.Value, ct);
+            return;
+        }
+
+        var manageUrl = $"{emailOptions.Value.BaseUrl.TrimEnd('/')}/signup/manage/{rawToken}";
+        var evt = slot.Event;
+        var links = CalendarInviteBuilder.BuildLinks(
+            evt.Title,
+            evt.Description,
+            evt.Location,
+            evt.Date,
+            slot.StartTime,
+            slot.EndTime,
+            slot.Label,
+            manageUrl);
+        var ics = CalendarInviteBuilder.BuildIcs(
+            evt.Title,
+            evt.Description,
+            evt.Location,
+            evt.Date,
+            slot.StartTime,
+            slot.EndTime,
+            slot.Label,
+            manageUrl,
+            signup.Id.ToString());
+        var (subject, html, text) = EmailTemplates.BuildSignupConfirmation(
+            signup.VolunteerName,
+            slot.Event.Group.Name,
+            slot.Event.Title,
+            slot.Label,
+            slot.Event.Date,
+            slot.StartTime,
+            slot.EndTime,
+            manageUrl,
+            evt.Location,
+            links,
+            hasCalendarAttachment: true);
+
+        var attachment = new EmailAttachment(
+            CalendarInviteBuilder.IcsFileName(evt.Title),
+            "text/calendar",
+            System.Text.Encoding.UTF8.GetBytes(ics));
+
+        await outbox.EnqueueAsync(signup.Email, subject, html, text, attachment, ct);
+    }
+
+    private static async Task EnqueueWaitlistConfirmationEmail(
+        AppDbContext db,
+        EmailOutboxService outbox,
+        IOptions<EmailOptions> emailOptions,
+        Signup signup,
+        TimeSlot slot,
+        string rawToken,
+        int waitlistPosition,
+        CancellationToken ct)
+    {
+        var manageUrl = $"{emailOptions.Value.BaseUrl.TrimEnd('/')}/signup/manage/{rawToken}";
+
+        var evt = slot.Event;
+        var (subject, html, text) = EmailTemplates.BuildWaitlistConfirmation(
+            signup.VolunteerName,
+            evt.Group.Name,
+            evt.Title,
+            slot.Label,
+            evt.Date,
+            slot.StartTime,
+            slot.EndTime,
+            manageUrl,
+            waitlistPosition,
+            evt.Location);
+
+        await outbox.EnqueueAsync(signup.Email, subject, html, text, ct: ct);
     }
 
     // --- Event Detail ---
