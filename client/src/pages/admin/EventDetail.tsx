@@ -417,7 +417,7 @@ function toSlotDialogSlot(slot: RosterEvent["slots"][number]): SlotDialogSlot {
 }
 
 function SignupsTab({ event }: { event: RosterEvent }) {
-  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null)
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>("all")
   const [expandedSignupId, setExpandedSignupId] = useState<string | null>(null)
   const [slotsExpanded, setSlotsExpanded] = useState(false)
   const [pendingSignupId, setPendingSignupId] = useState<string | null>(null)
@@ -453,16 +453,26 @@ function SignupsTab({ event }: { event: RosterEvent }) {
   const visibleSlots = event.slots.filter((slot) =>
     slot.label.toLowerCase().includes(query.trim().toLowerCase())
   )
+  const isAllSelected = selectedSlotId === "all"
   const selectedSlot =
-    event.slots.find((slot) => slot.id === selectedSlotId) ??
-    visibleSlots[0] ??
-    null
-  // Below lg the slot list collapses to the selected slot + an expander so
+    event.slots.find((slot) => slot.id === selectedSlotId) ?? null
+  // Below lg the slot list collapses to the selected row + an expander so
   // the roster isn't buried under a long list. If the selection is filtered
   // out, fall back to showing every visible row.
   const selectedIsVisible =
+    !isAllSelected &&
     selectedSlot != null &&
     visibleSlots.some((slot) => slot.id === selectedSlot.id)
+  const listCollapsed = (selectedIsVisible || isAllSelected) && !slotsExpanded
+  const totalActive = event.slots.reduce(
+    (n, s) => n + activeSignupCount(s.signups),
+    0
+  )
+  const totalCapacity = event.slots.reduce((n, s) => n + s.capacity, 0)
+  const totalWaitlisted = event.slots.reduce(
+    (n, s) => n + waitlistCount(s.signups),
+    0
+  )
 
   const handleDeleteSignup = async (signupId: string, notify?: boolean) => {
     try {
@@ -479,7 +489,9 @@ function SignupsTab({ event }: { event: RosterEvent }) {
 
   const confirmRemoveSignup = () => {
     if (!pendingSignupId) return
-    const signup = selectedSlot?.signups.find((s) => s.id === pendingSignupId)
+    const signup = event.slots
+      .flatMap((slot) => slot.signups)
+      .find((s) => s.id === pendingSignupId)
     if (
       removalPolicy === "Ask" &&
       signup &&
@@ -518,7 +530,7 @@ function SignupsTab({ event }: { event: RosterEvent }) {
     try {
       const affected = notifiableSignupCount(deletingSlot.signups)
       await api.deleteSlot(event.id, deletingSlot.id, notify)
-      if (deletingSlot.id === selectedSlotId) setSelectedSlotId(null)
+      if (deletingSlot.id === selectedSlotId) setSelectedSlotId("all")
       toast.success(
         notify === true && affected > 0
           ? `Time slot deleted — ${affected} volunteer(s) notified`
@@ -555,11 +567,36 @@ function SignupsTab({ event }: { event: RosterEvent }) {
     }
   }
 
-  const sortedSignups = selectedSlot
-    ? [...selectedSlot.signups].sort(compareSignupsByStatus)
-    : []
   const signupFilter = signupQuery.trim().toLowerCase()
-  const filteredSignups = sortedSignups.filter(
+  const signupSlotById = new Map(
+    event.slots.flatMap((slot) =>
+      slot.signups.map((s) => [s.id, slot] as const)
+    )
+  )
+  type ScopedSignup = RosterEvent["slots"][number]["signups"][number] & {
+    slotId: string
+    slotLabel: string
+  }
+  const scopedSignups: ScopedSignup[] = []
+  if (isAllSelected || !selectedSlot) {
+    for (const slot of event.slots) {
+      const sorted = [...slot.signups].sort(compareSignupsByStatus)
+      for (const s of sorted) {
+        scopedSignups.push({ ...s, slotId: slot.id, slotLabel: slot.label })
+      }
+    }
+  } else {
+    const sorted = [...selectedSlot.signups].sort(compareSignupsByStatus)
+    for (const s of sorted) {
+      scopedSignups.push({
+        ...s,
+        slotId: selectedSlot.id,
+        slotLabel: selectedSlot.label,
+      })
+    }
+  }
+  const totalScopedSignups = scopedSignups.length
+  const filteredSignups = scopedSignups.filter(
     (s) =>
       s.volunteerName.toLowerCase().includes(signupFilter) ||
       s.email.toLowerCase().includes(signupFilter)
@@ -571,14 +608,19 @@ function SignupsTab({ event }: { event: RosterEvent }) {
   const pendingResendSignup =
     pendingResendSignupId === null
       ? null
-      : (selectedSlot?.signups.find((s) => s.id === pendingResendSignupId) ??
-        null)
+      : (event.slots
+        .flatMap((slot) => slot.signups)
+        .find((s) => s.id === pendingResendSignupId) ?? null)
   const notifySignup =
     notifySignupId === null
       ? null
       : (event.slots
         .flatMap((slot) => slot.signups)
         .find((s) => s.id === notifySignupId) ?? null)
+  const notifySlotLabel =
+    (notifySignupId ? signupSlotById.get(notifySignupId)?.label : null) ??
+    selectedSlot?.label ??
+    "this slot"
 
   return (
     <>
@@ -615,7 +657,7 @@ function SignupsTab({ event }: { event: RosterEvent }) {
                 <>
                   Email <strong>{notifySignup.volunteerName}</strong> (
                   {notifySignup.email}) that they were removed from{" "}
-                  {selectedSlot?.label ?? "this slot"}?
+                  {notifySlotLabel}?
                 </>
               ) : (
                 "Email the participant that they were removed?"
@@ -788,6 +830,51 @@ function SignupsTab({ event }: { event: RosterEvent }) {
                 No timeslots match.
               </p>
             )}
+            {event.slots.length > 0 && (
+              <div
+                className={cn(
+                  "flex items-center gap-1 rounded-none border-l-4 py-2 pr-2 pl-4 transition-colors",
+                  isAllSelected
+                    ? "border-l-green-700"
+                    : "border-l-transparent bg-green-50 hover:bg-green-100 lg:border-r lg:border-r-border dark:bg-green-950 dark:hover:bg-green-900"
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedSlotId("all")
+                    setExpandedSignupId(null)
+                    setSlotsExpanded(false)
+                  }}
+                  aria-pressed={isAllSelected}
+                  className="min-w-0 flex-1 text-left"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium">
+                        All slots
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {event.slots.length}{" "}
+                        {event.slots.length === 1 ? "slot" : "slots"} ·
+                        search everyone
+                      </div>
+                    </div>
+                    <Badge
+                      variant={
+                        totalCapacity > 0 && totalActive >= totalCapacity
+                          ? "destructive"
+                          : "secondary"
+                      }
+                    >
+                      {totalActive}/{totalCapacity}
+                      {totalWaitlisted > 0 &&
+                        ` · ${totalWaitlisted} waiting`}
+                    </Badge>
+                  </div>
+                </button>
+              </div>
+            )}
             {visibleSlots.map((slot) => {
               const count = activeSignupCount(slot.signups)
               const waiting = waitlistCount(slot.signups)
@@ -801,8 +888,7 @@ function SignupsTab({ event }: { event: RosterEvent }) {
                       ? "border-l-green-700"
                       : "border-l-transparent bg-green-50 hover:bg-green-100 lg:border-r lg:border-r-border dark:bg-green-950 dark:hover:bg-green-900",
                     !isSelected &&
-                      !slotsExpanded &&
-                      selectedIsVisible &&
+                      listCollapsed &&
                       "max-lg:hidden"
                   )}
                 >
@@ -862,7 +948,10 @@ function SignupsTab({ event }: { event: RosterEvent }) {
                 </div>
               )
             })}
-            {visibleSlots.length > 1 && selectedIsVisible && (
+            {((isAllSelected && visibleSlots.length > 0) ||
+              (!isAllSelected &&
+                visibleSlots.length > 1 &&
+                selectedIsVisible)) && (
               <button
                 type="button"
                 onClick={() => setSlotsExpanded((v) => !v)}
@@ -887,47 +976,78 @@ function SignupsTab({ event }: { event: RosterEvent }) {
           />
         </div>
         <AdminPageBody>
-          {selectedSlot ? (
+          {event.slots.length === 0 ? (
+            <EmptyState>No time slots for this event.</EmptyState>
+          ) : !isAllSelected && !selectedSlot ? (
+            <EmptyState>No time slots match your search.</EmptyState>
+          ) : (
             <AdminPageCenter>
-              <DataCard>
-                <DataCardHeader className="flex-col items-stretch gap-1 px-4 pt-3 pb-0">
-                  <div className="flex flex-wrap items-start justify-between gap-2 text-sm">
-                    <span className="min-w-0 break-words">
-                      {selectedSlot.label}
-                    </span>
-                    <span className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                      <Badge
-                        variant={
-                          selectedSlot.allowWaitlist ? "outline" : "secondary"
-                        }
-                        title={
-                          selectedSlot.allowWaitlist
-                            ? "Participants can join the waitlist when this slot is full"
-                            : "Waitlist disabled — full slots reject new signups"
-                        }
-                      >
-                        {selectedSlot.allowWaitlist
-                          ? "Waitlist on"
-                          : "No waitlist"}
-                      </Badge>
-                    </span>
-                  </div>
-                  <p className="muted-xs mt-0.5">
-                    {formatTime(selectedSlot.startTime)}&ndash;
-                    {formatTime(selectedSlot.endTime)}
-                    {overnightSuffix(
-                      selectedSlot.startTime,
-                      selectedSlot.endTime
-                    )}
-                  </p>
-                </DataCardHeader>
-                <DataCardContent className="pt-2 pb-3">
-                  <CapacityBar
-                    filled={activeCount}
-                    capacity={selectedSlot.capacity}
-                  />
-                </DataCardContent>
-              </DataCard>
+              {isAllSelected || !selectedSlot ? (
+                <DataCard>
+                  <DataCardHeader className="flex-col items-stretch gap-1 px-4 pt-3 pb-0">
+                    <div className="flex flex-wrap items-start justify-between gap-2 text-sm">
+                      <span className="min-w-0 break-words">All slots</span>
+                      <span className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                        <Badge variant="secondary">
+                          {event.slots.length}{" "}
+                          {event.slots.length === 1 ? "slot" : "slots"}
+                        </Badge>
+                      </span>
+                    </div>
+                    <p className="muted-xs mt-0.5">
+                      {totalActive} of {totalCapacity} spots filled
+                      {totalWaitlisted > 0 &&
+                      ` · ${totalWaitlisted} on the waitlist`}
+                    </p>
+                  </DataCardHeader>
+                  <DataCardContent className="pt-2 pb-3">
+                    <CapacityBar
+                      filled={totalActive}
+                      capacity={totalCapacity}
+                    />
+                  </DataCardContent>
+                </DataCard>
+              ) : (
+                <DataCard>
+                  <DataCardHeader className="flex-col items-stretch gap-1 px-4 pt-3 pb-0">
+                    <div className="flex flex-wrap items-start justify-between gap-2 text-sm">
+                      <span className="min-w-0 break-words">
+                        {selectedSlot.label}
+                      </span>
+                      <span className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                        <Badge
+                          variant={
+                            selectedSlot.allowWaitlist ? "outline" : "secondary"
+                          }
+                          title={
+                            selectedSlot.allowWaitlist
+                              ? "Participants can join the waitlist when this slot is full"
+                              : "Waitlist disabled — full slots reject new signups"
+                          }
+                        >
+                          {selectedSlot.allowWaitlist
+                            ? "Waitlist on"
+                            : "No waitlist"}
+                        </Badge>
+                      </span>
+                    </div>
+                    <p className="muted-xs mt-0.5">
+                      {formatTime(selectedSlot.startTime)}&ndash;
+                      {formatTime(selectedSlot.endTime)}
+                      {overnightSuffix(
+                        selectedSlot.startTime,
+                        selectedSlot.endTime
+                      )}
+                    </p>
+                  </DataCardHeader>
+                  <DataCardContent className="pt-2 pb-3">
+                    <CapacityBar
+                      filled={activeCount}
+                      capacity={selectedSlot.capacity}
+                    />
+                  </DataCardContent>
+                </DataCard>
+              )}
               <DataCard>
                 <DataCardHeader>
                   <DataCardTitle
@@ -948,9 +1068,11 @@ function SignupsTab({ event }: { event: RosterEvent }) {
                 </DataCardHeader>
                 <DataCardDivider />
                 <DataCardContent variant="rows">
-                  {sortedSignups.length === 0 ? (
+                  {totalScopedSignups === 0 ? (
                     <p className="muted py-2 text-center">
-                      No signups for this slot yet.
+                      {isAllSelected
+                        ? "No signups for this event yet."
+                        : "No signups for this slot yet."}
                     </p>
                   ) : filteredSignups.length === 0 ? (
                     <p className="muted py-2 text-center">
@@ -958,12 +1080,24 @@ function SignupsTab({ event }: { event: RosterEvent }) {
                     </p>
                   ) : (
                     <>
+                      {signupFilter && (
+                        <p className="muted-xs px-4 pt-2">
+                          Showing {filteredSignups.length} of{" "}
+                          {totalScopedSignups}{" "}
+                          {isAllSelected
+                            ? "signups across all slots"
+                            : "signups"}
+                        </p>
+                      )}
                       <TableBleed>
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b text-left text-muted-foreground">
                               {hasAnyAnswers && <th className="w-8 py-2" />}
                               <th className="py-2 font-medium">Name</th>
+                              {isAllSelected && (
+                                <th className="py-2 font-medium">Slot</th>
+                              )}
                               <th className="py-2 font-medium">Email</th>
                               <th className="py-2 font-medium">Signed up</th>
                               <th className="py-2 font-medium">Status</th>
@@ -983,6 +1117,8 @@ function SignupsTab({ event }: { event: RosterEvent }) {
                                   questions={event.questions}
                                   hasAnswers={hasAnswers}
                                   showExpand={hasAnyAnswers}
+                                  showSlot={isAllSelected}
+                                  slotLabel={s.slotLabel}
                                   expanded={expanded}
                                   onToggle={() =>
                                     setExpandedSignupId(expanded ? null : s.id)
@@ -991,6 +1127,10 @@ function SignupsTab({ event }: { event: RosterEvent }) {
                                   onResend={() =>
                                     setPendingResendSignupId(s.id)
                                   }
+                                  onViewSlot={() => {
+                                    setSelectedSlotId(s.slotId)
+                                    setExpandedSignupId(null)
+                                  }}
                                   isResending={resendingSignupId === s.id}
                                 />
                               )
@@ -1009,12 +1149,18 @@ function SignupsTab({ event }: { event: RosterEvent }) {
                               answers={signupAnswers}
                               questions={event.questions}
                               hasAnswers={signupAnswers.length > 0}
+                              showSlot={isAllSelected}
+                              slotLabel={s.slotLabel}
                               expanded={expanded}
                               onToggle={() =>
                                 setExpandedSignupId(expanded ? null : s.id)
                               }
                               onRemove={() => setPendingSignupId(s.id)}
                               onResend={() => setPendingResendSignupId(s.id)}
+                              onViewSlot={() => {
+                                setSelectedSlotId(s.slotId)
+                                setExpandedSignupId(null)
+                              }}
                               isResending={resendingSignupId === s.id}
                             />
                           )
@@ -1025,12 +1171,6 @@ function SignupsTab({ event }: { event: RosterEvent }) {
                 </DataCardContent>
               </DataCard>
             </AdminPageCenter>
-          ) : (
-            <EmptyState>
-              {event.slots.length === 0
-                ? "No time slots for this event."
-                : "No time slots match your search."}
-            </EmptyState>
           )}
         </AdminPageBody>
       </div>
@@ -1795,10 +1935,13 @@ interface SignupRowProps {
   questions: { id: string; label: string; isDeleted: boolean }[]
   hasAnswers: boolean
   showExpand: boolean
+  showSlot?: boolean
+  slotLabel?: string
   expanded: boolean
   onToggle: () => void
   onRemove: () => void
   onResend: () => void
+  onViewSlot?: () => void
   isResending: boolean
 }
 
@@ -1813,10 +1956,13 @@ interface SignupCardProps {
   answers: { questionId: string; value: string }[]
   questions: { id: string; label: string; isDeleted: boolean }[]
   hasAnswers: boolean
+  showSlot?: boolean
+  slotLabel?: string
   expanded: boolean
   onToggle: () => void
   onRemove: () => void
   onResend: () => void
+  onViewSlot?: () => void
   isResending: boolean
 }
 
@@ -1829,10 +1975,13 @@ function SignupCard({
   answers,
   questions,
   hasAnswers,
+  showSlot,
+  slotLabel,
   expanded,
   onToggle,
   onRemove,
   onResend,
+  onViewSlot,
   isResending,
 }: SignupCardProps) {
   const questionById = new Map(questions.map((q) => [q.id, q]))
@@ -1865,6 +2014,17 @@ function SignupCard({
           <RowSecondary className="mt-0.5 truncate">
             {signup.email}
           </RowSecondary>
+          {showSlot && slotLabel && (
+            <div className="mt-1">
+              <button
+                type="button"
+                onClick={onViewSlot}
+                title={`Go to ${slotLabel}`}
+              >
+                <Badge variant="outline">{slotLabel}</Badge>
+              </button>
+            </div>
+          )}
           <RowSecondary>
             {new Date(signup.createdAt).toLocaleDateString()}
           </RowSecondary>
@@ -1926,10 +2086,13 @@ function SignupRow({
   questions,
   hasAnswers,
   showExpand,
+  showSlot,
+  slotLabel,
   expanded,
   onToggle,
   onRemove,
   onResend,
+  onViewSlot,
   isResending,
 }: SignupRowProps) {
   const questionById = new Map(questions.map((q) => [q.id, q]))
@@ -1956,6 +2119,21 @@ function SignupRow({
           </td>
         )}
         <td className="py-2">{signup.volunteerName}</td>
+        {showSlot && (
+          <td className="py-2">
+            {slotLabel ? (
+              <button
+                type="button"
+                onClick={onViewSlot}
+                title={`Go to ${slotLabel}`}
+              >
+                <Badge variant="outline">{slotLabel}</Badge>
+              </button>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
+          </td>
+        )}
         <td className="py-2 break-all text-muted-foreground">{signup.email}</td>
         <td className="py-2 text-muted-foreground">
           {new Date(signup.createdAt).toLocaleDateString()}
@@ -1992,7 +2170,7 @@ function SignupRow({
       {expanded && hasAnswers && (
         <tr className="border-b bg-muted/40 last:border-0">
           {showExpand && <td />}
-          <td colSpan={5} className="py-2 pr-2">
+          <td colSpan={showSlot ? 6 : 5} className="py-2 pr-2">
             <dl className="space-y-1">
               {answers.map((answer) => {
                 const question = questionById.get(answer.questionId)
