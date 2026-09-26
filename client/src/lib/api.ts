@@ -206,11 +206,11 @@ export function createAdminApi(getToken: () => Promise<string | null>) {
       await checkVoid(res)
     },
 
-    createInviteLink: async (eventId: string) => {
+    createInviteLink: async (eventId: string, name?: string) => {
       const res = await fetch(`${BASE}/events/${eventId}/invite-links`, {
         method: "POST",
         headers: await h(),
-        body: JSON.stringify({}),
+        body: JSON.stringify(name?.trim() ? { name: name.trim() } : {}),
       })
       return checkJson<InviteLink>(res)
     },
@@ -220,6 +220,15 @@ export function createAdminApi(getToken: () => Promise<string | null>) {
         headers: await h(),
       })
       return checkJson<InviteLink[]>(res)
+    },
+
+    updateInviteLink: async (id: string, name: string) => {
+      const res = await fetch(`${BASE}/invite-links/${id}`, {
+        method: "PUT",
+        headers: await h(),
+        body: JSON.stringify({ name }),
+      })
+      return checkJson<InviteLink>(res)
     },
 
     revokeInviteLink: async (id: string) => {

@@ -43,8 +43,17 @@ import {
   downloadCsv,
 } from "@/lib/csv"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   AdminHeaderBand,
   AdminHeaderEyebrow,
@@ -67,6 +76,7 @@ import {
   GhostAddRow,
   MetaRow,
   MobileRowList,
+  RequiredStar,
   RowIconButton,
   RowPrimary,
   RowSecondary,
@@ -887,6 +897,11 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
   const [pendingLink, setPendingLink] = useState<InviteLink | null>(null)
   const [revoking, setRevoking] = useState(false)
   const [inviteQuery, setInviteQuery] = useState("")
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createName, setCreateName] = useState("")
+  const [editing, setEditing] = useState<InviteLink | null>(null)
+  const [editName, setEditName] = useState("")
+  const [saving, setSaving] = useState(false)
 
   const { data: links, isLoading } = useQuery({
     queryKey: ["inviteLinks", eventId],
@@ -895,28 +910,60 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
 
   const inviteFilter = inviteQuery.trim().toLowerCase()
   const visibleLinks = (links ?? [])
-    .map((link, index) => ({ link, name: `Invite link ${index + 1}` }))
     .filter(
-      ({ link, name }) =>
-        name.toLowerCase().includes(inviteFilter) ||
+      (link) =>
+        (link.name ?? "").toLowerCase().includes(inviteFilter) ||
         `${window.location.origin}/invite/${link.code}`
           .toLowerCase()
           .includes(inviteFilter)
     )
-    .sort((a, b) => Number(b.link.isActive) - Number(a.link.isActive))
+    .sort((a, b) => Number(b.isActive) - Number(a.isActive))
 
-  const handleGenerate = async () => {
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ["inviteLinks", eventId] })
+
+  const handleGenerate = async (e?: React.FormEvent) => {
+    e?.preventDefault()
     setGenerating(true)
     try {
-      const link = await api.createInviteLink(eventId)
+      const trimmed = createName.trim()
+      const link = await api.createInviteLink(
+        eventId,
+        trimmed ? trimmed : undefined
+      )
       const url = `${window.location.origin}/invite/${link.code}`
       await copyToClipboard(url)
       toast.success("Invite link copied to clipboard")
-      queryClient.invalidateQueries({ queryKey: ["inviteLinks", eventId] })
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to generate link")
+      setCreateOpen(false)
+      setCreateName("")
+      await invalidate()
+    } catch (err) {
+      toast.error(formatApiError(err, "Failed to generate link"))
     } finally {
       setGenerating(false)
+    }
+  }
+
+  const openEdit = (link: InviteLink) => {
+    setEditing(link)
+    setEditName(link.name ?? "")
+  }
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editing) return
+    const trimmed = editName.trim()
+    if (!trimmed || trimmed === editing.name) return
+    setSaving(true)
+    try {
+      await api.updateInviteLink(editing.id, trimmed)
+      toast.success("Invite link renamed")
+      setEditing(null)
+      await invalidate()
+    } catch (err) {
+      toast.error(formatApiError(err, "Failed to rename invite link"))
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -933,7 +980,7 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
       await api.revokeInviteLink(pendingLink.id)
       toast.success("Invite link revoked")
       setPendingLink(null)
-      queryClient.invalidateQueries({ queryKey: ["inviteLinks", eventId] })
+      await invalidate()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to revoke link")
     } finally {
@@ -978,26 +1025,29 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
                     <tr className="border-b text-left text-muted-foreground">
                       <th className="w-40 py-2 font-medium">Name</th>
                       <th className="py-2 font-medium">Link</th>
-                      <th className="w-24 py-2 font-medium">Status</th>
-                      <th className="w-20 py-2" />
+                      <th className="w-28 py-2 pr-3 text-right font-medium">
+                        Signups
+                      </th>
+                      <th className="w-24 py-2 pl-1 font-medium">Status</th>
+                      <th className="w-28 py-2" />
                     </tr>
                   </thead>
                   <tbody>
                     {visibleLinks.length === 0 && (
                       <tr>
-                        <td colSpan={4} className="muted px-4 py-2 text-center">
+                        <td colSpan={5} className="muted px-4 py-2 text-center">
                           {links?.length === 0
                             ? "No invite links yet."
                             : "No invite links match your search."}
                         </td>
                       </tr>
                     )}
-                    {visibleLinks.map(({ link, name }) => {
+                    {visibleLinks.map((link) => {
                       const url = `${window.location.origin}/invite/${link.code}`
                       return (
                         <tr key={link.id} className="border-b last:border-0">
                           <td className="py-2 text-sm font-medium">
-                            <span className="block truncate">{name}</span>
+                            <span className="block truncate">{link.name}</span>
                           </td>
                           <td className="py-2">
                             <span
@@ -1007,7 +1057,13 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
                               {url}
                             </span>
                           </td>
-                          <td className="py-2">
+                          <td className="py-2 pr-3 text-right">
+                            <Badge variant="secondary" className="whitespace-nowrap">
+                              {link.signupCount}{" "}
+                              {link.signupCount === 1 ? "signup" : "signups"}
+                            </Badge>
+                          </td>
+                          <td className="py-2 pl-1">
                             <Badge
                               variant={link.isActive ? "default" : "secondary"}
                             >
@@ -1016,6 +1072,13 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
                           </td>
                           <td className="py-2">
                             <div className="flex items-center justify-end gap-1">
+                              <RowIconButton
+                                onClick={() => openEdit(link)}
+                                title={`Rename ${link.name}`}
+                                aria-label={`Rename ${link.name}`}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </RowIconButton>
                               <Button
                                 variant="outline"
                                 size="icon"
@@ -1054,17 +1117,22 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
                       : "No invite links match your search."}
                   </li>
                 )}
-                {visibleLinks.map(({ link, name }) => {
+                {visibleLinks.map((link) => {
                   const url = `${window.location.origin}/invite/${link.code}`
                   return (
                     <li key={link.id} className="px-4 py-2">
                       <div className="flex items-center justify-between gap-2">
-                        <RowPrimary>{name}</RowPrimary>
-                        <Badge
-                          variant={link.isActive ? "default" : "secondary"}
-                        >
-                          {link.isActive ? "Active" : "Revoked"}
-                        </Badge>
+                        <RowPrimary>{link.name}</RowPrimary>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <Badge variant="secondary">
+                            {link.signupCount}
+                          </Badge>
+                          <Badge
+                            variant={link.isActive ? "default" : "secondary"}
+                          >
+                            {link.isActive ? "Active" : "Revoked"}
+                          </Badge>
+                        </div>
                       </div>
                       <div className="mt-1 flex items-center gap-2">
                         <p
@@ -1073,6 +1141,16 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
                         >
                           {url}
                         </p>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          onClick={() => openEdit(link)}
+                          title="Rename"
+                          aria-label={`Rename ${link.name}`}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
                         <Button
                           variant="outline"
                           size="icon"
@@ -1100,8 +1178,14 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
                   )
                 })}
               </MobileRowList>
-              <GhostAddRow onClick={handleGenerate} disabled={generating}>
-                {generating ? "Generating..." : "Generate link"}
+              <GhostAddRow
+                onClick={() => {
+                  setCreateName(`Invite link ${(links?.length ?? 0) + 1}`)
+                  setCreateOpen(true)
+                }}
+                disabled={generating}
+              >
+                Generate link
               </GhostAddRow>
             </>
           )}
@@ -1120,6 +1204,99 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
         loadingLabel="Revoking..."
         onConfirm={handleRevoke}
       />
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New invite link</DialogTitle>
+            <DialogDescription>
+              Name it by where you will share it — e.g. Facebook, WhatsApp,
+              or church bulletin.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleGenerate} className="stack-md">
+            <div className="field-stack">
+              <Label htmlFor="invite-create-name">
+                <span>
+                  Link name <RequiredStar />
+                </span>
+              </Label>
+              <Input
+                id="invite-create-name"
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                required
+                maxLength={100}
+                placeholder="Facebook"
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCreateOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={generating || !createName.trim()}
+              >
+                {generating ? "Generating..." : "Generate & copy"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={editing !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename invite link</DialogTitle>
+            <DialogDescription>
+              The link itself stays the same — only the name changes.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEdit} className="stack-md">
+            <div className="field-stack">
+              <Label htmlFor="invite-edit-name">
+                <span>
+                  Link name <RequiredStar />
+                </span>
+              </Label>
+              <Input
+                id="invite-edit-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                required
+                maxLength={100}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditing(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={
+                  saving ||
+                  !editName.trim() ||
+                  editName.trim() === editing?.name
+                }
+              >
+                {saving ? "Saving..." : "Save"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

@@ -94,10 +94,16 @@ public static class AdminEndpoints
 
         admin.MapPost("/events/{eventId}/invite-links", CreateInviteLink)
             .Produces<InviteLinkResponse>()
+            .Produces(400)
             .Produces(401)
             .Produces(404);
         admin.MapGet("/events/{eventId}/invite-links", ListInviteLinks)
             .Produces<IEnumerable<InviteLinkResponse>>()
+            .Produces(401)
+            .Produces(404);
+        admin.MapPut("/invite-links/{id}", UpdateInviteLink)
+            .Produces<InviteLinkResponse>()
+            .Produces(400)
             .Produces(401)
             .Produces(404);
         admin.MapPut("/invite-links/{id}/revoke", RevokeInviteLink)
@@ -882,7 +888,7 @@ public static class AdminEndpoints
 
     // --- Invite Links ---
 
-    private static async Task<IResult> CreateInviteLink(Guid eventId, DateTime? expiresAt, AppDbContext db, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> CreateInviteLink(Guid eventId, CreateInviteLinkRequest? request, DateTime? expiresAt, AppDbContext db, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
         var evt = await db.Events
@@ -891,20 +897,26 @@ public static class AdminEndpoints
 
         if (evt is null) return Results.NotFound();
 
+        var resolvedExpiresAt = request?.ExpiresAt ?? expiresAt ?? DateTime.UtcNow.AddDays(7);
+        var name = string.IsNullOrWhiteSpace(request?.Name)
+            ? $"Invite link {await db.InviteLinks.CountAsync(l => l.EventId == eventId, ct) + 1}"
+            : Norm(request!.Name!);
+
         var link = new InviteLink
         {
             Id = Guid.NewGuid(),
             EventId = eventId,
+            Name = name,
             Code = GenerateInviteCode(),
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
-            ExpiresAt = expiresAt ?? DateTime.UtcNow.AddDays(7)
+            ExpiresAt = resolvedExpiresAt
         };
 
         db.InviteLinks.Add(link);
         await db.SaveChangesAsync(ct);
 
-        return Results.Ok(new InviteLinkResponse(link.Id, link.EventId, link.Code, link.IsActive, link.CreatedAt, link.ExpiresAt));
+        return Results.Ok(new InviteLinkResponse(link.Id, link.EventId, link.Name, link.Code, link.IsActive, link.CreatedAt, link.ExpiresAt, 0));
     }
 
     private static async Task<IResult> ListInviteLinks(Guid eventId, AppDbContext db, HttpContext http, CancellationToken ct)
@@ -921,7 +933,37 @@ public static class AdminEndpoints
             .OrderByDescending(l => l.CreatedAt)
             .ToListAsync(ct);
 
-        return Results.Ok(links.Select(l => new InviteLinkResponse(l.Id, l.EventId, l.Code, l.IsActive, l.CreatedAt, l.ExpiresAt)));
+        var linkIds = links.Select(l => l.Id).ToList();
+        var counts = await db.Signups
+            .Where(s => s.InviteLinkId != null && linkIds.Contains(s.InviteLinkId.Value)
+                && s.Status != SignupStatus.Cancelled && s.Status != SignupStatus.Removed)
+            .GroupBy(s => s.InviteLinkId!.Value)
+            .Select(g => new { InviteLinkId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.InviteLinkId, g => g.Count, ct);
+
+        return Results.Ok(links.Select(l => new InviteLinkResponse(
+            l.Id, l.EventId, l.Name, l.Code, l.IsActive, l.CreatedAt, l.ExpiresAt,
+            counts.TryGetValue(l.Id, out var c) ? c : 0)));
+    }
+
+    private static async Task<IResult> UpdateInviteLink(Guid id, UpdateInviteLinkRequest request, AppDbContext db, HttpContext http, CancellationToken ct)
+    {
+        var userId = GetUserId(http);
+        var link = await db.InviteLinks
+            .Include(l => l.Event!).ThenInclude(e => e.Group)
+            .FirstOrDefaultAsync(l => l.Id == id && l.EventId != null, ct);
+
+        if (link is null || link.Event is null || link.Event.Group.GroupOwner != userId)
+            return Results.NotFound();
+
+        link.Name = Norm(request.Name);
+        await db.SaveChangesAsync(ct);
+
+        var signupCount = await db.Signups.CountAsync(
+            s => s.InviteLinkId == id && s.Status != SignupStatus.Cancelled && s.Status != SignupStatus.Removed, ct);
+
+        return Results.Ok(new InviteLinkResponse(
+            link.Id, link.EventId, link.Name, link.Code, link.IsActive, link.CreatedAt, link.ExpiresAt, signupCount));
     }
 
     private static async Task<IResult> RevokeInviteLink(Guid id, AppDbContext db, HttpContext http, CancellationToken ct)
@@ -1108,11 +1150,18 @@ public record QuestionUpsert(
     }
 }
 
+public record CreateInviteLinkRequest(
+    [property: NotWhitespace, StringLength(100)] string? Name,
+    DateTime? ExpiresAt);
+
+public record UpdateInviteLinkRequest(
+    [property: Required, NotWhitespace, StringLength(100)] string Name);
+
 // --- Response DTOs ---
 
 public record GroupResponse(Guid Id, string Name, DateTime CreatedAt, int EventCount);
 
-public record InviteLinkResponse(Guid Id, Guid? EventId, string Code, bool IsActive, DateTime CreatedAt, DateTime? ExpiresAt);
+public record InviteLinkResponse(Guid Id, Guid? EventId, string Name, string Code, bool IsActive, DateTime CreatedAt, DateTime? ExpiresAt, int SignupCount);
 
 public record EventResponse(Guid Id, Guid GroupId, string Title, string? Description, string? Location, DateOnly Date, DateTime CreatedAt);
 

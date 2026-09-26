@@ -69,6 +69,11 @@ public class AppDbContext : DbContext
                 .WithMany(o => o.Signups)
                 .HasForeignKey(s => s.TimeSlotId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(s => s.InviteLink)
+                .WithMany(l => l.Signups)
+                .HasForeignKey(s => s.InviteLinkId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(e => e.InviteLinkId);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
         });
 
@@ -118,6 +123,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<InviteLink>(entity =>
         {
             entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
             entity.Property(e => e.Code).HasMaxLength(50).IsRequired();
             entity.HasIndex(e => e.Code).IsUnique();
             entity.HasOne(l => l.Event)

@@ -985,6 +985,107 @@ public class AdminEndpointTests : IDisposable
         Assert.Equal(HttpStatusCode.NotFound, revokeResp.StatusCode);
     }
 
+    [Fact]
+    public async Task CreateInviteLink_WithName_PersistsNameAndZeroCount()
+    {
+        var (_, eventId, _) = await SeedSlotAsync("Named Link Org");
+
+        var response = await _client.PostAsJsonAsync($"/api/events/{eventId}/invite-links", new { name = "Facebook" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("Facebook", body.GetProperty("name").GetString());
+        Assert.Equal(0, body.GetProperty("signupCount").GetInt32());
+    }
+
+    [Fact]
+    public async Task CreateInviteLink_DefaultName_IsNumbered()
+    {
+        var (_, eventId, _) = await SeedSlotAsync("Default Name Org");
+
+        var first = await _client.PostAsJsonAsync($"/api/events/{eventId}/invite-links", new { });
+        var firstBody = await first.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("Invite link 1", firstBody.GetProperty("name").GetString());
+
+        var second = await _client.PostAsJsonAsync($"/api/events/{eventId}/invite-links", new { });
+        var secondBody = await second.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("Invite link 2", secondBody.GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task UpdateInviteLink_RenamesLink()
+    {
+        var (_, eventId, _) = await SeedSlotAsync("Rename Link Org");
+
+        var createResp = await _client.PostAsJsonAsync($"/api/events/{eventId}/invite-links", new { name = "Old" });
+        var created = await createResp.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var linkId = created.GetProperty("id").GetGuid();
+
+        var updateResp = await _client.PutAsJsonAsync($"/api/invite-links/{linkId}", new { name = "  WhatsApp  " });
+
+        Assert.Equal(HttpStatusCode.OK, updateResp.StatusCode);
+        var updated = await updateResp.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("WhatsApp", updated.GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task UpdateInviteLink_WhitespaceName_Returns400()
+    {
+        var (_, eventId, _) = await SeedSlotAsync("Rename Blank Org");
+
+        var createResp = await _client.PostAsJsonAsync($"/api/events/{eventId}/invite-links", new { });
+        var created = await createResp.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var linkId = created.GetProperty("id").GetGuid();
+
+        var updateResp = await _client.PutAsJsonAsync($"/api/invite-links/{linkId}", new { name = "   " });
+
+        Assert.Equal(HttpStatusCode.BadRequest, updateResp.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateInviteLink_OtherUsersLink_Returns404()
+    {
+        var (_, eventId, _) = await SeedSlotAsync("Rename Other Org");
+
+        var createResp = await _client.PostAsJsonAsync($"/api/events/{eventId}/invite-links", new { });
+        var created = await createResp.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var linkId = created.GetProperty("id").GetGuid();
+
+        var otherClient = _factory.CreateClient();
+        otherClient.DefaultRequestHeaders.Add(TestAuthHandler.UserIdHeader, TestAuthHandler.OtherUserId);
+
+        var updateResp = await otherClient.PutAsJsonAsync($"/api/invite-links/{linkId}", new { name = "Hijack" });
+        Assert.Equal(HttpStatusCode.NotFound, updateResp.StatusCode);
+    }
+
+    [Fact]
+    public async Task ListInviteLinks_IncludesSignupCountsPerLink()
+    {
+        var (_, eventId, slotId) = await SeedSlotAsync("Attribution Org");
+
+        var linkAResp = await _client.PostAsJsonAsync($"/api/events/{eventId}/invite-links", new { name = "Facebook" });
+        var linkA = await linkAResp.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var codeA = linkA.GetProperty("code").GetString()!;
+
+        await _client.PostAsJsonAsync($"/api/events/{eventId}/invite-links", new { name = "WhatsApp" });
+
+        var signupResp = await _client.PostAsJsonAsync($"/api/invite/{codeA}/signups", new
+        {
+            slotId,
+            volunteerName = "Attr User",
+            email = "attr@example.com"
+        });
+        Assert.Equal(HttpStatusCode.Created, signupResp.StatusCode);
+
+        var list = await _client.GetFromJsonAsync<JsonElement>($"/api/events/{eventId}/invite-links", _jsonOptions);
+        var links = list.EnumerateArray().ToList();
+        Assert.Equal(2, links.Count);
+        var facebook = links.Single(l => l.GetProperty("name").GetString() == "Facebook");
+        var whatsapp = links.Single(l => l.GetProperty("name").GetString() == "WhatsApp");
+        Assert.Equal(1, facebook.GetProperty("signupCount").GetInt32());
+        Assert.Equal(0, whatsapp.GetProperty("signupCount").GetInt32());
+    }
+
     // --- Signup Questions ---
 
     [Fact]
