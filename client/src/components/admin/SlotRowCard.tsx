@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { TimeInput } from "@/components/ui/time-input"
 import { DataRow, RequiredStar } from "@/components/ui/layout"
-import { cn } from "@/lib/utils"
+import { cn, isOvernightSlot } from "@/lib/utils"
 import type { SlotDraft } from "@/lib/eventSlots"
 
 type SlotField = keyof Omit<SlotDraft, "key">
@@ -115,6 +115,9 @@ export function SlotRowCard({
         </div>
       </div>
       {error && <p className="field-error">{error}</p>}
+      {!error && isOvernightSlot(slot.startTime, slot.endTime) && (
+        <p className="muted-xs">Ends next day (+1 day).</p>
+      )}
       <label
         className={cn(
           "flex items-center gap-2 text-xs text-muted-foreground",

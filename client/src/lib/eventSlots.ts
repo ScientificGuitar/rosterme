@@ -30,8 +30,8 @@ export function createEmptySlot(key: number): SlotDraft {
 
 export function validateSlotBasics(slot: SlotDraft): string | null {
   if (!slot.label.trim()) return "Label is required."
-  if (slot.endTime <= slot.startTime)
-    return "End time must be after start time."
+  if (slot.endTime === slot.startTime)
+    return "End time must not equal start time. Use an earlier end time for an overnight slot."
   if (slot.capacity < 1) return "Capacity must be at least 1."
   return null
 }

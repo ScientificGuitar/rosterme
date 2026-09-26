@@ -291,7 +291,7 @@ public static class AdminEndpoints
 
         return Results.Ok(events.Select(e => new EventWithSlotsResponse(
             e.Id, e.GroupId, e.Group.Name, e.Title, e.Description, e.Location, e.Date, e.CreatedAt,
-            e.TimeSlots.OrderBy(s => s.StartTime).Select(s => new TimeSlotResponse(s.Id, s.EventId, s.Label, e.Date.ToDateTime(s.StartTime), e.Date.ToDateTime(s.EndTime), s.Capacity, s.Signups.Count(sg => sg.Status == SignupStatus.Pending || sg.Status == SignupStatus.Confirmed), s.AllowWaitlist))
+            e.TimeSlots.OrderBy(s => s.StartTime).Select(s => new TimeSlotResponse(s.Id, s.EventId, s.Label, SlotTimes.ResolveStart(e.Date, s.StartTime), SlotTimes.ResolveEnd(e.Date, s.StartTime, s.EndTime), s.Capacity, s.Signups.Count(sg => sg.Status == SignupStatus.Pending || sg.Status == SignupStatus.Confirmed), s.AllowWaitlist))
         )));
     }
 
@@ -438,11 +438,11 @@ public static class AdminEndpoints
             for (var i = 0; i < request.Slots.Count; i++)
             {
                 var s = request.Slots[i];
-                if (s.EndTime <= s.StartTime)
+                if (s.EndTime == s.StartTime)
                 {
                     return Results.ValidationProblem(new Dictionary<string, string[]>
                     {
-                        [$"Slots[{i}].EndTime"] = new[] { "EndTime must be after StartTime." }
+                        [$"Slots[{i}].EndTime"] = new[] { "EndTime must not equal StartTime. Use an earlier EndTime for an overnight slot." }
                     });
                 }
 
@@ -553,7 +553,7 @@ public static class AdminEndpoints
         db.TimeSlots.Add(slot);
         await db.SaveChangesAsync(ct);
 
-        return Results.Created($"/api/events/{eventId}/slots/{slot.Id}", new TimeSlotResponse(slot.Id, slot.EventId, slot.Label, evt.Date.ToDateTime(slot.StartTime), evt.Date.ToDateTime(slot.EndTime), slot.Capacity, 0, slot.AllowWaitlist));
+        return Results.Created($"/api/events/{eventId}/slots/{slot.Id}", new TimeSlotResponse(slot.Id, slot.EventId, slot.Label, SlotTimes.ResolveStart(evt.Date, slot.StartTime), SlotTimes.ResolveEnd(evt.Date, slot.StartTime, slot.EndTime), slot.Capacity, 0, slot.AllowWaitlist));
     }
 
     private static async Task<IResult> UpdateSlot(Guid eventId, Guid slotId, UpdateSlotRequest request, AppDbContext db, EmailOutboxService outbox, IOptions<EmailOptions> emailOptions, HttpContext http, CancellationToken ct)
@@ -594,11 +594,11 @@ public static class AdminEndpoints
             if (request.Capacity is not null) slot.Capacity = request.Capacity.Value;
             if (request.AllowWaitlist is not null) slot.AllowWaitlist = request.AllowWaitlist.Value;
 
-            if (slot.EndTime <= slot.StartTime)
+            if (slot.EndTime == slot.StartTime)
             {
                 return Results.ValidationProblem(new Dictionary<string, string[]>
                 {
-                    ["EndTime"] = new[] { "EndTime must be after StartTime." }
+                    ["EndTime"] = new[] { "EndTime must not equal StartTime. Use an earlier EndTime for an overnight slot." }
                 });
             }
 
@@ -610,7 +610,7 @@ public static class AdminEndpoints
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
 
-            return Results.Ok(new TimeSlotResponse(slot.Id, slot.EventId, slot.Label, slot.Event.Date.ToDateTime(slot.StartTime), slot.Event.Date.ToDateTime(slot.EndTime), slot.Capacity, signupCount, slot.AllowWaitlist));
+            return Results.Ok(new TimeSlotResponse(slot.Id, slot.EventId, slot.Label, SlotTimes.ResolveStart(slot.Event.Date, slot.StartTime), SlotTimes.ResolveEnd(slot.Event.Date, slot.StartTime, slot.EndTime), slot.Capacity, signupCount, slot.AllowWaitlist));
         });
     }
 
@@ -648,7 +648,7 @@ public static class AdminEndpoints
         return Results.Ok(events.Select(e => new RosterEventResponse(
             e.Id, e.GroupId, e.Group.Name, e.Title, e.Description, e.Location, e.Date, e.CreatedAt, RosterQuestionResponse.From(e.Questions),
             e.TimeSlots.OrderBy(s => s.StartTime).Select(s => new RosterSlotResponse(
-                s.Id, s.Label, e.Date.ToDateTime(s.StartTime), e.Date.ToDateTime(s.EndTime), s.Capacity, s.AllowWaitlist,
+                s.Id, s.Label, SlotTimes.ResolveStart(e.Date, s.StartTime), SlotTimes.ResolveEnd(e.Date, s.StartTime, s.EndTime), s.Capacity, s.AllowWaitlist,
                 s.Signups.Select(su => new SignupResponse(su.Id, su.TimeSlotId, su.VolunteerName, su.Email, su.Status.ToString(), su.CreatedAt,
                     su.Answers.Select(a => new SignupAnswerResponse(a.QuestionId, a.Value)).ToList()))
             ))
@@ -739,7 +739,7 @@ public static class AdminEndpoints
         return Results.Ok(new RosterEventResponse(
             evt.Id, evt.GroupId, evt.Group.Name, evt.Title, evt.Description, evt.Location, evt.Date, evt.CreatedAt, RosterQuestionResponse.From(evt.Questions),
             evt.TimeSlots.OrderBy(s => s.StartTime).Select(s => new RosterSlotResponse(
-                s.Id, s.Label, evt.Date.ToDateTime(s.StartTime), evt.Date.ToDateTime(s.EndTime), s.Capacity, s.AllowWaitlist,
+                s.Id, s.Label, SlotTimes.ResolveStart(evt.Date, s.StartTime), SlotTimes.ResolveEnd(evt.Date, s.StartTime, s.EndTime), s.Capacity, s.AllowWaitlist,
                 s.Signups.Select(su => new SignupResponse(su.Id, su.TimeSlotId, su.VolunteerName, su.Email, su.Status.ToString(), su.CreatedAt,
                     su.Answers.Select(a => new SignupAnswerResponse(a.QuestionId, a.Value)).ToList()))
             ))
@@ -891,10 +891,10 @@ public record CreateSlotRequest(
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        if (EndTime <= StartTime)
+        if (EndTime == StartTime)
         {
             yield return new ValidationResult(
-                "EndTime must be after StartTime.",
+                "EndTime must not equal StartTime. Use an earlier EndTime for an overnight slot.",
                 [nameof(EndTime), nameof(StartTime)]);
         }
     }
@@ -917,10 +917,10 @@ public record EventSlotUpsert(
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        if (EndTime <= StartTime)
+        if (EndTime == StartTime)
         {
             yield return new ValidationResult(
-                "EndTime must be after StartTime.",
+                "EndTime must not equal StartTime. Use an earlier EndTime for an overnight slot.",
                 [nameof(EndTime), nameof(StartTime)]);
         }
     }

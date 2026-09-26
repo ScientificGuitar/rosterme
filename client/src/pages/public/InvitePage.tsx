@@ -12,7 +12,7 @@ import { createPublicApi, ApiError } from "@/lib/api"
 import { useSeo } from "@/lib/seo"
 import type { PublicSlot, PublicQuestion } from "@/lib/types"
 import { isValidPhone } from "@/lib/eventQuestions"
-import { cn, formatTimeOnly } from "@/lib/utils"
+import { cn, formatTimeOnly, overnightSuffix } from "@/lib/utils"
 import { CapacityBar } from "@/components/ui/capacity-bar"
 import { LoadingState } from "@/components/ui/spinner"
 import {
@@ -373,6 +373,7 @@ function SignupForm({
                         <p className="muted-xs mt-0.5">
                           {formatTimeOnly(slot.startTime)}&ndash;
                           {formatTimeOnly(slot.endTime)}
+                          {overnightSuffix(slot.startTime, slot.endTime)}
                         </p>
                       </div>
                       <Badge

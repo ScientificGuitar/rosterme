@@ -504,11 +504,33 @@ public class AdminEndpointTests : IDisposable
         {
             slots = new object[]
             {
-                new { id = slotId, label = "Test Slot", startTime = "10:00", endTime = "09:00", capacity = 3 }
+                new { id = slotId, label = "Test Slot", startTime = "10:00", endTime = "10:00", capacity = 3 }
             }
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateEvent_WithSlots_OvernightTimes_Returns200WithNextDayEnd()
+    {
+        var (_, eventId, slotId) = await SeedSlotAsync("Sync Overnight Org");
+
+        var response = await _client.PutAsJsonAsync($"/api/events/{eventId}", new
+        {
+            slots = new object[]
+            {
+                new { id = slotId, label = "Test Slot", startTime = "22:00", endTime = "02:00", capacity = 3 }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var after = await _client.GetFromJsonAsync<JsonElement>($"/api/events/{eventId}", _jsonOptions);
+        var slot = after.GetProperty("slots").EnumerateArray().First();
+        var start = slot.GetProperty("startTime").GetDateTime();
+        var end = slot.GetProperty("endTime").GetDateTime();
+        Assert.Equal(start.Date.AddDays(1), end.Date);
     }
 
     [Fact]

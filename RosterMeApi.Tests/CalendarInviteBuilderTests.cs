@@ -94,4 +94,31 @@ public class CalendarInviteBuilderTests
         Assert.Equal("rosterme-sunday-service-9am.ics",
             CalendarInviteBuilder.IcsFileName("Sunday Service (9am)!"));
     }
+
+    [Fact]
+    public void BuildIcs_OvernightSlot_EndsNextDay()
+    {
+        var ics = CalendarInviteBuilder.BuildIcs(
+            "Night Shift", null, null,
+            new DateOnly(2026, 9, 6),
+            new TimeOnly(22, 0),
+            new TimeOnly(2, 0),
+            "Overnight", "https://example.com/m", "uid-overnight");
+
+        Assert.Contains("DTSTART:20260906T220000", ics);
+        Assert.Contains("DTEND:20260907T020000", ics);
+    }
+
+    [Fact]
+    public void BuildLinks_OvernightSlot_EndsNextDay()
+    {
+        var links = CalendarInviteBuilder.BuildLinks(
+            "Night Shift", null, null,
+            new DateOnly(2026, 9, 6),
+            new TimeOnly(22, 0),
+            new TimeOnly(2, 0),
+            "Overnight", "https://example.com/m");
+
+        Assert.Contains("20260906T220000/20260907T020000", links.Google);
+    }
 }

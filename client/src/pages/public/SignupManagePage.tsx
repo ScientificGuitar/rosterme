@@ -10,7 +10,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Separator } from "@/components/ui/separator"
 import { createPublicApi } from "@/lib/api"
 import { useSeo } from "@/lib/seo"
-import { formatTimeOnly } from "@/lib/utils"
+import { formatTimeOnly, overnightSuffix } from "@/lib/utils"
 import { Alert } from "@/components/ui/layout"
 import { LoadingState } from "@/components/ui/spinner"
 
@@ -133,6 +133,7 @@ export function SignupManagePage() {
             <p className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
               {formatTimeOnly(data.startTime)}&ndash;{formatTimeOnly(data.endTime)}
+              {overnightSuffix(data.startTime, data.endTime)}
             </p>
             {data.eventLocation && (
               <p className="flex items-center gap-2">
@@ -245,7 +246,8 @@ export function SignupManagePage() {
                       This will remove you from the waitlist for{" "}
                       <strong>&ldquo;{data.slotLabel}&rdquo;</strong> (
                       {formatTimeOnly(data.startTime)}&ndash;
-                      {formatTimeOnly(data.endTime)}). This action cannot be
+                      {formatTimeOnly(data.endTime)}
+                      {overnightSuffix(data.startTime, data.endTime)}). This action cannot be
                       undone.
                     </>
                   ) : (
@@ -253,7 +255,8 @@ export function SignupManagePage() {
                       This will release your spot for{" "}
                       <strong>&ldquo;{data.slotLabel}&rdquo;</strong> (
                       {formatTimeOnly(data.startTime)}&ndash;
-                      {formatTimeOnly(data.endTime)}). This action cannot be
+                      {formatTimeOnly(data.endTime)}
+                      {overnightSuffix(data.startTime, data.endTime)}). This action cannot be
                       undone.
                     </>
                   )
