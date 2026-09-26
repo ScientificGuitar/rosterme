@@ -29,8 +29,8 @@ function todayLocal(): string {
 }
 
 /** Derived status until the backend gains a real status/draft field. */
-function getEventStatus(date: string, today: string): "active" | "inactive" {
-  return date >= today ? "active" : "inactive"
+function getEventStatus(date: string, today: string): EventStatus {
+  return date >= today ? "upcoming" : "past"
 }
 
 function formatEventDate(date: string): string {
@@ -127,7 +127,7 @@ export function EventList() {
         sorted.sort((a, b) => {
           const sa = getEventStatus(a.date, today)
           const sb = getEventStatus(b.date, today)
-          if (sa !== sb) return sa === "active" ? -1 : 1
+          if (sa !== sb) return sa === "upcoming" ? -1 : 1
           if (a.date !== b.date) return a.date < b.date ? -1 : 1
           return a.title.localeCompare(b.title)
         })
@@ -301,8 +301,8 @@ function EventListItem({
           <p className="text-xs font-semibold text-muted-foreground">
             {formatEventDate(event.date)}
           </p>
-          <Badge variant={status === "active" ? "default" : "secondary"}>
-            {status === "active" ? "Active" : "Inactive"}
+          <Badge variant={status === "upcoming" ? "default" : "secondary"}>
+            {STATUS_LABELS[status]}
           </Badge>
         </div>
         <CardTitle className="font-semibold">
