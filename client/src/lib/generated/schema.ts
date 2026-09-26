@@ -402,7 +402,9 @@ export interface paths {
         post?: never;
         delete: {
             parameters: {
-                query?: never;
+                query?: {
+                    notify?: boolean;
+                };
                 header?: never;
                 path: {
                     id: string;
@@ -560,7 +562,9 @@ export interface paths {
         post?: never;
         delete: {
             parameters: {
-                query?: never;
+                query?: {
+                    notify?: boolean;
+                };
                 header?: never;
                 path: {
                     eventId: string;
@@ -654,7 +658,9 @@ export interface paths {
         post?: never;
         delete: {
             parameters: {
-                query?: never;
+                query?: {
+                    notify?: boolean;
+                };
                 header?: never;
                 path: {
                     id: string;
@@ -686,6 +692,62 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/signups/{id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description No Content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -748,7 +810,7 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": components["schemas"]["CreateInviteLinkRequest"];
+                    "application/json": null | components["schemas"]["CreateInviteLinkRequest"];
                 };
             };
             responses: {
@@ -760,6 +822,13 @@ export interface paths {
                     content: {
                         "application/json": components["schemas"]["InviteLinkResponse"];
                     };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 /** @description Unauthorized */
                 401: {
@@ -800,7 +869,7 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: {
+            requestBody: {
                 content: {
                     "application/json": components["schemas"]["UpdateInviteLinkRequest"];
                 };
@@ -1086,6 +1155,48 @@ export interface paths {
                     content: {
                         "application/json": components["schemas"]["SignupManageResponse"];
                     };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/signup/manage/{token}/calendar.ics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    token: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
                 /** @description Not Found */
                 404: {
@@ -1490,11 +1601,17 @@ export interface components {
             location: null | string;
             /** Format: date */
             date: string;
+            removalEmailPolicy: null | components["schemas"]["RemovalEmailPolicy"];
             slots: null | components["schemas"]["CreateSlotRequest"][];
             questions: null | components["schemas"]["QuestionUpsert"][];
         };
         CreateGroupRequest: {
             name: string;
+        };
+        CreateInviteLinkRequest: {
+            name: null | string;
+            /** Format: date-time */
+            expiresAt: null | string;
         };
         CreateSlotRequest: {
             label: string;
@@ -1533,6 +1650,7 @@ export interface components {
             location: null | string;
             /** Format: date */
             date: string;
+            removalEmailPolicy: components["schemas"]["RemovalEmailPolicy"];
             /** Format: date-time */
             createdAt: string;
         };
@@ -1559,6 +1677,7 @@ export interface components {
             location: null | string;
             /** Format: date */
             date: string;
+            removalEmailPolicy: components["schemas"]["RemovalEmailPolicy"];
             /** Format: date-time */
             createdAt: string;
             slots: components["schemas"]["TimeSlotResponse"][];
@@ -1586,14 +1705,6 @@ export interface components {
             expiresAt: null | string;
             /** Format: int32 */
             signupCount: number | string;
-        };
-        CreateInviteLinkRequest: {
-            name: null | string;
-            /** Format: date-time */
-            expiresAt: null | string;
-        };
-        UpdateInviteLinkRequest: {
-            name: string;
         };
         InvitePageResponse: {
             /** Format: uuid */
@@ -1639,6 +1750,8 @@ export interface components {
             required: boolean;
             options: null | string[];
         };
+        /** @enum {unknown} */
+        RemovalEmailPolicy: "Ask" | "Always" | "Never";
         ResendSignupRequest: {
             /** Format: uuid */
             slotId: string;
@@ -1655,6 +1768,7 @@ export interface components {
             location: null | string;
             /** Format: date */
             date: string;
+            removalEmailPolicy: components["schemas"]["RemovalEmailPolicy"];
             /** Format: date-time */
             createdAt: string;
             questions: components["schemas"]["RosterQuestionResponse"][];
@@ -1848,10 +1962,15 @@ export interface components {
             location: null | string;
             /** Format: date */
             date: null | string;
+            removalEmailPolicy: null | components["schemas"]["RemovalEmailPolicy"];
+            notifyOnRemove: null | boolean;
             slots: null | components["schemas"]["EventSlotUpsert"][];
             questions: null | components["schemas"]["QuestionUpsert"][];
         };
         UpdateGroupRequest: {
+            name: string;
+        };
+        UpdateInviteLinkRequest: {
             name: string;
         };
         UpdateSlotRequest: {

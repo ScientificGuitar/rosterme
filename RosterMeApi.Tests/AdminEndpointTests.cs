@@ -679,7 +679,7 @@ public class AdminEndpointTests : IDisposable
         var signup = await signupResp.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
         var signupId = signup.GetProperty("id").GetGuid();
 
-        var response = await _client.DeleteAsync($"/api/signups/{signupId}");
+        var response = await _client.DeleteAsync($"/api/signups/{signupId}?notify=true");
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
@@ -715,7 +715,7 @@ public class AdminEndpointTests : IDisposable
                 .Split('"')[0];
         }
 
-        var deleteResp = await _client.DeleteAsync($"/api/signups/{signupId}");
+        var deleteResp = await _client.DeleteAsync($"/api/signups/{signupId}?notify=true");
         Assert.Equal(HttpStatusCode.NoContent, deleteResp.StatusCode);
 
         using (var scope = _factory.Services.CreateScope())

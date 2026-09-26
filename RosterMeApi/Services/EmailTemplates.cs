@@ -518,4 +518,169 @@ public static class EmailTemplates
 
         return (subject, html, text);
     }
+
+    public static (string Subject, string HtmlBody, string TextBody) BuildSlotDeleted(
+        string volunteerName,
+        string groupName,
+        string eventTitle,
+        string slotLabel,
+        DateOnly eventDate,
+        TimeOnly startTime,
+        TimeOnly endTime,
+        string? location = null,
+        bool wasWaitlisted = false)
+    {
+        var subject = $"Shift removed: {eventTitle}";
+        var overnightSuffix = SlotTimes.OvernightSuffix(startTime, endTime);
+        var encodedSlotLabel = HttpUtility.HtmlEncode(slotLabel);
+        var encodedLocation = string.IsNullOrWhiteSpace(location)
+            ? null
+            : HttpUtility.HtmlEncode(location);
+
+        var locationHtml = encodedLocation is null
+            ? ""
+            : $"""
+                <p style="margin:8px 0 0;font-size:14px;color:#3f3f46;">📍 {encodedLocation}</p>
+                """;
+
+        var html = $"""
+            <!DOCTYPE html>
+            <html>
+            <body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+                <tr>
+                  <td align="center">
+                    <table role="presentation" width="100%" maxwidth="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background-color:#ffffff;border-radius:12px;overflow:hidden;">
+                      <tr>
+                        <td style="padding:32px 32px 24px;">
+                          <p style="margin:0 0 4px;font-size:14px;color:#71717a;">{HttpUtility.HtmlEncode(groupName)}</p>
+                          <h1 style="margin:0 0 4px;font-size:22px;color:#18181b;">This shift has been removed</h1>
+                          <h2 style="margin:0 0 16px;font-size:16px;font-weight:500;color:#3f3f46;">{HttpUtility.HtmlEncode(eventTitle)}</h2>
+                          <p style="margin:0;font-size:14px;color:#3f3f46;">{(wasWaitlisted ? "The organizer has removed the shift below, so your waitlist signup is cancelled. You don't need to take any action." : "The organizer has removed the shift below, so your signup is cancelled. You don't need to take any action.")}</p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:0 32px 8px;">
+                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fafafa;border-radius:8px;">
+                            <tr>
+                              <td style="padding:16px;">
+                                <p style="margin:0 0 4px;font-size:14px;color:#18181b;"><strong>{encodedSlotLabel}</strong></p>
+                                <p style="margin:0 0 4px;font-size:14px;color:#18181b;">{eventDate:dddd d MMMM yyyy}</p>
+                                <p style="margin:0;font-size:14px;color:#3f3f46;">{startTime:HH:mm}&ndash;{endTime:HH:mm}{overnightSuffix}</p>
+                                {locationHtml}
+                                <p style="margin:12px 0 0;font-size:14px;color:#3f3f46;">Name: <strong>{HttpUtility.HtmlEncode(volunteerName)}</strong></p>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:24px 32px 32px;">
+                          <p style="margin:0;font-size:13px;color:#71717a;">
+                            If you have questions, please contact the organizer directly.
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>
+            """;
+
+        var textLocation = string.IsNullOrWhiteSpace(location) ? "" : $"\nLocation: {location}";
+
+        var text = $"""
+            {groupName}
+
+            Shift removed: {eventTitle}
+            Shift: {slotLabel}
+            {eventDate:dddd d MMMM yyyy}, {startTime:HH:mm}-{endTime:HH:mm}{overnightSuffix}{textLocation}
+            Name: {volunteerName}
+
+            The organizer has removed this shift, so your {(wasWaitlisted ? "waitlist signup is cancelled" : "signup is cancelled")}. You don't need to take any action.
+            If you have questions, please contact the organizer directly.
+            """;
+
+        return (subject, html, text);
+    }
+
+    public static (string Subject, string HtmlBody, string TextBody) BuildEventCancelled(
+        string volunteerName,
+        string groupName,
+        string eventTitle,
+        DateOnly eventDate,
+        string? location = null)
+    {
+        var subject = $"Event cancelled: {eventTitle}";
+        var encodedLocation = string.IsNullOrWhiteSpace(location)
+            ? null
+            : HttpUtility.HtmlEncode(location);
+
+        var locationHtml = encodedLocation is null
+            ? ""
+            : $"""
+                <p style="margin:8px 0 0;font-size:14px;color:#3f3f46;">📍 {encodedLocation}</p>
+                """;
+
+        var html = $"""
+            <!DOCTYPE html>
+            <html>
+            <body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+                <tr>
+                  <td align="center">
+                    <table role="presentation" width="100%" maxwidth="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background-color:#ffffff;border-radius:12px;overflow:hidden;">
+                      <tr>
+                        <td style="padding:32px 32px 24px;">
+                          <p style="margin:0 0 4px;font-size:14px;color:#71717a;">{HttpUtility.HtmlEncode(groupName)}</p>
+                          <h1 style="margin:0 0 4px;font-size:22px;color:#18181b;">This event has been cancelled</h1>
+                          <h2 style="margin:0 0 16px;font-size:16px;font-weight:500;color:#3f3f46;">{HttpUtility.HtmlEncode(eventTitle)}</h2>
+                          <p style="margin:0;font-size:14px;color:#3f3f46;">The organizer has cancelled this event, so your signup is cancelled. You don't need to take any action.</p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:0 32px 8px;">
+                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fafafa;border-radius:8px;">
+                            <tr>
+                              <td style="padding:16px;">
+                                <p style="margin:0 0 4px;font-size:14px;color:#18181b;">{eventDate:dddd d MMMM yyyy}</p>
+                                {locationHtml}
+                                <p style="margin:12px 0 0;font-size:14px;color:#3f3f46;">Name: <strong>{HttpUtility.HtmlEncode(volunteerName)}</strong></p>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:24px 32px 32px;">
+                          <p style="margin:0;font-size:13px;color:#71717a;">
+                            If you have questions, please contact the organizer directly.
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>
+            """;
+
+        var textLocation = string.IsNullOrWhiteSpace(location) ? "" : $"\nLocation: {location}";
+
+        var text = $"""
+            {groupName}
+
+            Event cancelled: {eventTitle}
+            {eventDate:dddd d MMMM yyyy}{textLocation}
+            Name: {volunteerName}
+
+            The organizer has cancelled this event, so your signup is cancelled. You don't need to take any action.
+            If you have questions, please contact the organizer directly.
+            """;
+
+        return (subject, html, text);
+    }
 }

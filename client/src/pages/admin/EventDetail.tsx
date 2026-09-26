@@ -2,26 +2,27 @@ import { useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-  Trash2,
-  Link2,
-  Copy,
-  Plus,
-  Power,
-  Pencil,
-  MapPin,
-  Download,
-  ChevronDown,
-  ChevronRight,
-  Search,
-  X,
-  Users,
   Activity,
   ChartColumn,
+  ChevronDown,
+  ChevronRight,
   Clock,
+  Copy,
+  Download,
   Info,
+  Link2,
   ListChecks,
-  Wrench,
   Mail,
+  MapPin,
+  Pencil,
+  Plus,
+  Power,
+  Search,
+  Settings,
+  Trash2,
+  Users,
+  Wrench,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -34,6 +35,8 @@ import {
   cn,
   compareSignupsByStatus,
   formatTime,
+  isNotifiableStatus,
+  notifiableSignupCount,
   overnightSuffix,
   waitlistCount,
 } from "@/lib/utils"
@@ -83,6 +86,11 @@ import {
   TableBleed,
 } from "@/components/ui/layout"
 import { SlotDialog, type SlotDialogSlot } from "@/components/admin/SlotDialog"
+import { RemovalEmailHelp } from "@/components/admin/RemovalEmailSetting"
+import {
+  REMOVAL_EMAIL_LABELS,
+  type RemovalEmailPolicy,
+} from "@/lib/removalEmailPolicy"
 import { LoadingState } from "@/components/ui/spinner"
 import { useEvent } from "@/hooks/useEvent"
 import { useDeleteSignup } from "@/hooks/useDeleteSignup"
@@ -320,7 +328,10 @@ export function EventDetail() {
                                 <RowSecondary>
                                   {formatTime(slot.startTime)}&ndash;
                                   {formatTime(slot.endTime)}
-                                  {overnightSuffix(slot.startTime, slot.endTime)}
+                                  {overnightSuffix(
+                                    slot.startTime,
+                                    slot.endTime
+                                  )}
                                 </RowSecondary>
                               </div>
                               <Badge
@@ -420,6 +431,8 @@ function SignupsTab({ event }: { event: RosterEvent }) {
     RosterEvent["slots"][number] | null
   >(null)
   const [deletingSlotBusy, setDeletingSlotBusy] = useState(false)
+  const [notifySlotPrompt, setNotifySlotPrompt] = useState(false)
+  const [notifySignupId, setNotifySignupId] = useState<string | null>(null)
   const deleteSignup = useDeleteSignup()
   const resendSignup = useResendSignup()
   const [pendingResendSignupId, setPendingResendSignupId] = useState<
@@ -431,6 +444,7 @@ function SignupsTab({ event }: { event: RosterEvent }) {
   const api = useApi()
   const queryClient = useQueryClient()
   const isPast = event.date < todayLocal()
+  const removalPolicy: RemovalEmailPolicy = event.removalEmailPolicy ?? "Ask"
 
   const editingSlotDialogSlot = editingSlot
     ? toSlotDialogSlot(editingSlot)
@@ -450,13 +464,38 @@ function SignupsTab({ event }: { event: RosterEvent }) {
     selectedSlot != null &&
     visibleSlots.some((slot) => slot.id === selectedSlot.id)
 
-  const handleDeleteSignup = async (signupId: string) => {
+  const handleDeleteSignup = async (signupId: string, notify?: boolean) => {
     try {
-      await deleteSignup.mutateAsync(signupId)
-      toast.success("Signup removed — participant notified")
+      await deleteSignup.mutateAsync({ signupId, notify })
+      toast.success(
+        notify === false ? "Signup removed" : "Signup removed — notified"
+      )
       setPendingSignupId(null)
+      setNotifySignupId(null)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to delete signup")
+    }
+  }
+
+  const confirmRemoveSignup = () => {
+    if (!pendingSignupId) return
+    const signup = selectedSlot?.signups.find((s) => s.id === pendingSignupId)
+    if (
+      removalPolicy === "Ask" &&
+      signup &&
+      isNotifiableStatus(signup.status)
+    ) {
+      setNotifySignupId(pendingSignupId)
+      setPendingSignupId(null)
+    } else {
+      void handleDeleteSignup(
+        pendingSignupId,
+        removalPolicy === "Always"
+          ? true
+          : removalPolicy === "Never"
+            ? false
+            : undefined
+      )
     }
   }
 
@@ -473,14 +512,20 @@ function SignupsTab({ event }: { event: RosterEvent }) {
     }
   }
 
-  const handleDeleteSlot = async () => {
+  const handleDeleteSlot = async (notify?: boolean) => {
     if (!deletingSlot) return
     setDeletingSlotBusy(true)
     try {
-      await api.deleteSlot(event.id, deletingSlot.id)
+      const affected = notifiableSignupCount(deletingSlot.signups)
+      await api.deleteSlot(event.id, deletingSlot.id, notify)
       if (deletingSlot.id === selectedSlotId) setSelectedSlotId(null)
-      toast.success("Time slot deleted")
+      toast.success(
+        notify === true && affected > 0
+          ? `Time slot deleted — ${affected} volunteer(s) notified`
+          : "Time slot deleted"
+      )
       setDeletingSlot(null)
+      setNotifySlotPrompt(false)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["event", event.id] }),
         queryClient.invalidateQueries({ queryKey: ["events"] }),
@@ -489,6 +534,24 @@ function SignupsTab({ event }: { event: RosterEvent }) {
       toast.error(formatApiError(e, "Failed to delete time slot"))
     } finally {
       setDeletingSlotBusy(false)
+    }
+  }
+
+  const confirmDeleteSlot = () => {
+    if (!deletingSlot) return
+    if (
+      removalPolicy === "Ask" &&
+      notifiableSignupCount(deletingSlot.signups) > 0
+    ) {
+      setNotifySlotPrompt(true)
+    } else {
+      void handleDeleteSlot(
+        removalPolicy === "Always"
+          ? true
+          : removalPolicy === "Never"
+            ? false
+            : undefined
+      )
     }
   }
 
@@ -510,6 +573,12 @@ function SignupsTab({ event }: { event: RosterEvent }) {
       ? null
       : (selectedSlot?.signups.find((s) => s.id === pendingResendSignupId) ??
         null)
+  const notifySignup =
+    notifySignupId === null
+      ? null
+      : (event.slots
+        .flatMap((slot) => slot.signups)
+        .find((s) => s.id === notifySignupId) ?? null)
 
   return (
     <>
@@ -519,15 +588,61 @@ function SignupsTab({ event }: { event: RosterEvent }) {
           if (!open) setPendingSignupId(null)
         }}
         title="Remove signup?"
-        description="This will remove the participant from this slot and notify them by email. This action cannot be undone."
+        description={
+          removalPolicy === "Always"
+            ? "This will remove the participant from this slot and notify them by email. This action cannot be undone."
+            : removalPolicy === "Never"
+              ? "This will remove the participant from this slot without notifying them. This action cannot be undone."
+              : "This will remove the participant from this slot. This action cannot be undone."
+        }
         confirmLabel="Remove"
         variant="destructive"
         isLoading={deleteSignup.isPending}
         loadingLabel="Removing..."
-        onConfirm={() => {
-          if (pendingSignupId) handleDeleteSignup(pendingSignupId)
-        }}
+        onConfirm={confirmRemoveSignup}
       />
+      <Dialog
+        open={notifySignupId !== null}
+        onOpenChange={(open) => {
+          if (!open) setNotifySignupId(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Notify participant?</DialogTitle>
+            <DialogDescription>
+              {notifySignup ? (
+                <>
+                  Email <strong>{notifySignup.volunteerName}</strong> (
+                  {notifySignup.email}) that they were removed from{" "}
+                  {selectedSlot?.label ?? "this slot"}?
+                </>
+              ) : (
+                "Email the participant that they were removed?"
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() =>
+                notifySignupId && void handleDeleteSignup(notifySignupId, false)
+              }
+              disabled={deleteSignup.isPending}
+            >
+              Don&apos;t notify
+            </Button>
+            <Button
+              onClick={() =>
+                notifySignupId && void handleDeleteSignup(notifySignupId, true)
+              }
+              disabled={deleteSignup.isPending}
+            >
+              {deleteSignup.isPending ? "Removing..." : "Notify"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <ConfirmDialog
         open={pendingResendSignupId !== null}
         onOpenChange={(open) => {
@@ -570,22 +685,57 @@ function SignupsTab({ event }: { event: RosterEvent }) {
         }}
       />
       <ConfirmDialog
-        open={deletingSlot !== null}
+        open={deletingSlot !== null && !notifySlotPrompt}
         onOpenChange={(open) => {
           if (!open) setDeletingSlot(null)
         }}
         title={`Delete "${deletingSlot?.label ?? ""}"?`}
         description={
           deletingSlot && activeSignupCount(deletingSlot.signups) > 0
-            ? `This slot has ${activeSignupCount(deletingSlot.signups)} active signup(s), which will be removed with the slot. This action cannot be undone.`
+            ? removalPolicy === "Always"
+              ? `This slot has ${activeSignupCount(deletingSlot.signups)} active signup(s), which will be removed with the slot and notified by email. This action cannot be undone.`
+              : removalPolicy === "Never"
+                ? `This slot has ${activeSignupCount(deletingSlot.signups)} active signup(s), which will be removed with the slot without notification. This action cannot be undone.`
+                : `This slot has ${activeSignupCount(deletingSlot.signups)} active signup(s), which will be removed with the slot. This action cannot be undone.`
             : "This will permanently remove the time slot. This action cannot be undone."
         }
         confirmLabel="Delete"
         variant="destructive"
         isLoading={deletingSlotBusy}
         loadingLabel="Deleting..."
-        onConfirm={handleDeleteSlot}
+        onConfirm={confirmDeleteSlot}
       />
+      <Dialog
+        open={notifySlotPrompt && deletingSlot !== null}
+        onOpenChange={(open) => {
+          if (!open) setNotifySlotPrompt(false)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Notify volunteers?</DialogTitle>
+            <DialogDescription>
+              {deletingSlot &&
+                `${notifiableSignupCount(deletingSlot.signups)} signup(s) on "${deletingSlot.label}" will be removed. Email them that their shift was removed?`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => void handleDeleteSlot(false)}
+              disabled={deletingSlotBusy}
+            >
+              Don&apos;t notify
+            </Button>
+            <Button
+              onClick={() => void handleDeleteSlot(true)}
+              disabled={deletingSlotBusy}
+            >
+              {deletingSlotBusy ? "Deleting..." : "Notify"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <div className="grid flex-1 content-start items-start gap-0 lg:grid-cols-[300px_minmax(0,1fr)] lg:content-stretch lg:items-stretch">
         <div className="flex flex-col">
           <div className="divide-y divide-border">
@@ -838,7 +988,9 @@ function SignupsTab({ event }: { event: RosterEvent }) {
                                     setExpandedSignupId(expanded ? null : s.id)
                                   }
                                   onRemove={() => setPendingSignupId(s.id)}
-                                  onResend={() => setPendingResendSignupId(s.id)}
+                                  onResend={() =>
+                                    setPendingResendSignupId(s.id)
+                                  }
                                   isResending={resendingSignupId === s.id}
                                 />
                               )
@@ -1058,7 +1210,10 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
                             </span>
                           </td>
                           <td className="py-2 pr-3 text-right">
-                            <Badge variant="secondary" className="whitespace-nowrap">
+                            <Badge
+                              variant="secondary"
+                              className="whitespace-nowrap"
+                            >
                               {link.signupCount}{" "}
                               {link.signupCount === 1 ? "signup" : "signups"}
                             </Badge>
@@ -1124,9 +1279,7 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
                       <div className="flex items-center justify-between gap-2">
                         <RowPrimary>{link.name}</RowPrimary>
                         <div className="flex shrink-0 items-center gap-1.5">
-                          <Badge variant="secondary">
-                            {link.signupCount}
-                          </Badge>
+                          <Badge variant="secondary">{link.signupCount}</Badge>
                           <Badge
                             variant={link.isActive ? "default" : "secondary"}
                           >
@@ -1209,8 +1362,8 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
           <DialogHeader>
             <DialogTitle>New invite link</DialogTitle>
             <DialogDescription>
-              Name it by where you will share it — e.g. Facebook, WhatsApp,
-              or church bulletin.
+              Name it by where you will share it — e.g. Facebook, WhatsApp, or
+              church bulletin.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleGenerate} className="stack-md">
@@ -1237,10 +1390,7 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
               >
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={generating || !createName.trim()}
-              >
+              <Button type="submit" disabled={generating || !createName.trim()}>
                 {generating ? "Generating..." : "Generate & copy"}
               </Button>
             </DialogFooter>
@@ -1306,22 +1456,47 @@ function SettingsTab({ event }: { event: RosterEvent }) {
   const api = useApi()
   const queryClient = useQueryClient()
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [notifyEventPrompt, setNotifyEventPrompt] = useState(false)
   const [deletingEvent, setDeletingEvent] = useState(false)
+  const savedPolicy: RemovalEmailPolicy = event.removalEmailPolicy ?? "Ask"
+  const affectedCount = event.slots.reduce(
+    (n, s) => n + notifiableSignupCount(s.signups),
+    0
+  )
 
-  const handleDeleteEvent = async () => {
+  const handleDeleteEvent = async (notify?: boolean) => {
     setDeletingEvent(true)
     try {
-      await api.deleteEvent(event.id)
+      await api.deleteEvent(event.id, notify)
       await queryClient.invalidateQueries({ queryKey: ["events"] })
       await queryClient.invalidateQueries({ queryKey: ["groups"] })
       queryClient.removeQueries({ queryKey: ["event", event.id] })
-      toast.success("Event deleted")
+      toast.success(
+        notify === true && affectedCount > 0
+          ? `Event deleted — ${affectedCount} volunteer(s) notified`
+          : "Event deleted"
+      )
       setDeleteDialogOpen(false)
+      setNotifyEventPrompt(false)
       navigate("/dashboard")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to delete event")
     } finally {
       setDeletingEvent(false)
+    }
+  }
+
+  const confirmDeleteEvent = () => {
+    if (savedPolicy === "Ask" && affectedCount > 0) {
+      setNotifyEventPrompt(true)
+    } else {
+      void handleDeleteEvent(
+        savedPolicy === "Always"
+          ? true
+          : savedPolicy === "Never"
+            ? false
+            : undefined
+      )
     }
   }
 
@@ -1339,6 +1514,23 @@ function SettingsTab({ event }: { event: RosterEvent }) {
 
   return (
     <>
+      <DataCard>
+        <DataCardHeader>
+          <DataCardTitle icon={Settings}>General</DataCardTitle>
+        </DataCardHeader>
+        <DataCardDivider />
+        <DataCardContent>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-sm">
+              <span className="font-medium">Notify volunteers on removal</span>
+              <RemovalEmailHelp />
+            </div>
+            <span className="shrink-0 text-sm text-muted-foreground">
+              {REMOVAL_EMAIL_LABELS[savedPolicy]}
+            </span>
+          </div>
+        </DataCardContent>
+      </DataCard>
       <DataCard>
         <DataCardHeader>
           <DataCardTitle
@@ -1363,14 +1555,6 @@ function SettingsTab({ event }: { event: RosterEvent }) {
               <p className="muted mt-1">
                 Add questions participants answer when signing up.
               </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4"
-                onClick={() => navigate(`/events/${event.id}/edit`)}
-              >
-                Add questions
-              </Button>
             </div>
           ) : (
             <>
@@ -1499,21 +1683,75 @@ function SettingsTab({ event }: { event: RosterEvent }) {
         </DataCardContent>
       </DataCard>
       <ConfirmDialog
-        open={deleteDialogOpen}
+        open={deleteDialogOpen && !notifyEventPrompt}
         onOpenChange={setDeleteDialogOpen}
         title="Delete event?"
         description={
-          <>
-            This will permanently delete &ldquo;{event.title}&rdquo; and all
-            associated signups. This action cannot be undone.
-          </>
+          affectedCount > 0 ? (
+            savedPolicy === "Always" ? (
+              <>
+                This will permanently delete &ldquo;{event.title}&rdquo; and all
+                associated signups. {affectedCount} volunteer(s) will be
+                notified by email. This action cannot be undone.
+              </>
+            ) : savedPolicy === "Never" ? (
+              <>
+                This will permanently delete &ldquo;{event.title}&rdquo; and all
+                associated signups without notifying volunteers. This action
+                cannot be undone.
+              </>
+            ) : (
+              <>
+                This will permanently delete &ldquo;{event.title}&rdquo; and all
+                associated signups ({affectedCount} volunteer(s)). This action
+                cannot be undone.
+              </>
+            )
+          ) : (
+            <>
+              This will permanently delete &ldquo;{event.title}&rdquo; and all
+              associated signups. This action cannot be undone.
+            </>
+          )
         }
         confirmLabel="Delete"
         variant="destructive"
         isLoading={deletingEvent}
         loadingLabel="Deleting..."
-        onConfirm={handleDeleteEvent}
+        onConfirm={confirmDeleteEvent}
       />
+      <Dialog
+        open={notifyEventPrompt}
+        onOpenChange={(open) => {
+          if (!open) setNotifyEventPrompt(false)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Notify volunteers?</DialogTitle>
+            <DialogDescription>
+              {affectedCount} volunteer(s) signed up for &ldquo;{event.title}
+              &rdquo; will lose their signup. Email them that the event was
+              cancelled?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => void handleDeleteEvent(false)}
+              disabled={deletingEvent}
+            >
+              Don&apos;t notify
+            </Button>
+            <Button
+              onClick={() => void handleDeleteEvent(true)}
+              disabled={deletingEvent}
+            >
+              {deletingEvent ? "Deleting..." : "Notify"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
@@ -1601,7 +1839,7 @@ function SignupCard({
   return (
     <li className="px-4 py-2">
       <div className="flex items-start gap-3">
-        <span className="-ml-2 mr-1 grid w-8 shrink-0 place-items-center self-center pointer-coarse:w-11">
+        <span className="mr-1 -ml-2 grid w-8 shrink-0 place-items-center self-center pointer-coarse:w-11">
           {hasAnswers && (
             <RowIconButton
               onClick={onToggle}
@@ -1655,7 +1893,7 @@ function SignupCard({
         )}
       </div>
       {expanded && hasAnswers && (
-        <dl className="-mx-4 -mb-2 mt-2 space-y-1 border-t border-border bg-muted/40 px-4 pt-2 pb-2 text-sm">
+        <dl className="-mx-4 mt-2 -mb-2 space-y-1 border-t border-border bg-muted/40 px-4 pt-2 pb-2 text-sm">
           {answers.map((answer) => {
             const question = questionById.get(answer.questionId)
             const label = question ? question.label : "Deleted question"

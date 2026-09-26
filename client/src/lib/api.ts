@@ -124,7 +124,10 @@ export function createAdminApi(getToken: () => Promise<string | null>) {
       return checkJson<{ id: string }>(res)
     },
 
-    updateEvent: async (eventId: string, data: UpdateEventRequest) => {
+    updateEvent: async (
+      eventId: string,
+      data: Partial<UpdateEventRequest>
+    ) => {
       const res = await fetch(`${BASE}/events/${eventId}`, {
         method: "PUT",
         headers: await h(),
@@ -138,8 +141,9 @@ export function createAdminApi(getToken: () => Promise<string | null>) {
       return checkJson<RosterEvent>(res)
     },
 
-    deleteEvent: async (eventId: string) => {
-      const res = await fetch(`${BASE}/events/${eventId}`, {
+    deleteEvent: async (eventId: string, notify?: boolean) => {
+      const qs = notify === undefined ? "" : `?notify=${notify}`
+      const res = await fetch(`${BASE}/events/${eventId}${qs}`, {
         method: "DELETE",
         headers: await h(),
       })
@@ -168,11 +172,15 @@ export function createAdminApi(getToken: () => Promise<string | null>) {
       return checkJson<TimeSlotResponse>(res)
     },
 
-    deleteSlot: async (eventId: string, slotId: string) => {
-      const res = await fetch(`${BASE}/events/${eventId}/slots/${slotId}`, {
-        method: "DELETE",
-        headers: await h(),
-      })
+    deleteSlot: async (eventId: string, slotId: string, notify?: boolean) => {
+      const qs = notify === undefined ? "" : `?notify=${notify}`
+      const res = await fetch(
+        `${BASE}/events/${eventId}/slots/${slotId}${qs}`,
+        {
+          method: "DELETE",
+          headers: await h(),
+        }
+      )
       await checkVoid(res)
     },
 
@@ -190,8 +198,9 @@ export function createAdminApi(getToken: () => Promise<string | null>) {
       return checkJson<EventWithSlots[]>(res)
     },
 
-    deleteSignup: async (signupId: string) => {
-      const res = await fetch(`${BASE}/signups/${signupId}`, {
+    deleteSignup: async (signupId: string, notify?: boolean) => {
+      const qs = notify === undefined ? "" : `?notify=${notify}`
+      const res = await fetch(`${BASE}/signups/${signupId}${qs}`, {
         method: "DELETE",
         headers: await h(),
       })
