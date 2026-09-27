@@ -68,13 +68,7 @@ public class SuperAdminEndpointTests : IDisposable
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.Groups.Add(new Group
-            {
-                Id = groupId,
-                Name = "Activity Org",
-                GroupOwner = TestAuthHandler.TestUserId,
-                CreatedAt = DateTime.UtcNow
-            });
+            db.Groups.Add(TestGroupSeeder.OwnedBy("Activity Org", TestAuthHandler.TestUserId, groupId));
             db.Events.Add(new Event
             {
                 Id = Guid.NewGuid(),

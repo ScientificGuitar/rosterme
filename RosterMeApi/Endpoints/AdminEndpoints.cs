@@ -38,6 +38,17 @@ public static class AdminEndpoints
             .Produces(401)
             .Produces(404)
             .Produces(409);
+        admin.MapPost("/groups/{groupId}/admins", AddGroupAdmin)
+            .Produces<GroupAdminResponse>(201)
+            .Produces(400)
+            .Produces(401)
+            .Produces(404)
+            .Produces(409);
+        admin.MapDelete("/groups/{groupId}/admins/{adminId}", RemoveGroupAdmin)
+            .Produces(204)
+            .Produces(400)
+            .Produces(401)
+            .Produces(404);
 
         admin.MapPost("/events", CreateEvent)
             .Produces<EventResponse>(201)
@@ -156,10 +167,63 @@ public static class AdminEndpoints
     private static async Task<Group?> GetOwnedGroup(AppDbContext db, Guid groupId, string userId, CancellationToken ct)
     {
         return await db.Groups
-            .FirstOrDefaultAsync(o => o.Id == groupId && o.GroupOwner == userId, ct);
+            .FirstOrDefaultAsync(g => g.Id == groupId &&
+                g.Admins.Any(a => a.ClerkUserId == userId && a.Role == GroupAdminRole.Owner), ct);
     }
 
     // --- Groups ---
+
+    private static string? GetFullNameClaim(HttpContext http)
+    {
+        var name = http.User.FindFirstValue("name");
+        if (!string.IsNullOrWhiteSpace(name)) return name.Trim();
+        var first = http.User.FindFirstValue("first_name")?.Trim();
+        var last = http.User.FindFirstValue("last_name")?.Trim();
+        if (string.IsNullOrEmpty(first) && string.IsNullOrEmpty(last)) return null;
+        return string.Join(" ", new[] { first, last }.Where(s => !string.IsNullOrEmpty(s)));
+    }
+
+    private static string? NormalizeEmail(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToLowerInvariant();
+
+    /// <summary>
+    /// Fills in name/email for the current user's admin rows from Clerk JWT
+    /// claims, and links email-invited rows (added before the person had a
+    /// RosterMe account) to their Clerk user id when the emails match.
+    /// </summary>
+    private static async Task SyncGroupAdminIdentityAsync(AppDbContext db, HttpContext http, CancellationToken ct)
+    {
+        var userId = GetUserId(http);
+        var email = NormalizeEmail(http.User.FindFirstValue("email"));
+        var name = GetFullNameClaim(http);
+
+        var admins = await db.GroupAdmins
+            .Where(a => a.ClerkUserId == userId
+                || (email != null && a.ClerkUserId == null && a.Email == email))
+            .ToListAsync(ct);
+
+        var changed = false;
+        foreach (var admin in admins)
+        {
+            if (admin.ClerkUserId is null && email is not null && admin.Email == email)
+            {
+                admin.ClerkUserId = userId;
+                changed = true;
+            }
+            if (string.IsNullOrEmpty(admin.Name) && name is not null)
+            {
+                admin.Name = name;
+                changed = true;
+            }
+            if (string.IsNullOrEmpty(admin.Email) && email is not null)
+            {
+                admin.Email = email;
+                changed = true;
+            }
+        }
+
+        if (changed) await db.SaveChangesAsync(ct);
+    }
 
     private static async Task<IResult> CreateGroup(CreateGroupRequest request, AppDbContext db, HttpContext http, CancellationToken ct)
     {
@@ -169,28 +233,39 @@ public static class AdminEndpoints
         {
             Id = Guid.NewGuid(),
             Name = Norm(request.Name),
-            GroupOwner = userId,
             CreatedAt = DateTime.UtcNow
         };
+        group.Admins.Add(new GroupAdmin
+        {
+            Id = Guid.NewGuid(),
+            GroupId = group.Id,
+            ClerkUserId = userId,
+            Name = GetFullNameClaim(http),
+            Email = NormalizeEmail(http.User.FindFirstValue("email")),
+            Role = GroupAdminRole.Owner,
+            CreatedAt = DateTime.UtcNow
+        });
 
         db.Groups.Add(group);
         await db.SaveChangesAsync(ct);
 
-        return Results.Created($"/api/groups/{group.Id}", new GroupResponse(group.Id, group.Name, group.CreatedAt, 0));
+        return Results.Created($"/api/groups/{group.Id}", new GroupResponse(group.Id, group.Name, group.CreatedAt, 0, 1));
     }
 
     private static async Task<IResult> ListGroups(AppDbContext db, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
+        await SyncGroupAdminIdentityAsync(db, http, ct);
 
         var groups = await db.Groups
-            .Where(g => g.GroupOwner == userId)
+            .Where(g => g.Admins.Any(a => a.ClerkUserId == userId && a.Role == GroupAdminRole.Owner))
             .OrderBy(g => g.Name)
             .Select(g => new GroupResponse(
                 g.Id,
                 g.Name,
                 g.CreatedAt,
-                db.Events.Count(e => e.GroupId == g.Id)))
+                db.Events.Count(e => e.GroupId == g.Id),
+                g.Admins.Count))
             .ToListAsync(ct);
 
         return Results.Ok(groups);
@@ -199,19 +274,29 @@ public static class AdminEndpoints
     private static async Task<IResult> GetGroup(Guid id, AppDbContext db, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
+        await SyncGroupAdminIdentityAsync(db, http, ct);
 
         var group = await db.Groups
-            .Where(o => o.Id == id && o.GroupOwner == userId)
-            .Select(o => new GroupResponse(
-                o.Id,
-                o.Name,
-                o.CreatedAt,
-                db.Events.Count(e => e.GroupId == o.Id)))
-            .FirstOrDefaultAsync(ct);
+            .Include(g => g.Admins)
+            .FirstOrDefaultAsync(g => g.Id == id &&
+                g.Admins.Any(a => a.ClerkUserId == userId && a.Role == GroupAdminRole.Owner), ct);
 
         if (group is null) return Results.NotFound();
 
-        return Results.Ok(group);
+        var eventCount = await db.Events.CountAsync(e => e.GroupId == id, ct);
+        var currentUserRole = group.Admins.First(a => a.ClerkUserId == userId).Role.ToString();
+
+        return Results.Ok(new GroupDetailResponse(
+            group.Id,
+            group.Name,
+            group.CreatedAt,
+            eventCount,
+            group.Admins
+                .OrderBy(a => a.Role == GroupAdminRole.Owner ? 0 : 1)
+                .ThenBy(a => a.Name ?? a.Email ?? "")
+                .Select(a => new GroupAdminResponse(a.Id, a.ClerkUserId, a.Name, a.Email, a.Role.ToString()))
+                .ToList(),
+            currentUserRole));
     }
 
     private static async Task<IResult> UpdateGroup(Guid id, UpdateGroupRequest request, AppDbContext db, HttpContext http, CancellationToken ct)
@@ -224,7 +309,8 @@ public static class AdminEndpoints
         await db.SaveChangesAsync(ct);
 
         var eventCount = await db.Events.CountAsync(e => e.GroupId == id, ct);
-        return Results.Ok(new GroupResponse(group.Id, group.Name, group.CreatedAt, eventCount));
+        var adminCount = await db.GroupAdmins.CountAsync(a => a.GroupId == id, ct);
+        return Results.Ok(new GroupResponse(group.Id, group.Name, group.CreatedAt, eventCount, adminCount));
     }
 
     private static async Task<IResult> DeleteGroup(Guid id, AppDbContext db, HttpContext http, CancellationToken ct)
@@ -243,6 +329,81 @@ public static class AdminEndpoints
         }
 
         db.Groups.Remove(group);
+        await db.SaveChangesAsync(ct);
+
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> AddGroupAdmin(Guid groupId, AddGroupAdminRequest request, AppDbContext db, HttpContext http, CancellationToken ct)
+    {
+        var userId = GetUserId(http);
+        var group = await GetOwnedGroup(db, groupId, userId, ct);
+        if (group is null) return Results.NotFound();
+
+        var email = NormalizeEmail(request.Email);
+        if (email is null)
+        {
+            return Results.BadRequest(new { error = "A valid email is required.", code = "invalid_email" });
+        }
+
+        // Check the owner first so adding the owner's own email yields a
+        // specific error instead of the generic "already a member".
+        var ownerEmail = await db.GroupAdmins
+            .Where(a => a.GroupId == groupId && a.Role == GroupAdminRole.Owner)
+            .Select(a => a.Email)
+            .FirstOrDefaultAsync(ct);
+        if (ownerEmail is not null && string.Equals(ownerEmail, email, StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Conflict(new
+            {
+                error = "The group owner is already a member.",
+                code = "is_owner"
+            });
+        }
+
+        if (await db.GroupAdmins.AnyAsync(a => a.GroupId == groupId && a.Email == email, ct))
+        {
+            return Results.Conflict(new
+            {
+                error = "This person is already a member of the group.",
+                code = "admin_exists"
+            });
+        }
+
+        var admin = new GroupAdmin
+        {
+            Id = Guid.NewGuid(),
+            GroupId = groupId,
+            Email = email,
+            Role = GroupAdminRole.Admin,
+            CreatedAt = DateTime.UtcNow
+        };
+        db.GroupAdmins.Add(admin);
+        await db.SaveChangesAsync(ct);
+
+        return Results.Created($"/api/groups/{groupId}/admins/{admin.Id}",
+            new GroupAdminResponse(admin.Id, admin.ClerkUserId, admin.Name, admin.Email, admin.Role.ToString()));
+    }
+
+    private static async Task<IResult> RemoveGroupAdmin(Guid groupId, Guid adminId, AppDbContext db, HttpContext http, CancellationToken ct)
+    {
+        var userId = GetUserId(http);
+        var group = await GetOwnedGroup(db, groupId, userId, ct);
+        if (group is null) return Results.NotFound();
+
+        var admin = await db.GroupAdmins.FirstOrDefaultAsync(a => a.Id == adminId && a.GroupId == groupId, ct);
+        if (admin is null) return Results.NotFound();
+
+        if (admin.Role == GroupAdminRole.Owner)
+        {
+            return Results.BadRequest(new
+            {
+                error = "The group owner cannot be removed from the group.",
+                code = "owner_not_removable"
+            });
+        }
+
+        db.GroupAdmins.Remove(admin);
         await db.SaveChangesAsync(ct);
 
         return Results.NoContent();
@@ -321,7 +482,7 @@ public static class AdminEndpoints
         var userId = GetUserId(http);
 
         var events = await db.Events
-            .Where(e => e.Group.GroupOwner == userId && e.Date >= from && e.Date <= to)
+            .Where(e => e.Group.Admins.Any(a => a.ClerkUserId == userId && a.Role == GroupAdminRole.Owner) && e.Date >= from && e.Date <= to)
             .Include(e => e.Group)
             .Include(e => e.TimeSlots).ThenInclude(s => s.Signups)
             .OrderBy(e => e.Date)
@@ -340,7 +501,7 @@ public static class AdminEndpoints
             .Include(e => e.Group)
             .Include(e => e.Questions).ThenInclude(q => q.Answers)
             .Include(e => e.TimeSlots).ThenInclude(s => s.Signups)
-            .FirstOrDefaultAsync(e => e.Id == id && e.Group.GroupOwner == userId, ct);
+            .FirstOrDefaultAsync(e => e.Id == id && e.Group.Admins.Any(a => a.ClerkUserId == userId && a.Role == GroupAdminRole.Owner), ct);
 
         if (evt is null) return Results.NotFound();
 
@@ -588,7 +749,7 @@ public static class AdminEndpoints
         var evt = await db.Events
             .Include(e => e.Group)
             .Include(e => e.TimeSlots).ThenInclude(s => s.Signups)
-            .FirstOrDefaultAsync(e => e.Id == id && e.Group.GroupOwner == userId, ct);
+            .FirstOrDefaultAsync(e => e.Id == id && e.Group.Admins.Any(a => a.ClerkUserId == userId && a.Role == GroupAdminRole.Owner), ct);
 
         if (evt is null) return Results.NotFound();
 
@@ -638,7 +799,7 @@ public static class AdminEndpoints
         var userId = GetUserId(http);
         var evt = await db.Events
             .Include(e => e.Group)
-            .FirstOrDefaultAsync(e => e.Id == eventId && e.Group.GroupOwner == userId, ct);
+            .FirstOrDefaultAsync(e => e.Id == eventId && e.Group.Admins.Any(a => a.ClerkUserId == userId && a.Role == GroupAdminRole.Owner), ct);
 
         if (evt is null) return Results.NotFound();
 
@@ -668,7 +829,7 @@ public static class AdminEndpoints
         var userId = GetUserId(http);
         var slot = await db.TimeSlots
             .Include(s => s.Event).ThenInclude(e => e.Group)
-            .FirstOrDefaultAsync(s => s.Id == slotId && s.EventId == eventId && s.Event.Group.GroupOwner == userId, ct);
+            .FirstOrDefaultAsync(s => s.Id == slotId && s.EventId == eventId && s.Event.Group.Admins.Any(a => a.ClerkUserId == userId && a.Role == GroupAdminRole.Owner), ct);
 
         if (slot is null) return Results.NotFound();
 
@@ -727,7 +888,7 @@ public static class AdminEndpoints
         var slot = await db.TimeSlots
             .Include(s => s.Event).ThenInclude(e => e.Group)
             .Include(s => s.Signups)
-            .FirstOrDefaultAsync(s => s.Id == slotId && s.EventId == eventId && s.Event.Group.GroupOwner == userId, ct);
+            .FirstOrDefaultAsync(s => s.Id == slotId && s.EventId == eventId && s.Event.Group.Admins.Any(a => a.ClerkUserId == userId && a.Role == GroupAdminRole.Owner), ct);
 
         if (slot is null) return Results.NotFound();
 
@@ -785,7 +946,7 @@ public static class AdminEndpoints
         var weekEnd = weekStart.AddDays(6);
 
         var events = await db.Events
-            .Where(e => e.Group.GroupOwner == userId && e.Date >= weekStart && e.Date <= weekEnd)
+            .Where(e => e.Group.Admins.Any(a => a.ClerkUserId == userId && a.Role == GroupAdminRole.Owner) && e.Date >= weekStart && e.Date <= weekEnd)
             .Include(e => e.Group)
             .Include(e => e.Questions)
             .Include(e => e.TimeSlots).ThenInclude(s => s.Signups).ThenInclude(su => su.Answers)
@@ -809,7 +970,7 @@ public static class AdminEndpoints
         var userId = GetUserId(http);
         var signup = await db.Signups
             .Include(s => s.TimeSlot).ThenInclude(s => s.Event).ThenInclude(e => e.Group)
-            .FirstOrDefaultAsync(s => s.Id == id && s.TimeSlot.Event.Group.GroupOwner == userId, ct);
+            .FirstOrDefaultAsync(s => s.Id == id && s.TimeSlot.Event.Group.Admins.Any(a => a.ClerkUserId == userId && a.Role == GroupAdminRole.Owner), ct);
 
         if (signup is null) return Results.NotFound();
 
@@ -883,7 +1044,7 @@ public static class AdminEndpoints
         var userId = GetUserId(http);
         var signup = await db.Signups
             .Include(s => s.TimeSlot).ThenInclude(s => s.Event).ThenInclude(e => e.Group)
-            .FirstOrDefaultAsync(s => s.Id == id && s.TimeSlot.Event.Group.GroupOwner == userId, ct);
+            .FirstOrDefaultAsync(s => s.Id == id && s.TimeSlot.Event.Group.Admins.Any(a => a.ClerkUserId == userId && a.Role == GroupAdminRole.Owner), ct);
 
         if (signup is null) return Results.NotFound();
 
@@ -1015,7 +1176,7 @@ public static class AdminEndpoints
             .Include(e => e.Group)
             .Include(e => e.Questions)
             .Include(e => e.TimeSlots).ThenInclude(s => s.Signups).ThenInclude(su => su.Answers)
-            .FirstOrDefaultAsync(e => e.Id == id && e.Group.GroupOwner == userId, ct);
+            .FirstOrDefaultAsync(e => e.Id == id && e.Group.Admins.Any(a => a.ClerkUserId == userId && a.Role == GroupAdminRole.Owner), ct);
 
         if (evt is null) return Results.NotFound();
 
@@ -1036,7 +1197,7 @@ public static class AdminEndpoints
         var userId = GetUserId(http);
         var evt = await db.Events
             .Include(e => e.Group)
-            .FirstOrDefaultAsync(e => e.Id == eventId && e.Group.GroupOwner == userId, ct);
+            .FirstOrDefaultAsync(e => e.Id == eventId && e.Group.Admins.Any(a => a.ClerkUserId == userId && a.Role == GroupAdminRole.Owner), ct);
 
         if (evt is null) return Results.NotFound();
 
@@ -1067,7 +1228,7 @@ public static class AdminEndpoints
         var userId = GetUserId(http);
         var evt = await db.Events
             .Include(e => e.Group)
-            .FirstOrDefaultAsync(e => e.Id == eventId && e.Group.GroupOwner == userId, ct);
+            .FirstOrDefaultAsync(e => e.Id == eventId && e.Group.Admins.Any(a => a.ClerkUserId == userId && a.Role == GroupAdminRole.Owner), ct);
 
         if (evt is null) return Results.NotFound();
 
@@ -1093,10 +1254,10 @@ public static class AdminEndpoints
     {
         var userId = GetUserId(http);
         var link = await db.InviteLinks
-            .Include(l => l.Event!).ThenInclude(e => e.Group)
+            .Include(l => l.Event!).ThenInclude(e => e.Group).ThenInclude(g => g.Admins)
             .FirstOrDefaultAsync(l => l.Id == id && l.EventId != null, ct);
 
-        if (link is null || link.Event is null || link.Event.Group.GroupOwner != userId)
+        if (link is null || link.Event is null || !link.Event.Group.Admins.Any(a => a.ClerkUserId == userId && a.Role == GroupAdminRole.Owner))
             return Results.NotFound();
 
         link.Name = Norm(request.Name);
@@ -1113,10 +1274,10 @@ public static class AdminEndpoints
     {
         var userId = GetUserId(http);
         var link = await db.InviteLinks
-            .Include(l => l.Event!).ThenInclude(e => e.Group)
+            .Include(l => l.Event!).ThenInclude(e => e.Group).ThenInclude(g => g.Admins)
             .FirstOrDefaultAsync(l => l.Id == id && l.EventId != null, ct);
 
-        if (link is null || link.Event is null || link.Event.Group.GroupOwner != userId)
+        if (link is null || link.Event is null || !link.Event.Group.Admins.Any(a => a.ClerkUserId == userId && a.Role == GroupAdminRole.Owner))
             return Results.NotFound();
 
         if (!link.IsActive) return Results.NoContent();
@@ -1142,6 +1303,9 @@ public record CreateGroupRequest(
 
 public record UpdateGroupRequest(
     [property: Required, NotWhitespace, StringLength(200)] string Name);
+
+public record AddGroupAdminRequest(
+    [property: Required, EmailAddress, StringLength(320)] string Email);
 
 public record CreateEventRequest(
     Guid GroupId,
@@ -1305,7 +1469,17 @@ public record UpdateInviteLinkRequest(
 
 // --- Response DTOs ---
 
-public record GroupResponse(Guid Id, string Name, DateTime CreatedAt, int EventCount);
+public record GroupResponse(Guid Id, string Name, DateTime CreatedAt, int EventCount, int AdminCount);
+
+public record GroupAdminResponse(Guid Id, string? ClerkUserId, string? Name, string? Email, string Role);
+
+public record GroupDetailResponse(
+    Guid Id,
+    string Name,
+    DateTime CreatedAt,
+    int EventCount,
+    List<GroupAdminResponse> Admins,
+    string CurrentUserRole);
 
 public record InviteLinkResponse(Guid Id, Guid? EventId, string Name, string Code, bool IsActive, DateTime CreatedAt, DateTime? ExpiresAt, int SignupCount);
 

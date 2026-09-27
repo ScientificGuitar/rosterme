@@ -52,7 +52,11 @@ public static class SuperAdminEndpoints
         var slots = await db.TimeSlots.CountAsync(ct);
         var signups = await db.Signups.CountAsync(ct);
         var inviteLinks = await db.InviteLinks.CountAsync(ct);
-        var owners = await db.Groups.Select(g => g.GroupOwner).Distinct().CountAsync(ct);
+        var owners = await db.GroupAdmins
+            .Where(a => a.Role == GroupAdminRole.Owner)
+            .Select(a => a.ClerkUserId)
+            .Distinct()
+            .CountAsync(ct);
         var emailsPending = await db.EmailMessages.CountAsync(m => !m.Sent, ct);
         var emailsSent = await db.EmailMessages.CountAsync(m => m.Sent, ct);
 
@@ -126,7 +130,11 @@ public static class SuperAdminEndpoints
         var groups = await db.Groups
             .OrderByDescending(g => g.CreatedAt)
             .Take(take)
-            .Select(g => new SuperAdminGroupRow(g.Id, g.Name, g.GroupOwner, g.CreatedAt))
+            .Select(g => new SuperAdminGroupRow(
+                g.Id,
+                g.Name,
+                g.Admins.Where(a => a.Role == GroupAdminRole.Owner).Select(a => a.ClerkUserId).FirstOrDefault() ?? "",
+                g.CreatedAt))
             .ToListAsync(ct);
         var events = await db.Events
             .OrderByDescending(e => e.CreatedAt)

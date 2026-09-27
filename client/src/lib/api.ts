@@ -3,6 +3,8 @@ import type {
   CreateEventRequest,
   EventWithSlots,
   Group,
+  GroupAdmin,
+  GroupDetail,
   InviteLink,
   PublicInviteData,
   CreateSlotRequest,
@@ -95,6 +97,13 @@ export function createAdminApi(getToken: () => Promise<string | null>) {
     getGroups: async () => {
       const res = await fetch(`${BASE}/groups`, { headers: await h() })
       return checkJson<Group[]>(res)
+    },
+
+    getGroup: async (groupId: string) => {
+      const res = await fetch(`${BASE}/groups/${groupId}`, {
+        headers: await h(),
+      })
+      return checkJson<GroupDetail>(res)
     },
 
     createGroup: async (name: string) => {
@@ -250,6 +259,23 @@ export function createAdminApi(getToken: () => Promise<string | null>) {
 
     deleteGroup: async (groupId: string) => {
       const res = await fetch(`${BASE}/groups/${groupId}`, {
+        method: "DELETE",
+        headers: await h(),
+      })
+      await checkVoid(res)
+    },
+
+    addGroupAdmin: async (groupId: string, email: string) => {
+      const res = await fetch(`${BASE}/groups/${groupId}/admins`, {
+        method: "POST",
+        headers: await h(),
+        body: JSON.stringify({ email }),
+      })
+      return checkJson<GroupAdmin>(res)
+    },
+
+    removeGroupAdmin: async (groupId: string, adminId: string) => {
+      const res = await fetch(`${BASE}/groups/${groupId}/admins/${adminId}`, {
         method: "DELETE",
         headers: await h(),
       })
