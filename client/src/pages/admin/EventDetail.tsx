@@ -17,6 +17,7 @@ import {
   Pencil,
   Plus,
   Power,
+  QrCode,
   Search,
   Settings,
   Trash2,
@@ -86,6 +87,8 @@ import {
   TableBleed,
 } from "@/components/ui/layout"
 import { SlotDialog, type SlotDialogSlot } from "@/components/admin/SlotDialog"
+import { InviteQrDialog } from "@/components/admin/InviteQrDialog"
+import { buildInviteUrl } from "@/lib/inviteQr"
 import { RemovalEmailHelp } from "@/components/admin/RemovalEmailSetting"
 import {
   REMOVAL_EMAIL_LABELS,
@@ -370,7 +373,7 @@ export function EventDetail() {
         <TabsContent value="invites">
           <AdminPageBody>
             <AdminPageCenter>
-              <InviteLinkSection eventId={event.id} />
+              <InviteLinkSection eventId={event.id} eventTitle={event.title} />
             </AdminPageCenter>
           </AdminPageBody>
         </TabsContent>
@@ -1180,13 +1183,15 @@ function SignupsTab({ event }: { event: RosterEvent }) {
 
 interface InviteLinkSectionProps {
   eventId: string
+  eventTitle: string
 }
 
-function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
+function InviteLinkSection({ eventId, eventTitle }: InviteLinkSectionProps) {
   const api = useApi()
   const queryClient = useQueryClient()
   const [generating, setGenerating] = useState(false)
   const [pendingLink, setPendingLink] = useState<InviteLink | null>(null)
+  const [qrLink, setQrLink] = useState<InviteLink | null>(null)
   const [revoking, setRevoking] = useState(false)
   const [inviteQuery, setInviteQuery] = useState("")
   const [createOpen, setCreateOpen] = useState(false)
@@ -1205,9 +1210,7 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
     .filter(
       (link) =>
         (link.name ?? "").toLowerCase().includes(inviteFilter) ||
-        `${window.location.origin}/invite/${link.code}`
-          .toLowerCase()
-          .includes(inviteFilter)
+        buildInviteUrl(link.code).toLowerCase().includes(inviteFilter)
     )
     .sort((a, b) => Number(b.isActive) - Number(a.isActive))
 
@@ -1223,7 +1226,7 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
         eventId,
         trimmed ? trimmed : undefined
       )
-      const url = `${window.location.origin}/invite/${link.code}`
+      const url = buildInviteUrl(link.code)
       await copyToClipboard(url)
       toast.success("Invite link copied to clipboard")
       setCreateOpen(false)
@@ -1260,7 +1263,7 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
   }
 
   const handleCopy = async (code: string) => {
-    const url = `${window.location.origin}/invite/${code}`
+    const url = buildInviteUrl(code)
     await copyToClipboard(url)
     toast.success("Link copied")
   }
@@ -1321,7 +1324,7 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
                         Signups
                       </th>
                       <th className="w-24 py-2 pl-1 font-medium">Status</th>
-                      <th className="w-28 py-2" />
+                      <th className="w-36 py-2" />
                     </tr>
                   </thead>
                   <tbody>
@@ -1335,11 +1338,13 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
                       </tr>
                     )}
                     {visibleLinks.map((link) => {
-                      const url = `${window.location.origin}/invite/${link.code}`
+                      const url = buildInviteUrl(link.code)
                       return (
                         <tr key={link.id} className="border-b last:border-0">
                           <td className="py-2 text-sm font-medium">
-                            <span className="block truncate">{link.name}</span>
+                            <span title={link.name} className="block truncate">
+                              {link.name}
+                            </span>
                           </td>
                           <td className="py-2">
                             <span
@@ -1386,6 +1391,17 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
                                 <Copy className="h-3 w-3" />
                               </Button>
                               <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => setQrLink(link)}
+                                title="QR code"
+                                aria-label={`Show QR code for ${link.name}`}
+                                disabled={!link.isActive}
+                              >
+                                <QrCode className="h-3 w-3" />
+                              </Button>
+                              <Button
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8"
@@ -1413,7 +1429,7 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
                   </li>
                 )}
                 {visibleLinks.map((link) => {
-                  const url = `${window.location.origin}/invite/${link.code}`
+                  const url = buildInviteUrl(link.code)
                   return (
                     <li key={link.id} className="px-4 py-2">
                       <div className="flex items-center justify-between gap-2">
@@ -1456,6 +1472,17 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
                           <Copy className="h-3 w-3" />
                         </Button>
                         <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          onClick={() => setQrLink(link)}
+                          title="QR code"
+                          aria-label={`Show QR code for ${link.name}`}
+                          disabled={!link.isActive}
+                        >
+                          <QrCode className="h-3 w-3" />
+                        </Button>
+                        <Button
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 shrink-0"
@@ -1496,6 +1523,14 @@ function InviteLinkSection({ eventId }: InviteLinkSectionProps) {
         isLoading={revoking}
         loadingLabel="Revoking..."
         onConfirm={handleRevoke}
+      />
+      <InviteQrDialog
+        link={qrLink}
+        eventTitle={eventTitle}
+        open={qrLink !== null}
+        onOpenChange={(open) => {
+          if (!open) setQrLink(null)
+        }}
       />
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
