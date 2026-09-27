@@ -30,6 +30,8 @@ export type Group = NumericFields<Schemas["GroupResponse"]>
 
 export type GroupAdmin = NumericFields<Schemas["GroupAdminResponse"]>
 
+export type GroupAdminRole = Schemas["GroupAdminRole"]
+
 export type GroupDetail = NumericFields<Schemas["GroupDetailResponse"]>
 
 export type AddGroupAdminRequest = NumericFields<Schemas["AddGroupAdminRequest"]>

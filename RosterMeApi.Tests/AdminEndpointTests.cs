@@ -381,6 +381,171 @@ public class AdminEndpointTests : IDisposable
         Assert.Equal("Invited Person", admin.Name);
     }
 
+    // --- Group membership (linked admins) ---
+
+    [Fact]
+    public async Task ListGroups_ShowsGroupsWhereUserIsLinkedAdmin()
+    {
+        var orgId = await SeedGroupWithLinkedAdminAsync("Member List Org");
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/groups");
+        request.Headers.Add(TestAuthHandler.UserIdHeader, TestAuthHandler.OtherUserId);
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var groups = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var group = groups.EnumerateArray().First(g => g.GetProperty("id").GetGuid() == orgId);
+        Assert.Equal("Admin", group.GetProperty("currentUserRole").GetString());
+    }
+
+    [Fact]
+    public async Task GetGroup_AsLinkedAdmin_Returns200()
+    {
+        var orgId = await SeedGroupWithLinkedAdminAsync("Member Get Org");
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/groups/{orgId}");
+        request.Headers.Add(TestAuthHandler.UserIdHeader, TestAuthHandler.OtherUserId);
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("Admin", body.GetProperty("currentUserRole").GetString());
+        Assert.Equal(2, body.GetProperty("admins").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task UpdateGroup_AsLinkedAdmin_Returns404()
+    {
+        var orgId = await SeedGroupWithLinkedAdminAsync("Owner Write Org");
+
+        var response = await AsUserAsync(
+            HttpMethod.Put, $"/api/groups/{orgId}", new { name = "Hacked" }, TestAuthHandler.OtherUserId);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteGroup_AsLinkedAdmin_Returns404()
+    {
+        var orgId = await SeedGroupWithLinkedAdminAsync("Owner Delete Org");
+
+        var response = await AsUserAsync(
+            HttpMethod.Delete, $"/api/groups/{orgId}", null, TestAuthHandler.OtherUserId);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AddGroupAdmin_AsLinkedAdmin_Returns404()
+    {
+        var orgId = await SeedGroupWithLinkedAdminAsync("Owner Admin Org");
+
+        var response = await AsUserAsync(
+            HttpMethod.Post, $"/api/groups/{orgId}/admins", new { email = "x@example.com" }, TestAuthHandler.OtherUserId);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task RemoveGroupAdmin_AsLinkedAdmin_Returns404()
+    {
+        var orgId = await SeedGroupWithLinkedAdminAsync("Owner Remove Org");
+        var detail = await _client.GetFromJsonAsync<JsonElement>($"/api/groups/{orgId}", _jsonOptions);
+        var ownerId = detail.GetProperty("admins").EnumerateArray().First().GetProperty("id").GetGuid();
+
+        var response = await AsUserAsync(
+            HttpMethod.Delete, $"/api/groups/{orgId}/admins/{ownerId}", null, TestAuthHandler.OtherUserId);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateEvent_AsLinkedAdmin_Returns201()
+    {
+        var orgId = await SeedGroupWithLinkedAdminAsync("Member Event Org");
+
+        var response = await AsUserAsync(HttpMethod.Post, "/api/events", new
+        {
+            groupId = orgId,
+            title = "Admin Made Event",
+            date = FutureDate()
+        }, TestAuthHandler.OtherUserId);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ListEvents_AsLinkedAdmin_IncludesGroupEvents()
+    {
+        var orgId = await SeedGroupWithLinkedAdminAsync("Member Events Org");
+        var create = await _client.PostAsJsonAsync("/api/events", new
+        {
+            groupId = orgId,
+            title = "Shared Event",
+            date = FutureDate()
+        });
+        var created = await create.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var eventId = created.GetProperty("id").GetGuid();
+
+        var response = await AsUserAsync(
+            HttpMethod.Get, "/api/events?from=2000-01-01&to=2100-01-01", null, TestAuthHandler.OtherUserId);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var events = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Contains(events.EnumerateArray(), e => e.GetProperty("id").GetGuid() == eventId);
+    }
+
+    [Fact]
+    public async Task UpdateEvent_AsLinkedAdmin_Returns200()
+    {
+        var orgId = await SeedGroupWithLinkedAdminAsync("Member Update Org");
+        var create = await _client.PostAsJsonAsync("/api/events", new
+        {
+            groupId = orgId,
+            title = "Shared Event",
+            date = FutureDate()
+        });
+        var created = await create.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var eventId = created.GetProperty("id").GetGuid();
+
+        var response = await AsUserAsync(
+            HttpMethod.Put, $"/api/events/{eventId}", new { title = "Renamed By Admin" }, TestAuthHandler.OtherUserId);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task InvitedAdmin_FirstInteractionSyncs_ThenSeesGroup()
+    {
+        // Owner invites someone by email (no account yet), then the invitee
+        // hits an event endpoint first — the sync filter still links them.
+        var orgId = await SeedOrgAsync("Sync Member Org");
+        await _client.PostAsJsonAsync($"/api/groups/{orgId}/admins", new { email = "sync-me@example.com" });
+
+        using (var request = new HttpRequestMessage(HttpMethod.Get, "/api/events?from=2000-01-01&to=2100-01-01"))
+        {
+            request.Headers.Add(TestAuthHandler.UserIdHeader, TestAuthHandler.OtherUserId);
+            request.Headers.Add(TestAuthHandler.EmailHeader, "sync-me@example.com");
+            var eventsResponse = await _client.SendAsync(request);
+            Assert.Equal(HttpStatusCode.OK, eventsResponse.StatusCode);
+        }
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var admin = await db.GroupAdmins.SingleAsync(a => a.GroupId == orgId && a.Email == "sync-me@example.com");
+            Assert.Equal(TestAuthHandler.OtherUserId, admin.ClerkUserId);
+        }
+
+        using var groupsRequest = new HttpRequestMessage(HttpMethod.Get, "/api/groups");
+        groupsRequest.Headers.Add(TestAuthHandler.UserIdHeader, TestAuthHandler.OtherUserId);
+        groupsRequest.Headers.Add(TestAuthHandler.EmailHeader, "sync-me@example.com");
+        var groupsResponse = await _client.SendAsync(groupsRequest);
+        var groups = await groupsResponse.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var group = groups.EnumerateArray().First(g => g.GetProperty("id").GetGuid() == orgId);
+        Assert.Equal("Admin", group.GetProperty("currentUserRole").GetString());
+    }
+
     // --- Events ---
 
     [Fact]
@@ -1654,6 +1819,28 @@ public class AdminEndpointTests : IDisposable
         var response = await _client.PostAsJsonAsync("/api/groups", new { name });
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
         return body.GetProperty("id").GetGuid();
+    }
+
+    private async Task<Guid> SeedGroupWithLinkedAdminAsync(string name)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var org = TestGroupSeeder.OwnedBy(name, TestAuthHandler.TestUserId)
+            .WithLinkedAdmin(TestAuthHandler.OtherUserId, "member@example.com");
+        db.Groups.Add(org);
+        await db.SaveChangesAsync();
+        return org.Id;
+    }
+
+    /// <summary>Sends a request authenticated as the given test user.</summary>
+    private async Task<HttpResponseMessage> AsUserAsync(
+        HttpMethod method, string url, object? body, string userId, string? email = null)
+    {
+        using var request = new HttpRequestMessage(method, url);
+        if (body is not null) request.Content = JsonContent.Create(body);
+        request.Headers.Add(TestAuthHandler.UserIdHeader, userId);
+        if (email is not null) request.Headers.Add(TestAuthHandler.EmailHeader, email);
+        return await _client.SendAsync(request);
     }
 
     private static string FutureDate(int daysAhead = 30) =>

@@ -38,6 +38,10 @@ public class AppDbContext : DbContext
             entity.HasIndex(e => e.GroupId)
                 .IsUnique()
                 .HasFilter("\"Role\" = 'Owner'");
+            // Access checks filter by (GroupId, ClerkUserId); the identity sync
+            // looks up admins globally by ClerkUserId alone.
+            entity.HasIndex(e => new { e.GroupId, e.ClerkUserId });
+            entity.HasIndex(e => e.ClerkUserId);
             entity.HasOne(e => e.Group)
                 .WithMany(g => g.Admins)
                 .HasForeignKey(e => e.GroupId)
