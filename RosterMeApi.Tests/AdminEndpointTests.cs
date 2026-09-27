@@ -93,13 +93,7 @@ public class AdminEndpointTests : IDisposable
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.Groups.Add(new Group
-            {
-                Id = otherOrgId,
-                Name = "Other Org",
-                GroupOwner = TestAuthHandler.OtherUserId,
-                CreatedAt = DateTime.UtcNow
-            });
+            db.Groups.Add(TestGroupSeeder.OwnedBy("Other Org", TestAuthHandler.OtherUserId, otherOrgId));
             await db.SaveChangesAsync();
         }
 
@@ -116,13 +110,7 @@ public class AdminEndpointTests : IDisposable
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.Groups.Add(new Group
-            {
-                Id = otherId,
-                Name = "Other Group",
-                GroupOwner = TestAuthHandler.OtherUserId,
-                CreatedAt = DateTime.UtcNow
-            });
+            db.Groups.Add(TestGroupSeeder.OwnedBy("Other Group", TestAuthHandler.OtherUserId, otherId));
             await db.SaveChangesAsync();
         }
 
@@ -165,13 +153,7 @@ public class AdminEndpointTests : IDisposable
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.Groups.Add(new Group
-            {
-                Id = otherOrgId,
-                Name = "Other Org",
-                GroupOwner = TestAuthHandler.OtherUserId,
-                CreatedAt = DateTime.UtcNow
-            });
+            db.Groups.Add(TestGroupSeeder.OwnedBy("Other Org", TestAuthHandler.OtherUserId, otherOrgId));
             await db.SaveChangesAsync();
         }
 
@@ -225,6 +207,180 @@ public class AdminEndpointTests : IDisposable
         Assert.Equal(1, group.GetProperty("eventCount").GetInt32());
     }
 
+    // --- Group admins ---
+
+    [Fact]
+    public async Task CreateGroup_CapturesOwnerIdentityFromToken()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/groups");
+        request.Content = JsonContent.Create(new { name = "Owner Identity Org" });
+        request.Headers.Add(TestAuthHandler.EmailHeader, "owner@example.com");
+        request.Headers.Add(TestAuthHandler.NameHeader, "Owner Admin");
+
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal(1, body.GetProperty("adminCount").GetInt32());
+        var orgId = body.GetProperty("id").GetGuid();
+
+        var detail = await _client.GetFromJsonAsync<JsonElement>($"/api/groups/{orgId}", _jsonOptions);
+        var owner = detail.GetProperty("admins").EnumerateArray().First();
+        Assert.Equal("Owner", owner.GetProperty("role").GetString());
+        Assert.Equal("owner@example.com", owner.GetProperty("email").GetString());
+        Assert.Equal("Owner Admin", owner.GetProperty("name").GetString());
+        Assert.Equal("Owner", detail.GetProperty("currentUserRole").GetString());
+    }
+
+    [Fact]
+    public async Task AddGroupAdmin_AddsMemberAndCounts()
+    {
+        var orgId = await SeedOrgAsync("Add Admin Org");
+
+        var response = await _client.PostAsJsonAsync($"/api/groups/{orgId}/admins", new { email = "Admin@Example.com" });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var admin = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("Admin", admin.GetProperty("role").GetString());
+        // Email is normalized: lowercased.
+        Assert.Equal("admin@example.com", admin.GetProperty("email").GetString());
+
+        var detail = await _client.GetFromJsonAsync<JsonElement>($"/api/groups/{orgId}", _jsonOptions);
+        Assert.Equal(2, detail.GetProperty("admins").GetArrayLength());
+
+        var groups = await _client.GetFromJsonAsync<JsonElement>("/api/groups", _jsonOptions);
+        var group = groups.EnumerateArray().First(g => g.GetProperty("id").GetGuid() == orgId);
+        Assert.Equal(2, group.GetProperty("adminCount").GetInt32());
+    }
+
+    [Fact]
+    public async Task AddGroupAdmin_DuplicateEmail_Returns409()
+    {
+        var orgId = await SeedOrgAsync("Dup Admin Org");
+        await _client.PostAsJsonAsync($"/api/groups/{orgId}/admins", new { email = "dup@example.com" });
+
+        var response = await _client.PostAsJsonAsync($"/api/groups/{orgId}/admins", new { email = "DUP@example.com" });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("admin_exists", body.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task AddGroupAdmin_OwnersEmail_Returns409()
+    {
+        // Owner is created with an email claim so we can attempt to re-add them.
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/groups");
+        request.Content = JsonContent.Create(new { name = "Owner Email Org" });
+        request.Headers.Add(TestAuthHandler.EmailHeader, "owner@example.com");
+        var created = await _client.SendAsync(request);
+        var orgId = (await created.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions)).GetProperty("id").GetGuid();
+
+        var response = await _client.PostAsJsonAsync($"/api/groups/{orgId}/admins", new { email = "owner@example.com" });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("is_owner", body.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task AddGroupAdmin_InvalidEmail_Returns400()
+    {
+        var orgId = await SeedOrgAsync("Invalid Email Org");
+
+        var response = await _client.PostAsJsonAsync($"/api/groups/{orgId}/admins", new { email = "not-an-email" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AddGroupAdmin_NotOwner_Returns404()
+    {
+        var otherGroupId = Guid.NewGuid();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Groups.Add(TestGroupSeeder.OwnedBy("Foreign Org", TestAuthHandler.OtherUserId, otherGroupId));
+            await db.SaveChangesAsync();
+        }
+
+        var response = await _client.PostAsJsonAsync($"/api/groups/{otherGroupId}/admins", new { email = "x@example.com" });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task RemoveGroupAdmin_RemovesMember()
+    {
+        var orgId = await SeedOrgAsync("Remove Admin Org");
+        var add = await _client.PostAsJsonAsync($"/api/groups/{orgId}/admins", new { email = "bye@example.com" });
+        var admin = await add.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var adminId = admin.GetProperty("id").GetGuid();
+
+        var response = await _client.DeleteAsync($"/api/groups/{orgId}/admins/{adminId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var remaining = await db.GroupAdmins.Where(a => a.GroupId == orgId).Select(a => a.Id).ToListAsync();
+        Assert.DoesNotContain(adminId, remaining);
+    }
+
+    [Fact]
+    public async Task RemoveGroupAdmin_Owner_Returns400()
+    {
+        var orgId = await SeedOrgAsync("Owner Remove Org");
+        var detail = await _client.GetFromJsonAsync<JsonElement>($"/api/groups/{orgId}", _jsonOptions);
+        var ownerId = detail.GetProperty("admins").EnumerateArray().First().GetProperty("id").GetGuid();
+
+        var response = await _client.DeleteAsync($"/api/groups/{orgId}/admins/{ownerId}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        Assert.Equal("owner_not_removable", body.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task GetGroup_ReturnsAdminsOwnedFirst()
+    {
+        var orgId = await SeedOrgAsync("Detail Org");
+        await _client.PostAsJsonAsync($"/api/groups/{orgId}/admins", new { email = "member@example.com" });
+
+        var response = await _client.GetAsync($"/api/groups/{orgId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(_jsonOptions);
+        var admins = body.GetProperty("admins").EnumerateArray().ToList();
+        Assert.Equal(2, admins.Count);
+        Assert.Equal("Owner", admins[0].GetProperty("role").GetString());
+        Assert.Equal("Admin", admins[1].GetProperty("role").GetString());
+        Assert.Equal("Owner", body.GetProperty("currentUserRole").GetString());
+    }
+
+    [Fact]
+    public async Task AdminInvitedByEmail_IsLinkedToClerkId_OnSignIn()
+    {
+        var orgId = await SeedOrgAsync("Link Org");
+        await _client.PostAsJsonAsync($"/api/groups/{orgId}/admins", new { email = "invitee@example.com" });
+
+        // The invited person signs in for the first time with their email claim.
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/groups");
+        request.Headers.Add(TestAuthHandler.UserIdHeader, TestAuthHandler.OtherUserId);
+        request.Headers.Add(TestAuthHandler.EmailHeader, "invitee@example.com");
+        request.Headers.Add(TestAuthHandler.NameHeader, "Invited Person");
+
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var admin = await db.GroupAdmins.SingleAsync(a => a.GroupId == orgId && a.Email == "invitee@example.com");
+        Assert.Equal(TestAuthHandler.OtherUserId, admin.ClerkUserId);
+        Assert.Equal("Invited Person", admin.Name);
+    }
+
     // --- Events ---
 
     [Fact]
@@ -249,13 +405,7 @@ public class AdminEndpointTests : IDisposable
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.Groups.Add(new Group
-            {
-                Id = otherGroupId,
-                Name = "Other Group",
-                GroupOwner = TestAuthHandler.OtherUserId,
-                CreatedAt = DateTime.UtcNow
-            });
+            db.Groups.Add(TestGroupSeeder.OwnedBy("Other Group", TestAuthHandler.OtherUserId, otherGroupId));
             await db.SaveChangesAsync();
         }
 
@@ -302,13 +452,7 @@ public class AdminEndpointTests : IDisposable
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.Groups.Add(new Group
-            {
-                Id = otherGroupId,
-                Name = "Other Group",
-                GroupOwner = TestAuthHandler.OtherUserId,
-                CreatedAt = DateTime.UtcNow
-            });
+            db.Groups.Add(TestGroupSeeder.OwnedBy("Other Group", TestAuthHandler.OtherUserId, otherGroupId));
             await db.SaveChangesAsync();
         }
         var create = await _client.PostAsJsonAsync("/api/events", new
@@ -945,7 +1089,9 @@ public class AdminEndpointTests : IDisposable
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var stored = await db.Signups.Include(s => s.TimeSlot).ThenInclude(s => s.Event).ThenInclude(e => e.Group)
                 .SingleAsync(s => s.Id == signupId);
-            stored.TimeSlot.Event.Group.GroupOwner = TestAuthHandler.OtherUserId;
+            var ownerAdmin = await db.GroupAdmins
+                .SingleAsync(a => a.GroupId == stored.TimeSlot.Event.GroupId && a.Role == GroupAdminRole.Owner);
+            ownerAdmin.ClerkUserId = TestAuthHandler.OtherUserId;
             await db.SaveChangesAsync();
         }
 
@@ -978,13 +1124,7 @@ public class AdminEndpointTests : IDisposable
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var org = new Group
-            {
-                Id = Guid.NewGuid(),
-                Name = "Other",
-                GroupOwner = TestAuthHandler.OtherUserId,
-                CreatedAt = DateTime.UtcNow
-            };
+            var org = TestGroupSeeder.OwnedBy("Other", TestAuthHandler.OtherUserId);
             db.Groups.Add(org);
             db.Events.Add(new Event
             {

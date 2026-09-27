@@ -8,6 +8,7 @@ public class AppDbContext : DbContext
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     public DbSet<Group> Groups => Set<Group>();
+    public DbSet<GroupAdmin> GroupAdmins => Set<GroupAdmin>();
     public DbSet<Event> Events => Set<Event>();
     public DbSet<TimeSlot> TimeSlots => Set<TimeSlot>();
     public DbSet<Signup> Signups => Set<Signup>();
@@ -22,8 +23,25 @@ public class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
-            entity.Property(e => e.GroupOwner).HasMaxLength(100).IsRequired();
-            entity.HasIndex(e => e.GroupOwner);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+        });
+
+        modelBuilder.Entity<GroupAdmin>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ClerkUserId).HasMaxLength(100);
+            entity.Property(e => e.Name).HasMaxLength(200);
+            entity.Property(e => e.Email).HasMaxLength(320);
+            entity.Property(e => e.Role).HasConversion<string>().HasMaxLength(20).IsRequired();
+            entity.HasIndex(e => new { e.GroupId, e.Email }).IsUnique();
+            // Exactly one owner per group, enforced at the database level.
+            entity.HasIndex(e => e.GroupId)
+                .IsUnique()
+                .HasFilter("\"Role\" = 'Owner'");
+            entity.HasOne(e => e.Group)
+                .WithMany(g => g.Admins)
+                .HasForeignKey(e => e.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
         });
 

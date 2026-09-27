@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Dashboard } from "@/pages/admin/Dashboard"
 import { SuperAdminPage } from "@/pages/admin/SuperAdminPage"
 import { GroupsPage } from "@/pages/admin/GroupsPage"
+import { GroupEditPage } from "@/pages/admin/GroupEditPage"
 import { CreateEvent } from "@/pages/admin/CreateEvent"
 import { EventDetail } from "@/pages/admin/EventDetail"
 import { EditEvent } from "@/pages/admin/EditEvent"
@@ -39,6 +40,11 @@ import { confirmNavigation } from "@/hooks/useUnsavedChanges"
 function EditEventWrapper() {
   const { id } = useParams()
   return <EditEvent key={id} />
+}
+
+function GroupEditWrapper() {
+  const { id } = useParams()
+  return <GroupEditPage key={id} />
 }
 
 function EventDetailWrapper() {
@@ -121,6 +127,8 @@ function useMobileBar(): { title: string; backTo: string | null } {
     return { title: "Edit Event", backTo: `/events/${editMatch.params.id}` }
   if (matchPath("/events/:id", pathname))
     return { title: "Event Details", backTo: "/dashboard" }
+  if (matchPath("/groups/:id", pathname))
+    return { title: "Edit Group", backTo: "/groups" }
   if (matchPath("/groups", pathname)) return { title: "Groups", backTo: null }
   if (matchPath("/reports", pathname)) return { title: "Reports", backTo: null }
   if (matchPath("/admin", pathname)) return { title: "Admin", backTo: null }
@@ -192,6 +200,7 @@ export function App() {
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/groups" element={<GroupsPage />} />
+            <Route path="/groups/:id" element={<GroupEditWrapper />} />
             <Route path="/events" element={<Dashboard />} />
             <Route path="/events/new" element={<CreateEvent />} />
             <Route path="/events/:id" element={<EventDetailWrapper />} />

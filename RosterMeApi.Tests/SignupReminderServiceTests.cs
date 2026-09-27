@@ -165,13 +165,7 @@ public class SignupReminderServiceTests
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var org = new Group
-        {
-            Id = Guid.NewGuid(),
-            Name = "Reminder Test Org",
-            GroupOwner = TestAuthHandler.TestUserId,
-            CreatedAt = DateTime.UtcNow
-        };
+        var org = TestGroupSeeder.OwnedBy("Reminder Test Org", TestAuthHandler.TestUserId);
         var evt = new Event
         {
             Id = Guid.NewGuid(),

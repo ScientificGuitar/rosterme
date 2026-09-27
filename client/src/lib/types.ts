@@ -28,6 +28,12 @@ export type UpdateGroupRequest = NumericFields<Schemas["UpdateGroupRequest"]>
 
 export type Group = NumericFields<Schemas["GroupResponse"]>
 
+export type GroupAdmin = NumericFields<Schemas["GroupAdminResponse"]>
+
+export type GroupDetail = NumericFields<Schemas["GroupDetailResponse"]>
+
+export type AddGroupAdminRequest = NumericFields<Schemas["AddGroupAdminRequest"]>
+
 export type CreateSlotRequest = NumericFields<Schemas["CreateSlotRequest"]>
 
 export type PublicInviteData = NumericFields<Schemas["InvitePageResponse"]>

@@ -146,13 +146,7 @@ public class CascadeDeleteTests(IntegrationTestFactory factory) : IDisposable
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var org = new Group
-        {
-            Id = Guid.NewGuid(),
-            Name = name,
-            GroupOwner = TestAuthHandler.TestUserId,
-            CreatedAt = DateTime.UtcNow
-        };
+        var org = TestGroupSeeder.OwnedBy(name, TestAuthHandler.TestUserId);
         db.Groups.Add(org);
         await db.SaveChangesAsync();
         return org.Id;

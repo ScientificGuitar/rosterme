@@ -12,6 +12,8 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
     public const string OtherUserId = "test-admin-2";
     public const string UserIdHeader = "X-Test-UserId";
     public const string RoleHeader = "X-Test-Role";
+    public const string EmailHeader = "X-Test-Email";
+    public const string NameHeader = "X-Test-Name";
 
     public TestAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
@@ -31,6 +33,18 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
             var role = roles.First()!;
             if (!string.IsNullOrWhiteSpace(role))
                 claims.Add(new Claim("role", role));
+        }
+        if (Context.Request.Headers.TryGetValue(EmailHeader, out var emails))
+        {
+            var email = emails.First()!;
+            if (!string.IsNullOrWhiteSpace(email))
+                claims.Add(new Claim("email", email));
+        }
+        if (Context.Request.Headers.TryGetValue(NameHeader, out var names))
+        {
+            var name = names.First()!;
+            if (!string.IsNullOrWhiteSpace(name))
+                claims.Add(new Claim("name", name));
         }
         var identity = new ClaimsIdentity(claims, "Test");
         var principal = new ClaimsPrincipal(identity);

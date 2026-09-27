@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { Link } from "react-router-dom"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Pencil, Trash2, Users } from "lucide-react"
@@ -195,6 +196,7 @@ export function GroupsPage() {
                       <thead>
                         <tr className="border-b text-left text-muted-foreground">
                           <th className="py-2 font-medium">Name</th>
+                          <th className="w-24 py-2 font-medium">Members</th>
                           <th className="w-28 py-2 font-medium">Events</th>
                           <th className="w-20 py-2" />
                         </tr>
@@ -208,14 +210,33 @@ export function GroupsPage() {
                               className="border-b last:border-0"
                             >
                               <td className="py-2">
-                                <RowPrimary>{group.name}</RowPrimary>
-                                <RowSecondary>
-                                  Created {formatCreatedAt(group.createdAt)}
-                                </RowSecondary>
+                                <Link
+                                  to={`/groups/${group.id}`}
+                                  className="block rounded outline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                                >
+                                  <RowPrimary>{group.name}</RowPrimary>
+                                  <RowSecondary>
+                                    Created{" "}
+                                    {formatCreatedAt(group.createdAt)}
+                                  </RowSecondary>
+                                </Link>
                               </td>
                               <td className="py-2">
                                 <Badge
-                                  variant={hasEvents ? "default" : "secondary"}
+                                  variant="secondary"
+                                  title="Admins of this group"
+                                >
+                                  {group.adminCount}{" "}
+                                  {group.adminCount === 1
+                                    ? "member"
+                                    : "members"}
+                                </Badge>
+                              </td>
+                              <td className="py-2">
+                                <Badge
+                                  variant={
+                                    hasEvents ? "default" : "secondary"
+                                  }
                                   title={
                                     hasEvents
                                       ? "This group has events and cannot be deleted"
@@ -223,7 +244,9 @@ export function GroupsPage() {
                                   }
                                 >
                                   {group.eventCount}{" "}
-                                  {group.eventCount === 1 ? "event" : "events"}
+                                  {group.eventCount === 1
+                                    ? "event"
+                                    : "events"}
                                 </Badge>
                               </td>
                               <td className="py-2">
@@ -270,7 +293,12 @@ export function GroupsPage() {
                       return (
                         <li key={group.id} className="px-4 py-2">
                           <div className="flex items-center justify-between gap-2">
-                            <RowPrimary>{group.name}</RowPrimary>
+                            <Link
+                              to={`/groups/${group.id}`}
+                              className="min-w-0 flex-1 rounded outline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                            >
+                              <RowPrimary>{group.name}</RowPrimary>
+                            </Link>
                             <Badge
                               variant={hasEvents ? "default" : "secondary"}
                             >
@@ -279,9 +307,15 @@ export function GroupsPage() {
                             </Badge>
                           </div>
                           <div className="mt-1 flex items-center justify-between gap-2">
-                            <RowSecondary>
-                              Created {formatCreatedAt(group.createdAt)}
-                            </RowSecondary>
+                            <div className="min-w-0">
+                              <RowSecondary>
+                                Created {formatCreatedAt(group.createdAt)}
+                              </RowSecondary>
+                              <RowSecondary>
+                                {group.adminCount}{" "}
+                                {group.adminCount === 1 ? "member" : "members"}
+                              </RowSecondary>
+                            </div>
                             <div className="flex shrink-0 items-center gap-1">
                               <Button
                                 variant="outline"
