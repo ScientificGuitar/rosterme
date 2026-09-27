@@ -1811,6 +1811,7 @@ export interface components {
         AddGroupAdminRequest: {
             email: string;
         };
+        GroupAdminRole: "Owner" | "Admin";
         GroupAdminResponse: {
             /** Format: uuid */
             id: string;
@@ -1828,7 +1829,7 @@ export interface components {
             /** Format: int32 */
             eventCount: number | string;
             admins: components["schemas"]["GroupAdminResponse"][];
-            currentUserRole: string;
+            currentUserRole: components["schemas"]["GroupAdminRole"];
         };
         GroupResponse: {
             /** Format: uuid */
@@ -1840,6 +1841,7 @@ export interface components {
             eventCount: number | string;
             /** Format: int32 */
             adminCount: number | string;
+            currentUserRole: components["schemas"]["GroupAdminRole"];
         };
         InviteLinkResponse: {
             /** Format: uuid */

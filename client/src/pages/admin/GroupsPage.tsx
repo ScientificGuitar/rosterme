@@ -204,6 +204,7 @@ export function GroupsPage() {
                       <tbody>
                         {visible.map((group) => {
                           const hasEvents = group.eventCount > 0
+                          const isOwner = group.currentUserRole === "Owner"
                           return (
                             <tr
                               key={group.id}
@@ -250,36 +251,38 @@ export function GroupsPage() {
                                 </Badge>
                               </td>
                               <td className="py-2">
-                                <div className="flex items-center justify-end gap-1">
-                                  <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => openEdit(group)}
-                                    title="Rename group"
-                                    aria-label={`Rename ${group.name}`}
-                                  >
-                                    <Pencil className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                    onClick={() =>
-                                      hasEvents
-                                        ? setBlockedGroup(group)
-                                        : setDeleting(group)
-                                    }
-                                    title={
-                                      hasEvents
-                                        ? "Why can't this group be deleted?"
-                                        : `Delete ${group.name}`
-                                    }
-                                    aria-label={`Delete ${group.name}`}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </div>
+                                {isOwner && (
+                                  <div className="flex items-center justify-end gap-1">
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={() => openEdit(group)}
+                                      title="Rename group"
+                                      aria-label={`Rename ${group.name}`}
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                      onClick={() =>
+                                        hasEvents
+                                          ? setBlockedGroup(group)
+                                          : setDeleting(group)
+                                      }
+                                      title={
+                                        hasEvents
+                                          ? "Why can't this group be deleted?"
+                                          : `Delete ${group.name}`
+                                      }
+                                      aria-label={`Delete ${group.name}`}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                )}
                               </td>
                             </tr>
                           )
@@ -290,6 +293,7 @@ export function GroupsPage() {
                   <MobileRowList>
                     {visible.map((group) => {
                       const hasEvents = group.eventCount > 0
+                      const isOwner = group.currentUserRole === "Owner"
                       return (
                         <li key={group.id} className="px-4 py-2">
                           <div className="flex items-center justify-between gap-2">
@@ -316,36 +320,38 @@ export function GroupsPage() {
                                 {group.adminCount === 1 ? "member" : "members"}
                               </RowSecondary>
                             </div>
-                            <div className="flex shrink-0 items-center gap-1">
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => openEdit(group)}
-                                title="Rename group"
-                                aria-label={`Rename ${group.name}`}
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                onClick={() =>
-                                  hasEvents
-                                    ? setBlockedGroup(group)
-                                    : setDeleting(group)
-                                }
-                                title={
-                                  hasEvents
-                                    ? "Why can't this group be deleted?"
-                                    : `Delete ${group.name}`
-                                }
-                                aria-label={`Delete ${group.name}`}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
+                            {isOwner && (
+                              <div className="flex shrink-0 items-center gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => openEdit(group)}
+                                  title="Rename group"
+                                  aria-label={`Rename ${group.name}`}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  onClick={() =>
+                                    hasEvents
+                                      ? setBlockedGroup(group)
+                                      : setDeleting(group)
+                                  }
+                                  title={
+                                    hasEvents
+                                      ? "Why can't this group be deleted?"
+                                      : `Delete ${group.name}`
+                                  }
+                                  aria-label={`Delete ${group.name}`}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         </li>
                       )

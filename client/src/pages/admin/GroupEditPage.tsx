@@ -186,6 +186,7 @@ function GroupEditor({ group, groupId }: { group: GroupDetail; groupId: string }
   }
 
   const owner = group.admins.find((a) => a.role === "Owner")
+  const isOwner = group.currentUserRole === "Owner"
 
   const visibleAdmins = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -237,16 +238,24 @@ function GroupEditor({ group, groupId }: { group: GroupDetail; groupId: string }
                     required
                     maxLength={200}
                     className="max-w-sm"
+                    disabled={!isOwner}
                   />
-                  <Button
-                    type="submit"
-                    disabled={
-                      savingName || !name.trim() || name.trim() === group.name
-                    }
-                  >
-                    {savingName ? "Saving..." : "Save"}
-                  </Button>
+                  {isOwner && (
+                    <Button
+                      type="submit"
+                      disabled={
+                        savingName || !name.trim() || name.trim() === group.name
+                      }
+                    >
+                      {savingName ? "Saving..." : "Save"}
+                    </Button>
+                  )}
                 </div>
+                {!isOwner && (
+                  <p className="muted">
+                    Only the group owner can rename this group.
+                  </p>
+                )}
               </form>
             </DataCardContent>
           </DataCard>
@@ -305,44 +314,48 @@ function GroupEditor({ group, groupId }: { group: GroupDetail; groupId: string }
                             Owner
                           </Badge>
                         ) : (
-                          <>
-                            <Badge variant="secondary">Admin</Badge>
-                            <RowIconButton
-                              onClick={() => setRemoving(admin)}
-                              title={`Remove ${admin.email ?? "member"}`}
-                              aria-label={`Remove ${admin.email ?? "member"}`}
-                              className="text-muted-foreground hover:text-destructive"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </RowIconButton>
-                          </>
+                          <Badge variant="secondary">Admin</Badge>
+                        )}
+                        {isOwner && owner && admin.id !== owner.id && (
+                          <RowIconButton
+                            onClick={() => setRemoving(admin)}
+                            title={`Remove ${admin.email ?? "member"}`}
+                            aria-label={`Remove ${admin.email ?? "member"}`}
+                            className="text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </RowIconButton>
                         )}
                       </div>
                     </DataRow>
                   ))}
                 </DataRowList>
               )}
-              <GhostAddRow onClick={() => setAddOpen(true)}>
-                Add member
-              </GhostAddRow>
+              {isOwner && (
+                <GhostAddRow onClick={() => setAddOpen(true)}>
+                  Add member
+                </GhostAddRow>
+              )}
             </DataCardContent>
           </DataCard>
 
-          <DataCard className="border-destructive/40">
-            <DataCardHeader>
-              <DataCardTitle icon={UserRoundCog}>Danger zone</DataCardTitle>
-            </DataCardHeader>
-            <DataCardDivider />
-            <DataCardContent>
-              <Button
-                variant="destructive"
-                onClick={() => setDeleteOpen(true)}
-                disabled={deleteBusy}
-              >
-                <Trash2 className="mr-1.5 h-4 w-4" /> Delete group
-              </Button>
-            </DataCardContent>
-          </DataCard>
+          {isOwner && (
+            <DataCard className="border-destructive/40">
+              <DataCardHeader>
+                <DataCardTitle icon={UserRoundCog}>Danger zone</DataCardTitle>
+              </DataCardHeader>
+              <DataCardDivider />
+              <DataCardContent>
+                <Button
+                  variant="destructive"
+                  onClick={() => setDeleteOpen(true)}
+                  disabled={deleteBusy}
+                >
+                  <Trash2 className="mr-1.5 h-4 w-4" /> Delete group
+                </Button>
+              </DataCardContent>
+            </DataCard>
+          )}
         </AdminPageCenter>
       </AdminPageBody>
 
