@@ -1,7 +1,10 @@
 using System.ComponentModel.DataAnnotations;
+using System.Security.Cryptography;
+using System.Text;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
 using RosterMeApi.Data;
@@ -19,6 +22,19 @@ public static class PublicEndpoints
 
         pub.MapGet("/{code}", GetInvitePage)
             .Produces<InvitePageResponse>()
+            .Produces(404);
+        // Server-rendered link previews for chat-platform unfurlers
+        // (Discord, WhatsApp, ...), which don't execute the SPA's JS.
+        // The frontend nginx routes bot user-agents here; humans always
+        // get index.html. Title/group/date only — never location, emails,
+        // or signup counts.
+        pub.MapGet("/{code}/unfurl", GetInviteUnfurl)
+            .Produces(200, contentType: "text/html")
+            .Produces(404, contentType: "text/html");
+        pub.MapGet("/{code}/og-image.png", GetInviteOgImage)
+            .Produces(200, contentType: "image/png")
+            .Produces(302)
+            .Produces(304)
             .Produces(404);
         pub.MapPost("/{code}/signups", CreateSignup)
             .RequireRateLimiting("signup")
@@ -100,6 +116,97 @@ public static class PublicEndpoints
                     ))
             )
         ));
+    }
+
+    private static async Task<IResult> GetInviteUnfurl(
+        string code,
+        AppDbContext db,
+        IOptions<EmailOptions> emailOptions,
+        HttpContext http,
+        CancellationToken ct)
+    {
+        var baseUrl = ResolvePublicBaseUrl(emailOptions, http);
+        var inviteUrl = $"{baseUrl}/invite/{code}";
+
+        var data = await FindUnfurlDataAsync(db, code, ct);
+        if (data is null)
+        {
+            // Generic fallback: same stance as the SPA's "Invalid invite
+            // link" page — no event data leaks for revoked/expired codes.
+            var fallback = InviteUnfurlBuilder.BuildFallbackHtml(inviteUrl, $"{baseUrl}/og-image.png");
+            return Results.Content(fallback, "text/html; charset=utf-8", statusCode: 404);
+        }
+
+        var html = InviteUnfurlBuilder.BuildHtml(data, inviteUrl, $"{baseUrl}/api/invite/{code}/og-image.png");
+        // Crawlers cache aggressively on their side; a short max-age keeps
+        // organizer edits reasonably fresh without hammering the database.
+        http.Response.Headers.CacheControl = "public, max-age=300";
+        return Results.Content(html, "text/html; charset=utf-8");
+    }
+
+    private static async Task<IResult> GetInviteOgImage(
+        string code,
+        AppDbContext db,
+        IMemoryCache cache,
+        IOptions<EmailOptions> emailOptions,
+        HttpContext http,
+        ILoggerFactory loggerFactory,
+        CancellationToken ct)
+    {
+        var baseUrl = ResolvePublicBaseUrl(emailOptions, http);
+        var data = await FindUnfurlDataAsync(db, code, ct);
+        if (data is null)
+            return Results.Redirect($"{baseUrl}/og-image.png", permanent: false);
+
+        // Content-keyed cache: re-renders when the organizer edits the
+        // title/group/date (there is no UpdatedAt column to key on), with a
+        // 30-minute absolute expiry as a memory backstop.
+        var contentKey = $"{data.EventTitle}\n{data.GroupName}\n{data.EventDate:yyyy-MM-dd}";
+        var contentHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(contentKey)));
+        var cacheKey = $"ogimg:{code}";
+
+        byte[] png;
+        if (cache.TryGetValue<(string Hash, byte[] Png)>(cacheKey, out var cached) && cached.Hash == contentHash)
+        {
+            png = cached.Png;
+        }
+        else
+        {
+            try
+            {
+                png = InviteOgImageRenderer.Render(data);
+            }
+            catch (Exception ex)
+            {
+                loggerFactory.CreateLogger("InviteUnfurl").LogWarning(ex, "OG image render failed for invite {Code}", code);
+                return Results.Redirect($"{baseUrl}/og-image.png", permanent: false);
+            }
+            cache.Set(cacheKey, (contentHash, png), TimeSpan.FromMinutes(30));
+        }
+
+        var etag = $"\"og-{contentHash[..16].ToLowerInvariant()}\"";
+        if (http.Request.Headers.IfNoneMatch.Any(v => v is not null && (v.Trim() == etag || v.Trim() == "*")))
+            return Results.StatusCode(StatusCodes.Status304NotModified);
+
+        http.Response.Headers.ETag = etag;
+        http.Response.Headers.CacheControl = "public, max-age=3600";
+        return Results.Bytes(png, "image/png");
+    }
+
+    private static Task<InviteUnfurlData?> FindUnfurlDataAsync(AppDbContext db, string code, CancellationToken ct) =>
+        db.InviteLinks
+            .Where(l => l.Code == code && l.IsActive
+                && (!l.ExpiresAt.HasValue || l.ExpiresAt.Value > DateTime.UtcNow))
+            .Where(l => l.Event != null)
+            .Select(l => new InviteUnfurlData(l.Event!.Title, l.Event.Group.Name, l.Event.Date))
+            .FirstOrDefaultAsync(ct);
+
+    private static string ResolvePublicBaseUrl(IOptions<EmailOptions> emailOptions, HttpContext http)
+    {
+        var configured = emailOptions.Value.BaseUrl?.Trim().TrimEnd('/');
+        if (!string.IsNullOrEmpty(configured))
+            return configured;
+        return $"{http.Request.Scheme}://{http.Request.Host}";
     }
 
     private static async Task<IResult> CreateSignup(
