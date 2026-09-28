@@ -121,6 +121,9 @@ builder.Services.AddHealthChecks()
 
 builder.Services.AddProblemDetails();
 
+// Backs the per-invite OG image cache (InviteUnfurl endpoints).
+builder.Services.AddMemoryCache();
+
 // Integration tests set Testing:DisableRateLimiting=true (via environment
 // variable from the test factory) so the suite isn't throttled by the signup
 // policy — no test asserts 429, and sequential signup-heavy tests would

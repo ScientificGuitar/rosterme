@@ -7,7 +7,7 @@ RUN dotnet publish -c Release -o /publish --no-restore -p:DebugType=none -p:Debu
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
-RUN apt-get update && apt-get install -y curl --no-install-recommends && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y curl fontconfig fonts-dejavu-core --no-install-recommends && rm -rf /var/lib/apt/lists/*
 COPY --from=build /publish .
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "RosterMeApi.dll"]
