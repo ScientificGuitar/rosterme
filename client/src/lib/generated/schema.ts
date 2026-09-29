@@ -435,6 +435,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/events/recurring": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateRecurringEventsRequest"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EventResponse"][];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events/{id}": {
         parameters: {
             query?: never;
@@ -1894,6 +1954,19 @@ export interface components {
             /** Format: date-time */
             expiresAt: null | string;
         };
+        CreateRecurringEventsRequest: {
+            /** Format: uuid */
+            groupId: string;
+            title: string;
+            description: null | string;
+            location: null | string;
+            /** Format: date */
+            date: string;
+            removalEmailPolicy: null | components["schemas"]["RemovalEmailPolicy"];
+            recurrence: components["schemas"]["RecurrenceRequest"];
+            slots: null | components["schemas"]["CreateSlotRequest"][];
+            questions: null | components["schemas"]["QuestionUpsert"][];
+        };
         CreateSlotRequest: {
             label: string;
             /** Format: time */
@@ -1909,6 +1982,8 @@ export interface components {
             /** Format: int32 */
             count: number | string;
         };
+        /** @enum {unknown} */
+        DayOfWeek: "Sunday" | "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday";
         EventActivityListResponse: {
             items: components["schemas"]["EventActivityResponse"][];
             /** Format: int32 */
@@ -2073,6 +2148,18 @@ export interface components {
             type: null | components["schemas"]["QuestionType"];
             required: boolean;
             options: null | string[];
+        };
+        /** @enum {unknown} */
+        RecurrenceFrequency: "Daily" | "Weekly" | "Monthly";
+        RecurrenceRequest: {
+            frequency: components["schemas"]["RecurrenceFrequency"];
+            /** Format: int32 */
+            interval: null | number | string;
+            daysOfWeek: null | components["schemas"]["DayOfWeek"][];
+            /** Format: int32 */
+            count: null | number | string;
+            /** Format: date */
+            untilDate: null | string;
         };
         /** @enum {unknown} */
         RemovalEmailPolicy: "Ask" | "Always" | "Never";

@@ -46,6 +46,7 @@ import type { RemovalEmailPolicy } from "@/lib/removalEmailPolicy"
 import { SlotRowCard } from "@/components/admin/SlotRowCard"
 import { StickySaveBar } from "@/components/admin/StickySaveBar"
 import { QuestionRowCard } from "@/components/admin/QuestionRowCard"
+import { RecurrenceSection } from "@/components/admin/RecurrenceSection"
 import { useApi } from "@/hooks/useApi"
 import {
   useUnsavedChangesPrompt,
@@ -72,6 +73,14 @@ import {
   buildQuestionPayload,
   type QuestionDraft,
 } from "@/lib/eventQuestions"
+import {
+  buildRecurrencePayload,
+  createEmptyRecurrence,
+  formatDateSpan,
+  planOccurrences,
+  validateRecurrence,
+  type RecurrenceDraft,
+} from "@/lib/recurrence"
 
 type Tab = "overview" | "slots" | "settings"
 
@@ -87,6 +96,9 @@ export function CreateEvent() {
   const [date, setDate] = useState("")
   const [slots, setSlots] = useState<SlotDraft[]>([])
   const [questions, setQuestions] = useState<QuestionDraft[]>([])
+  const [recurrence, setRecurrence] = useState<RecurrenceDraft>(() =>
+    createEmptyRecurrence("")
+  )
   const [removalEmailPolicy, setRemovalEmailPolicy] =
     useState<RemovalEmailPolicy>("Ask")
   const [submitting, setSubmitting] = useState(false)
@@ -127,7 +139,8 @@ export function CreateEvent() {
     date !== "" ||
     removalEmailPolicy !== "Ask" ||
     slots.length > 0 ||
-    questions.length > 0
+    questions.length > 0 ||
+    recurrence.enabled
   useUnsavedChangesPrompt(isDirty)
 
   const handleCancel = () => {
@@ -195,6 +208,12 @@ export function CreateEvent() {
     setSlotErrors(errors)
     const questionErrs = validateQuestionDrafts(questions)
     setQuestionErrors(questionErrs)
+    const recurrenceErr = validateRecurrence(date, recurrence)
+    if (recurrenceErr) {
+      toast.error(recurrenceErr)
+      setTab("overview")
+      return
+    }
     if (Object.keys(errors).length > 0) {
       toast.error("Fix the highlighted time slots before saving.")
       setTab("slots")
@@ -208,6 +227,49 @@ export function CreateEvent() {
     setSubmitting(true)
 
     try {
+      if (recurrence.enabled) {
+        const payload = buildRecurrencePayload(recurrence)
+        if (!payload) {
+          toast.error("Fix the repeat settings before saving.")
+          setTab("overview")
+          return
+        }
+        const created = await api.createRecurringEvents({
+          groupId,
+          title: title.trim(),
+          description: description.trim() || null,
+          location: location.trim() || null,
+          date,
+          removalEmailPolicy,
+          recurrence: payload,
+          slots: slots.length > 0 ? buildSlotCreatePayload(slots) : null,
+          questions:
+            questions.length > 0 ? buildQuestionPayload(questions) : null,
+        })
+        const plan = planOccurrences(date, recurrence)
+        const span = formatDateSpan(created.map((e) => e.date))
+        if (
+          plan &&
+          (plan.truncated ||
+            created.length < (plan.requestedTotal ?? created.length))
+        ) {
+          const want =
+            plan.requestedTotal !== null
+              ? ` of ${plan.requestedTotal} requested`
+              : ""
+          toast.warning(
+            `Created ${created.length}${want} (${span}) — repeats are limited to 60 occurrences within 12 months.`
+          )
+        } else {
+          toast.success(
+            `${created.length} event${created.length === 1 ? "" : "s"} created (${span})`
+          )
+        }
+        await queryClient.invalidateQueries({ queryKey: ["events"] })
+        await queryClient.invalidateQueries({ queryKey: ["groups"] })
+        navigate("/dashboard")
+        return
+      }
       const { id } = await api.createEvent({
         groupId,
         title: title.trim(),
@@ -289,6 +351,11 @@ export function CreateEvent() {
                       onLocationChange={setLocation}
                       onDateChange={setDate}
                       dateMin={todayLocal()}
+                    />
+                    <RecurrenceSection
+                      startDate={date}
+                      draft={recurrence}
+                      onChange={setRecurrence}
                     />
                   </DataCardContent>
                 </DataCard>

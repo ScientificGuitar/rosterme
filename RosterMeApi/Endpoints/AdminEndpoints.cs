@@ -59,6 +59,11 @@ public static class AdminEndpoints
             .Produces(400)
             .Produces(401)
             .Produces(404);
+        admin.MapPost("/events/recurring", CreateRecurringEvents)
+            .Produces<List<EventResponse>>(201)
+            .Produces(400)
+            .Produces(401)
+            .Produces(404);
         admin.MapGet("/events", ListEvents)
             .Produces<IEnumerable<EventWithSlotsResponse>>()
             .Produces(401);
@@ -509,6 +514,102 @@ public static class AdminEndpoints
         return Results.Created($"/api/events/{evt.Id}", new EventResponse(
             evt.Id, evt.GroupId, evt.Title, evt.Description, evt.Location, evt.Date, evt.RemovalEmailPolicy, evt.CreatedAt
         ));
+    }
+
+    private static async Task<IResult> CreateRecurringEvents(CreateRecurringEventsRequest request, AppDbContext db, ActivityLogService activity, HttpContext http, CancellationToken ct)
+    {
+        var userId = GetUserId(http);
+        var group = await GetAccessibleGroup(db, request.GroupId, userId, ct);
+        if (group is null) return Results.NotFound();
+
+        var interval = request.Recurrence.Interval ?? 1;
+        var dates = RecurrenceExpander.Expand(
+            request.Date,
+            request.Recurrence.Frequency,
+            interval,
+            request.Recurrence.DaysOfWeek,
+            request.Recurrence.Count,
+            request.Recurrence.UntilDate);
+
+        if (dates.Count == 0)
+        {
+            return Results.BadRequest(new
+            {
+                error = "The recurrence rule produces no occurrences.",
+                code = "recurrence_no_dates"
+            });
+        }
+
+        var title = Norm(request.Title);
+        var description = NormNull(request.Description);
+        var location = NormNull(request.Location);
+        var policy = request.RemovalEmailPolicy ?? RemovalEmailPolicy.Ask;
+        var actor = ActivityActor.From(http);
+        var responses = new List<EventResponse>(dates.Count);
+
+        foreach (var date in dates)
+        {
+            var evt = new Event
+            {
+                Id = Guid.NewGuid(),
+                GroupId = request.GroupId,
+                Title = title,
+                Description = description,
+                Location = location,
+                Date = date,
+                RemovalEmailPolicy = policy,
+                CreatedAt = DateTime.UtcNow
+            };
+            db.Events.Add(evt);
+
+            activity.Log(evt.Id, ActivityKind.EventCreated, "created this event", actor);
+
+            if (request.Questions is not null)
+            {
+                for (var i = 0; i < request.Questions.Count; i++)
+                {
+                    var q = request.Questions[i];
+                    db.SignupQuestions.Add(new SignupQuestion
+                    {
+                        Id = Guid.NewGuid(),
+                        EventId = evt.Id,
+                        Label = Norm(q.Label),
+                        Type = q.Type!.Value,
+                        Required = q.Required,
+                        Options = q.Type == QuestionType.Dropdown ? SerializeOptions(q.Options) : null,
+                        SortOrder = i,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+            }
+
+            if (request.Slots is not null)
+            {
+                for (var i = 0; i < request.Slots.Count; i++)
+                {
+                    var s = request.Slots[i];
+                    db.TimeSlots.Add(new TimeSlot
+                    {
+                        Id = Guid.NewGuid(),
+                        EventId = evt.Id,
+                        Label = Norm(s.Label),
+                        StartTime = s.StartTime,
+                        EndTime = s.EndTime,
+                        Capacity = s.Capacity,
+                        AllowWaitlist = s.AllowWaitlist ?? true,
+                        SortOrder = i,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+            }
+
+            responses.Add(new EventResponse(
+                evt.Id, evt.GroupId, evt.Title, evt.Description, evt.Location, evt.Date, evt.RemovalEmailPolicy, evt.CreatedAt));
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        return Results.Created("/api/events/recurring", responses);
     }
 
     private static async Task<IResult> ListEvents(DateOnly from, DateOnly to, AppDbContext db, HttpContext http, CancellationToken ct)
@@ -1421,6 +1522,96 @@ public record CreateEventRequest(
             yield return new ValidationResult(
                 "Date cannot be in the past.",
                 [nameof(Date)]);
+        }
+    }
+}
+
+public record RecurrenceRequest(
+    RecurrenceFrequency Frequency,
+    [property: Range(1, 12)] int? Interval,
+    List<DayOfWeek>? DaysOfWeek,
+    [property: Range(2, 60)] int? Count,
+    DateOnly? UntilDate) : IValidatableObject
+{
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (Count.HasValue == UntilDate.HasValue)
+        {
+            yield return new ValidationResult(
+                "Exactly one of Count or UntilDate is required.",
+                [nameof(Count), nameof(UntilDate)]);
+        }
+        if (Frequency == RecurrenceFrequency.Weekly)
+        {
+            if (DaysOfWeek is null || DaysOfWeek.Count == 0)
+            {
+                yield return new ValidationResult(
+                    "At least one weekday is required for weekly recurrence.",
+                    [nameof(DaysOfWeek)]);
+            }
+            else if (DaysOfWeek.Distinct().Count() != DaysOfWeek.Count)
+            {
+                yield return new ValidationResult(
+                    "DaysOfWeek must not contain duplicates.",
+                    [nameof(DaysOfWeek)]);
+            }
+        }
+        else if (DaysOfWeek is { Count: > 0 })
+        {
+            yield return new ValidationResult(
+                "DaysOfWeek is only allowed for weekly recurrence.",
+                [nameof(DaysOfWeek)]);
+        }
+    }
+}
+
+public record CreateRecurringEventsRequest(
+    Guid GroupId,
+    [property: Required, NotWhitespace, StringLength(300)] string Title,
+    [property: NotWhitespace, StringLength(2000)] string? Description,
+    [property: NotWhitespace, StringLength(500)] string? Location,
+    DateOnly Date,
+    RemovalEmailPolicy? RemovalEmailPolicy,
+    [property: Required] RecurrenceRequest Recurrence,
+    [property: MaxLength(50)] List<CreateSlotRequest>? Slots,
+    [property: MaxLength(10)] List<QuestionUpsert>? Questions) : IValidatableObject
+{
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (GroupId == Guid.Empty)
+        {
+            yield return new ValidationResult(
+                "GroupId is required.",
+                [nameof(GroupId)]);
+        }
+        if (Date == default)
+        {
+            yield return new ValidationResult(
+                "Date is required.",
+                [nameof(Date)]);
+        }
+        else if (Date < DateOnly.FromDateTime(DateTime.UtcNow))
+        {
+            yield return new ValidationResult(
+                "Date cannot be in the past.",
+                [nameof(Date)]);
+        }
+        if (Recurrence is not null)
+        {
+            if (Recurrence.UntilDate is { } until && until < Date)
+            {
+                yield return new ValidationResult(
+                    "UntilDate cannot be before the event date.",
+                    ["Recurrence.UntilDate"]);
+            }
+            if (Recurrence.Frequency == RecurrenceFrequency.Weekly
+                && Recurrence.DaysOfWeek is { Count: > 0 }
+                && !Recurrence.DaysOfWeek.Contains(Date.DayOfWeek))
+            {
+                yield return new ValidationResult(
+                    "The event date's weekday must be one of the selected repeat days.",
+                    ["Recurrence.DaysOfWeek"]);
+            }
         }
     }
 }

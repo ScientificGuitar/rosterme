@@ -22,6 +22,14 @@ export type InviteLink = Schemas["InviteLinkResponse"]
 
 export type CreateEventRequest = NumericFields<Schemas["CreateEventRequest"]>
 
+export type CreateRecurringEventsRequest = NumericFields<
+  Schemas["CreateRecurringEventsRequest"]
+>
+
+export type RecurrenceRequest = NumericFields<Schemas["RecurrenceRequest"]>
+
+export type RecurrenceFrequency = Schemas["RecurrenceFrequency"]
+
 export type CreateGroupRequest = NumericFields<Schemas["CreateGroupRequest"]>
 
 export type UpdateGroupRequest = NumericFields<Schemas["UpdateGroupRequest"]>
