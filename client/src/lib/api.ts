@@ -14,6 +14,7 @@ import type {
   UpdateEventRequest,
   TimeSlotResponse,
   SignupManageData,
+  ReportsData,
 } from "@/lib/types"
 
 const BASE = "/api"
@@ -224,6 +225,22 @@ export function createAdminApi(getToken: () => Promise<string | null>) {
         headers: await h(),
       })
       return checkJson<EventWithSlots[]>(res)
+    },
+
+    getReports: async (params?: {
+      groupIds?: string[]
+      eventIds?: string[]
+      days?: number
+    }) => {
+      const search = new URLSearchParams()
+      params?.groupIds?.forEach((id) => search.append("groupIds", id))
+      params?.eventIds?.forEach((id) => search.append("eventIds", id))
+      if (params?.days !== undefined) search.set("days", String(params.days))
+      const qs = search.toString() ? `?${search}` : ""
+      const res = await fetch(`${BASE}/reports${qs}`, {
+        headers: await h(),
+      })
+      return checkJson<ReportsData>(res)
     },
 
     deleteSignup: async (signupId: string, notify?: boolean) => {

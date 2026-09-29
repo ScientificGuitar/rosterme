@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils"
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, soon: false },
   { to: "/groups", label: "Groups", icon: Users, soon: false },
-  { to: "/reports", label: "Reports", icon: BarChart3, soon: true },
+  { to: "/reports", label: "Reports", icon: BarChart3, soon: false },
 ]
 
 function isActive(pathname: string, to: string): boolean {

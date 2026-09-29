@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -94,6 +95,10 @@ public static class AdminEndpoints
 
         admin.MapGet("/roster", GetRoster)
             .Produces<IEnumerable<RosterEventResponse>>()
+            .Produces(401);
+
+        admin.MapGet("/reports", GetReports)
+            .Produces<ReportsResponse>()
             .Produces(401);
 
         admin.MapDelete("/signups/{id}", DeleteSignup)
@@ -1084,6 +1089,87 @@ public static class AdminEndpoints
 
     // --- Roster ---
 
+    private static async Task<IResult> GetReports([AsParameters] ReportsQuery query, AppDbContext db, HttpContext http, CancellationToken ct)
+    {
+        var userId = GetUserId(http);
+        var days = query.Days ?? 90;
+        var groupIds = query.GroupIds?.Where(g => g != Guid.Empty).Distinct().ToList() ?? [];
+        var eventIds = query.EventIds?.Where(g => g != Guid.Empty).Distinct().ToList() ?? [];
+
+        var eventsQuery = db.Events.Where(e => e.Group.Admins.Any(a => a.ClerkUserId == userId));
+        if (groupIds.Count > 0)
+            eventsQuery = eventsQuery.Where(e => groupIds.Contains(e.GroupId));
+        if (eventIds.Count > 0)
+            eventsQuery = eventsQuery.Where(e => eventIds.Contains(e.Id));
+
+        var events = await eventsQuery
+            .Include(e => e.Group)
+            .Include(e => e.TimeSlots).ThenInclude(s => s.Signups)
+            .OrderBy(e => e.Date)
+            .ToListAsync(ct);
+
+        static bool IsActive(SignupStatus status) =>
+            status is SignupStatus.Pending or SignupStatus.Confirmed;
+        static bool IsWaitlisted(SignupStatus status) =>
+            status is SignupStatus.WaitlistPending or SignupStatus.Waitlisted;
+        static double FillRate(int active, int capacity) =>
+            capacity == 0 ? 0 : (double)active / capacity;
+
+        var eventRows = events.Select(e =>
+        {
+            var slots = e.TimeSlots.Count;
+            var capacity = e.TimeSlots.Sum(s => s.Capacity);
+            var signups = e.TimeSlots.SelectMany(s => s.Signups).ToList();
+            var active = signups.Count(sg => IsActive(sg.Status));
+            var waitlisted = signups.Count(sg => IsWaitlisted(sg.Status));
+            return new ReportEventRow(
+                e.Id, e.GroupId, e.Group.Name, e.Title, e.Date,
+                slots, capacity, active, waitlisted, FillRate(active, capacity));
+        }).ToList();
+
+        var groupRows = events
+            .GroupBy(e => new { e.GroupId, Name = e.Group.Name })
+            .Select(g =>
+            {
+                var eventCount = g.Count();
+                var slots = g.Sum(e => e.TimeSlots.Count);
+                var capacity = g.Sum(e => e.TimeSlots.Sum(s => s.Capacity));
+                var signups = g.SelectMany(e => e.TimeSlots).SelectMany(s => s.Signups).ToList();
+                var active = signups.Count(sg => IsActive(sg.Status));
+                return new ReportGroupRow(
+                    g.Key.GroupId, g.Key.Name, eventCount, slots, capacity, active, FillRate(active, capacity));
+            })
+            .OrderBy(g => g.Name)
+            .ToList();
+
+        var allSignups = events.SelectMany(e => e.TimeSlots).SelectMany(s => s.Signups).ToList();
+        var totalSlots = events.Sum(e => e.TimeSlots.Count);
+        var totalCapacity = events.Sum(e => e.TimeSlots.Sum(s => s.Capacity));
+        var totalActive = allSignups.Count(sg => IsActive(sg.Status));
+        var totalWaitlisted = allSignups.Count(sg => IsWaitlisted(sg.Status));
+        var summary = new ReportsSummaryResponse(
+            events.Count, totalSlots, totalCapacity, totalActive, totalWaitlisted, FillRate(totalActive, totalCapacity));
+
+        var byStatus = allSignups
+            .GroupBy(sg => sg.Status.ToString())
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        // Bucket by signup creation date (same convention as the superadmin
+        // activity endpoint: timestamp without time zone stored as UTC).
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var start = today.AddDays(-(days - 1));
+        static DateOnly Day(DateTime createdAt) =>
+            DateOnly.FromDateTime(DateTime.SpecifyKind(createdAt, DateTimeKind.Utc));
+        var signupsPerDay = Enumerable.Range(0, days)
+            .Select(i => start.AddDays(i))
+            .Select(d => new DayCount(
+                d.ToString("yyyy-MM-dd"),
+                allSignups.Count(sg => Day(sg.CreatedAt) == d)))
+            .ToList();
+
+        return Results.Ok(new ReportsResponse(summary, groupRows, eventRows, byStatus, signupsPerDay));
+    }
+
     private static async Task<IResult> GetRoster(DateOnly weekStart, AppDbContext db, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
@@ -1791,3 +1877,33 @@ public record EventActivityResponse(
     string? ActorName, string? VolunteerName, Guid? SignupId, DateTime OccurredAt);
 
 public record EventActivityListResponse(List<EventActivityResponse> Items, int Total, bool HasMore);
+
+public sealed class ReportsQuery
+{
+    [FromQuery(Name = "groupIds")]
+    public Guid[]? GroupIds { get; set; }
+
+    [FromQuery(Name = "eventIds")]
+    public Guid[]? EventIds { get; set; }
+
+    [FromQuery(Name = "days")]
+    [Range(1, 90)]
+    public int? Days { get; set; }
+}
+
+public sealed record ReportsSummaryResponse(
+    int Events, int Slots, int Capacity, int ActiveSignups, int Waitlisted, double FillRate);
+
+public sealed record ReportGroupRow(
+    Guid Id, string Name, int Events, int Slots, int Capacity, int ActiveSignups, double FillRate);
+
+public sealed record ReportEventRow(
+    Guid Id, Guid GroupId, string GroupName, string Title, DateOnly Date,
+    int Slots, int Capacity, int ActiveSignups, int Waitlisted, double FillRate);
+
+public sealed record ReportsResponse(
+    ReportsSummaryResponse Summary,
+    List<ReportGroupRow> Groups,
+    List<ReportEventRow> Events,
+    Dictionary<string, int> SignupsByStatus,
+    List<DayCount> SignupsPerDay);

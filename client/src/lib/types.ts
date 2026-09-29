@@ -82,4 +82,14 @@ export type EventActivityList = NumericFields<
   Schemas["EventActivityListResponse"]
 >
 
+export type ReportsData = NumericFields<Schemas["ReportsResponse"]>
+
+export type ReportsSummary = NumericFields<Schemas["ReportsSummaryResponse"]>
+
+export type ReportGroupRow = NumericFields<Schemas["ReportGroupRow"]>
+
+export type ReportEventRow = NumericFields<Schemas["ReportEventRow"]>
+
+export type ReportDayCount = NumericFields<Schemas["DayCount"]>
+
 export type EventSlotSummary = NumericFields<Schemas["TimeSlotResponse"]>
