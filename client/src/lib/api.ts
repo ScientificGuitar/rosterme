@@ -1,6 +1,7 @@
 import type {
   RosterEvent,
   CreateEventRequest,
+  CreateRecurringEventsRequest,
   EventWithSlots,
   EventActivityList,
   Group,
@@ -132,6 +133,15 @@ export function createAdminApi(getToken: () => Promise<string | null>) {
         body: JSON.stringify(data),
       })
       return checkJson<{ id: string }>(res)
+    },
+
+    createRecurringEvents: async (data: CreateRecurringEventsRequest) => {
+      const res = await fetch(`${BASE}/events/recurring`, {
+        method: "POST",
+        headers: await h(),
+        body: JSON.stringify(data),
+      })
+      return checkJson<{ id: string; date: string }[]>(res)
     },
 
     updateEvent: async (
@@ -292,7 +302,9 @@ export function createAdminApi(getToken: () => Promise<string | null>) {
     },
 
     getSuperAdminStats: async () => {
-      const res = await fetch(`${BASE}/superadmin/stats`, { headers: await h() })
+      const res = await fetch(`${BASE}/superadmin/stats`, {
+        headers: await h(),
+      })
       return checkJson<SuperAdminStats>(res)
     },
 
@@ -310,7 +322,11 @@ export function createAdminApi(getToken: () => Promise<string | null>) {
       return checkJson<SuperAdminRecent>(res)
     },
 
-    listOutbox: async (params?: { sent?: boolean; skip?: number; take?: number }) => {
+    listOutbox: async (params?: {
+      sent?: boolean
+      skip?: number
+      take?: number
+    }) => {
       const search = new URLSearchParams()
       if (params?.sent !== undefined) search.set("sent", String(params.sent))
       if (params?.skip !== undefined) search.set("skip", String(params.skip))
@@ -357,7 +373,13 @@ export interface SuperAdminActivity {
 
 export interface SuperAdminRecent {
   groups: { id: string; name: string; groupOwner: string; createdAt: string }[]
-  events: { id: string; groupId: string; title: string; date: string; createdAt: string }[]
+  events: {
+    id: string
+    groupId: string
+    title: string
+    date: string
+    createdAt: string
+  }[]
   signups: {
     id: string
     timeSlotId: string
