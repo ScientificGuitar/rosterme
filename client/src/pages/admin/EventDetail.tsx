@@ -87,6 +87,7 @@ import {
   TableBleed,
 } from "@/components/ui/layout"
 import { SlotDialog, type SlotDialogSlot } from "@/components/admin/SlotDialog"
+import { RecentActivity } from "@/components/admin/RecentActivity"
 import { InviteQrDialog } from "@/components/admin/InviteQrDialog"
 import { buildInviteUrl } from "@/lib/inviteQr"
 import { RemovalEmailHelp } from "@/components/admin/RemovalEmailSetting"
@@ -360,8 +361,8 @@ export function EventDetail() {
                   <DataCardTitle icon={Activity}>Recent activity</DataCardTitle>
                 </DataCardHeader>
                 <DataCardDivider />
-                <DataCardContent>
-                  <p className="muted">Recent activity coming soon.</p>
+                <DataCardContent variant="rows">
+                  <RecentActivity eventId={event.id} />
                 </DataCardContent>
               </DataCard>
             </AdminPageCenter>
@@ -1214,8 +1215,10 @@ function InviteLinkSection({ eventId, eventTitle }: InviteLinkSectionProps) {
     )
     .sort((a, b) => Number(b.isActive) - Number(a.isActive))
 
-  const invalidate = () =>
+  const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["inviteLinks", eventId] })
+    queryClient.invalidateQueries({ queryKey: ["eventActivity", eventId] })
+  }
 
   const handleGenerate = async (e?: React.FormEvent) => {
     e?.preventDefault()

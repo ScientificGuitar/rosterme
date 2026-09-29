@@ -36,6 +36,7 @@ builder.Services.AddResend(options =>
 });
 builder.Services.AddScoped<IEmailSender, ResendEmailSender>();
 builder.Services.AddScoped<EmailOutboxService>();
+builder.Services.AddScoped<ActivityLogService>();
 builder.Services.AddScoped<SignupReminderService>();
 builder.Services.AddHostedService<EmailBackgroundService>();
 builder.Services.AddHostedService<ReminderBackgroundService>();

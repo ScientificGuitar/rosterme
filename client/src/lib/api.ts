@@ -2,6 +2,7 @@ import type {
   RosterEvent,
   CreateEventRequest,
   EventWithSlots,
+  EventActivityList,
   Group,
   GroupAdmin,
   GroupDetail,
@@ -148,6 +149,14 @@ export function createAdminApi(getToken: () => Promise<string | null>) {
     getEvent: async (id: string) => {
       const res = await fetch(`${BASE}/events/${id}`, { headers: await h() })
       return checkJson<RosterEvent>(res)
+    },
+
+    getEventActivity: async (eventId: string, skip = 0, take = 5) => {
+      const res = await fetch(
+        `${BASE}/events/${eventId}/activity?skip=${skip}&take=${take}`,
+        { headers: await h() }
+      )
+      return checkJson<EventActivityList>(res)
     },
 
     deleteEvent: async (eventId: string, notify?: boolean) => {

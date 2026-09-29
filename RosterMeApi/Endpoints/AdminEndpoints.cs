@@ -29,7 +29,7 @@ public static class AdminEndpoints
             .Produces<IEnumerable<GroupResponse>>()
             .Produces(401);
         admin.MapGet("/groups/{id}", GetGroup)
-            .Produces<GroupResponse>()
+            .Produces<GroupDetailResponse>()
             .Produces(401)
             .Produces(404);
         admin.MapPut("/groups/{id}", UpdateGroup)
@@ -104,6 +104,11 @@ public static class AdminEndpoints
 
         admin.MapGet("/events/{id}", GetEvent)
             .Produces<RosterEventResponse>()
+            .Produces(401)
+            .Produces(404);
+
+        admin.MapGet("/events/{id}/activity", GetEventActivity)
+            .Produces<EventActivityListResponse>()
             .Produces(401)
             .Produces(404);
 
@@ -438,7 +443,7 @@ public static class AdminEndpoints
 
     // --- Events ---
 
-    private static async Task<IResult> CreateEvent(CreateEventRequest request, AppDbContext db, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> CreateEvent(CreateEventRequest request, AppDbContext db, ActivityLogService activity, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
         var group = await GetAccessibleGroup(db, request.GroupId, userId, ct);
@@ -457,6 +462,8 @@ public static class AdminEndpoints
         };
 
         db.Events.Add(evt);
+
+        activity.Log(evt.Id, ActivityKind.EventCreated, "created this event", ActivityActor.From(http));
 
         if (request.Questions is not null)
         {
@@ -521,7 +528,7 @@ public static class AdminEndpoints
         )));
     }
 
-    private static async Task<IResult> UpdateEvent(Guid id, UpdateEventRequest request, AppDbContext db, EmailOutboxService outbox, IOptions<EmailOptions> emailOptions, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> UpdateEvent(Guid id, UpdateEventRequest request, AppDbContext db, EmailOutboxService outbox, ActivityLogService activity, IOptions<EmailOptions> emailOptions, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
         var evt = await db.Events
@@ -736,6 +743,11 @@ public static class AdminEndpoints
             }
         }
 
+        var actor = ActivityActor.From(http);
+        activity.Log(evt.Id, ActivityKind.EventUpdated, "edited this event", actor);
+        foreach (var label in removedSlotNotifications.Select(n => n.SlotLabel).Distinct(StringComparer.Ordinal))
+            activity.Log(evt.Id, ActivityKind.SlotDeleted, $"removed time slot “{label}”", actor);
+
         var strategy = db.Database.CreateExecutionStrategy();
 
         return await strategy.ExecuteAsync(async () =>
@@ -821,7 +833,7 @@ public static class AdminEndpoints
 
     // --- Time Slots ---
 
-    private static async Task<IResult> CreateSlot(Guid eventId, CreateSlotRequest request, AppDbContext db, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> CreateSlot(Guid eventId, CreateSlotRequest request, AppDbContext db, ActivityLogService activity, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
         var evt = await db.Events
@@ -846,12 +858,13 @@ public static class AdminEndpoints
         };
 
         db.TimeSlots.Add(slot);
+        activity.Log(eventId, ActivityKind.SlotCreated, $"added time slot “{slot.Label}”", ActivityActor.From(http));
         await db.SaveChangesAsync(ct);
 
         return Results.Created($"/api/events/{eventId}/slots/{slot.Id}", new TimeSlotResponse(slot.Id, slot.EventId, slot.Label, SlotTimes.ResolveStart(evt.Date, slot.StartTime), SlotTimes.ResolveEnd(evt.Date, slot.StartTime, slot.EndTime), slot.Capacity, 0, slot.AllowWaitlist));
     }
 
-    private static async Task<IResult> UpdateSlot(Guid eventId, Guid slotId, UpdateSlotRequest request, AppDbContext db, EmailOutboxService outbox, IOptions<EmailOptions> emailOptions, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> UpdateSlot(Guid eventId, Guid slotId, UpdateSlotRequest request, AppDbContext db, EmailOutboxService outbox, ActivityLogService activity, IOptions<EmailOptions> emailOptions, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
         var slot = await db.TimeSlots
@@ -897,6 +910,8 @@ public static class AdminEndpoints
                 });
             }
 
+            activity.Log(slot.EventId, ActivityKind.SlotUpdated, $"updated time slot “{slot.Label}”", ActivityActor.From(http));
+
             await db.SaveChangesAsync(ct);
 
             if (slot.Capacity > oldCapacity)
@@ -909,7 +924,7 @@ public static class AdminEndpoints
         });
     }
 
-    private static async Task<IResult> DeleteSlot(Guid eventId, Guid slotId, bool? notify, AppDbContext db, EmailOutboxService outbox, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> DeleteSlot(Guid eventId, Guid slotId, bool? notify, AppDbContext db, EmailOutboxService outbox, ActivityLogService activity, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
         var slot = await db.TimeSlots
@@ -937,6 +952,8 @@ public static class AdminEndpoints
                 slot.Label, slot.StartTime, slot.EndTime))
             .ToList();
         var evt = slot.Event;
+
+        activity.Log(evt.Id, ActivityKind.SlotDeleted, $"removed time slot “{slot.Label}”", ActivityActor.From(http));
 
         var strategy = db.Database.CreateExecutionStrategy();
 
@@ -992,7 +1009,7 @@ public static class AdminEndpoints
 
     // --- Signups ---
 
-    private static async Task<IResult> DeleteSignup(Guid id, bool? notify, AppDbContext db, EmailOutboxService outbox, IOptions<EmailOptions> emailOptions, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> DeleteSignup(Guid id, bool? notify, AppDbContext db, EmailOutboxService outbox, ActivityLogService activity, IOptions<EmailOptions> emailOptions, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
         var signup = await db.Signups
@@ -1039,6 +1056,9 @@ public static class AdminEndpoints
 
             var slot = signup.TimeSlot;
             var evt = slot.Event;
+            activity.Log(evt.Id, ActivityKind.SignupRemoved,
+                $"removed {signup.VolunteerName} from “{slot.Label}”{(shouldNotify.Value ? " and notified them" : "")}",
+                ActivityActor.From(http), signup.VolunteerName, signup.Id);
             if (shouldNotify.Value)
             {
                 var (subject, html, text) = EmailTemplates.BuildSignupRemoved(
@@ -1066,7 +1086,7 @@ public static class AdminEndpoints
         });
     }
 
-    private static async Task<IResult> ResendSignupConfirmation(Guid id, AppDbContext db, EmailOutboxService outbox, IOptions<EmailOptions> emailOptions, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> ResendSignupConfirmation(Guid id, AppDbContext db, EmailOutboxService outbox, ActivityLogService activity, IOptions<EmailOptions> emailOptions, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
         var signup = await db.Signups
@@ -1092,6 +1112,10 @@ public static class AdminEndpoints
 
         var rawToken = TokenService.GenerateToken();
         signup.ManagementTokenHash = TokenService.HashToken(rawToken);
+
+        activity.Log(signup.TimeSlot.EventId, ActivityKind.ConfirmationResent,
+            $"resent the confirmation email to {signup.VolunteerName}",
+            ActivityActor.From(http), signup.VolunteerName, signup.Id);
 
         var slot = signup.TimeSlot;
         if (signup.Status == SignupStatus.WaitlistPending)
@@ -1217,9 +1241,38 @@ public static class AdminEndpoints
         ));
     }
 
+    // --- Event Activity ---
+
+    private static async Task<IResult> GetEventActivity(
+        Guid id, AppDbContext db, HttpContext http, CancellationToken ct, int skip = 0, int take = 5)
+    {
+        var userId = GetUserId(http);
+        var exists = await db.Events
+            .AnyAsync(e => e.Id == id && e.Group.Admins.Any(a => a.ClerkUserId == userId), ct);
+
+        if (!exists) return Results.NotFound();
+
+        take = Math.Clamp(take <= 0 ? 5 : take, 1, 50);
+        skip = Math.Max(skip, 0);
+
+        var total = await db.EventActivities.CountAsync(a => a.EventId == id, ct);
+        var items = await db.EventActivities
+            .Where(a => a.EventId == id)
+            .OrderByDescending(a => a.OccurredAt)
+            .ThenByDescending(a => a.Id)
+            .Skip(skip)
+            .Take(take)
+            .Select(a => new EventActivityResponse(
+                a.Id, a.Kind.ToString(), a.Message, a.ActorClerkUserId,
+                a.ActorName, a.VolunteerName, a.SignupId, a.OccurredAt))
+            .ToListAsync(ct);
+
+        return Results.Ok(new EventActivityListResponse(items, total, skip + items.Count < total));
+    }
+
     // --- Invite Links ---
 
-    private static async Task<IResult> CreateInviteLink(Guid eventId, CreateInviteLinkRequest? request, DateTime? expiresAt, AppDbContext db, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> CreateInviteLink(Guid eventId, CreateInviteLinkRequest? request, DateTime? expiresAt, AppDbContext db, ActivityLogService activity, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
         var evt = await db.Events
@@ -1245,6 +1298,7 @@ public static class AdminEndpoints
         };
 
         db.InviteLinks.Add(link);
+        activity.Log(eventId, ActivityKind.InviteCreated, $"created invite link “{name}”", ActivityActor.From(http));
         await db.SaveChangesAsync(ct);
 
         return Results.Ok(new InviteLinkResponse(link.Id, link.EventId, link.Name, link.Code, link.IsActive, link.CreatedAt, link.ExpiresAt, 0));
@@ -1277,7 +1331,7 @@ public static class AdminEndpoints
             counts.TryGetValue(l.Id, out var c) ? c : 0)));
     }
 
-    private static async Task<IResult> UpdateInviteLink(Guid id, UpdateInviteLinkRequest request, AppDbContext db, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> UpdateInviteLink(Guid id, UpdateInviteLinkRequest request, AppDbContext db, ActivityLogService activity, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
         var link = await db.InviteLinks
@@ -1287,7 +1341,10 @@ public static class AdminEndpoints
         if (link is null || link.Event is null || !link.Event.Group.Admins.Any(a => a.ClerkUserId == userId))
             return Results.NotFound();
 
+        var oldName = link.Name;
         link.Name = Norm(request.Name);
+        if (!string.Equals(oldName, link.Name, StringComparison.Ordinal))
+            activity.Log(link.EventId!.Value, ActivityKind.InviteRenamed, $"renamed invite link “{oldName}” to “{link.Name}”", ActivityActor.From(http));
         await db.SaveChangesAsync(ct);
 
         var signupCount = await db.Signups.CountAsync(
@@ -1297,7 +1354,7 @@ public static class AdminEndpoints
             link.Id, link.EventId, link.Name, link.Code, link.IsActive, link.CreatedAt, link.ExpiresAt, signupCount));
     }
 
-    private static async Task<IResult> RevokeInviteLink(Guid id, AppDbContext db, HttpContext http, CancellationToken ct)
+    private static async Task<IResult> RevokeInviteLink(Guid id, AppDbContext db, ActivityLogService activity, HttpContext http, CancellationToken ct)
     {
         var userId = GetUserId(http);
         var link = await db.InviteLinks
@@ -1310,6 +1367,7 @@ public static class AdminEndpoints
         if (!link.IsActive) return Results.NoContent();
 
         link.IsActive = false;
+        activity.Log(link.EventId!.Value, ActivityKind.InviteRevoked, $"revoked invite link “{link.Name}”", ActivityActor.From(http));
         await db.SaveChangesAsync(ct);
 
         return Results.NoContent();
@@ -1536,3 +1594,9 @@ public record RosterSlotResponse(Guid Id, string Label, DateTime StartTime, Date
 public record SignupResponse(Guid Id, Guid TimeSlotId, string VolunteerName, string Email, string Status, DateTime CreatedAt, List<SignupAnswerResponse> Answers);
 
 public record SignupAnswerResponse(Guid QuestionId, string Value);
+
+public record EventActivityResponse(
+    Guid Id, string Kind, string Message, string? ActorClerkUserId,
+    string? ActorName, string? VolunteerName, Guid? SignupId, DateTime OccurredAt);
+
+public record EventActivityListResponse(List<EventActivityResponse> Items, int Total, bool HasMore);

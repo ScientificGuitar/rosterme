@@ -83,6 +83,17 @@ public static class WaitlistService
             next.Status = SignupStatus.Confirmed;
             next.ReminderSentAt = null;
 
+            db.EventActivities.Add(new EventActivity
+            {
+                Id = Guid.NewGuid(),
+                EventId = slot.EventId,
+                Kind = ActivityKind.WaitlistPromoted,
+                Message = $"was promoted from the waitlist for “{slot.Label}”",
+                VolunteerName = next.VolunteerName,
+                SignupId = next.Id,
+                OccurredAt = DateTime.UtcNow
+            });
+
             await EnqueuePromotionEmail(db, outbox, emailOptions, next, slot, rawToken, ct);
             promoted++;
         }
