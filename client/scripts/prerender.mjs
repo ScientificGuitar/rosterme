@@ -140,9 +140,13 @@ for (const r of ROUTES) {
     `<meta name="twitter:description" content="${escapeHtml(r.description)}" />`
   )
 
-  // Static snapshot for crawlers without JS. React createRoot clears
-  // #root on first render, so JS visitors are unaffected.
-  const staticBody = `<div id="root"><main><h1>${escapeHtml(r.h1)}</h1><p>${escapeHtml(r.body)}</p><p><a href="/">RosterMe home</a> · <a href="/features">Features</a> · <a href="/resources">Resources</a></p></main></div>`
+  // Static snapshot for crawlers without JS. It must NOT live inside
+  // #root: the browser paints #root as soon as the HTML parses, so the
+  // snapshot would flash on every reload before the JS bundle mounts and
+  // creates the real page. As a hidden sibling of #root it's never painted
+  // for humans, yet no-JS crawlers still read its text from raw HTML.
+  const snapBody = `<main><h1>${escapeHtml(r.h1)}</h1><p>${escapeHtml(r.body)}</p><p><a href="/">RosterMe home</a> · <a href="/features">Features</a> · <a href="/resources">Resources</a></p></main>`
+  const staticBody = `<div id="root"></div>\n<div hidden aria-hidden="true">${snapBody}</div>`
   html = html.replace(/<div id="root"><\/div>/, staticBody)
 
   const outPath = join(dist, r.out)
