@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { Link } from "react-router-dom"
 import {
   Activity,
   BarChart3,
   CalendarDays,
   ChartColumn,
+  Download,
   Users,
   X,
 } from "lucide-react"
@@ -51,6 +53,7 @@ import {
 } from "@/components/ui/layout"
 import { LoadingState } from "@/components/ui/spinner"
 import { formatApiError } from "@/lib/api"
+import { exportReportsToExcel } from "@/lib/reportExport"
 
 function toDateString(d: Date): string {
   const year = d.getFullYear()
@@ -139,6 +142,17 @@ export function ReportsPage() {
 
   const reports = useReports(selectedGroupIds, selectedEventIds, days)
   const data = reports.data
+  const canExport = Boolean(data && Number(data.summary.events) > 0)
+
+  const handleExport = async () => {
+    if (!data) return
+    try {
+      await exportReportsToExcel(data)
+      toast.success("Report exported to Excel")
+    } catch (err) {
+      toast.error(formatApiError(err, "Failed to export report"))
+    }
+  }
 
   const summary = data?.summary
   const byGroup = useMemo(
@@ -187,6 +201,18 @@ export function ReportsPage() {
       <AdminHeader
         title="Reports"
         subtitle="Attendance and signup insights for your events."
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={!canExport || reports.isLoading}
+            className="bg-background"
+          >
+            <Download className="h-4 w-4" />
+            Export
+          </Button>
+        }
       />
       <AdminPageBody>
         <AdminPageCenter>
