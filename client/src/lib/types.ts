@@ -2,7 +2,13 @@ import type { components } from "@/lib/generated/schema"
 
 type Schemas = components["schemas"]
 
-type Num<T> = number extends T ? number : T
+type Num<T> = null extends T
+  ? number extends Exclude<T, null>
+    ? number | null
+    : T
+  : number extends T
+    ? number
+    : T
 
 type NumericFields<T> = {
   [K in keyof T]: T[K] extends Array<infer U>
