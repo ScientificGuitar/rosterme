@@ -28,8 +28,8 @@ const ROUTES = [
     description:
       "See what RosterMe can do: create events and shifts, share one signup link, track coverage, and send automatic reminders. Free for schools and community groups.",
     robots: "index, follow",
-    h1: "Features — coming soon",
-    body: "We're putting together a full tour of everything RosterMe can do: events and shifts, one signup link, coverage tracking, and automatic reminders. Check back soon.",
+    h1: "Every tool you need to run volunteer signups.",
+    body: "RosterMe covers the whole journey: build events and shifts, share invite links, and know who's coming. Recurring events, waitlists with auto-promotion, custom signup questions, QR codes, teams, reminders, reports, and more. Volunteers never need an account.",
   },
   {
     route: "/resources",
