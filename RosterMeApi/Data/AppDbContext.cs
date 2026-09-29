@@ -16,6 +16,7 @@ public class AppDbContext : DbContext
     public DbSet<SignupAnswer> SignupAnswers => Set<SignupAnswer>();
     public DbSet<InviteLink> InviteLinks => Set<InviteLink>();
     public DbSet<EmailMessage> EmailMessages => Set<EmailMessage>();
+    public DbSet<EventActivity> EventActivities => Set<EventActivity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -155,6 +156,26 @@ public class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.SetNull);
             entity.HasIndex(e => e.EventId);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
+        });
+
+        modelBuilder.Entity<EventActivity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Kind).HasConversion<string>().HasMaxLength(30).IsRequired();
+            entity.Property(e => e.Message).HasMaxLength(1000).IsRequired();
+            entity.Property(e => e.ActorClerkUserId).HasMaxLength(100);
+            entity.Property(e => e.ActorName).HasMaxLength(200);
+            entity.Property(e => e.VolunteerName).HasMaxLength(200);
+            entity.HasOne(e => e.Event)
+                .WithMany()
+                .HasForeignKey(e => e.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Signup)
+                .WithMany()
+                .HasForeignKey(e => e.SignupId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(e => new { e.EventId, e.OccurredAt, e.Id });
+            entity.Property(e => e.OccurredAt).HasDefaultValueSql("now()");
         });
     }
 }

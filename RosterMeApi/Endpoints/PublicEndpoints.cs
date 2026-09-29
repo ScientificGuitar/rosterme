@@ -214,6 +214,7 @@ public static class PublicEndpoints
         PublicSignupRequest request,
         AppDbContext db,
         EmailOutboxService outbox,
+        ActivityLogService activity,
         IOptions<EmailOptions> emailOptions,
         CancellationToken ct)
     {
@@ -368,6 +369,10 @@ public static class PublicEndpoints
 
             await EnqueueConfirmationEmail(db, outbox, emailOptions, signup, slot, rawToken, waitlistPosition, ct);
 
+            activity.Log(link.EventId!.Value, ActivityKind.SignupCreated,
+                isWaitlist ? $"signed up for the waitlist in “{slot.Label}”" : $"signed up for “{slot.Label}”",
+                ActivityActor.Volunteer(signup.VolunteerName), signup.VolunteerName, signup.Id);
+
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
 
@@ -426,7 +431,7 @@ public static class PublicEndpoints
         return Results.File(bytes, "text/calendar", CalendarInviteBuilder.IcsFileName(evt.Title));
     }
 
-    private static async Task<IResult> ConfirmSignup(string token, AppDbContext db, CancellationToken ct)
+    private static async Task<IResult> ConfirmSignup(string token, AppDbContext db, ActivityLogService activity, CancellationToken ct)
     {
         var hash = TokenService.HashToken(token);
         var signup = await db.Signups
@@ -456,6 +461,9 @@ public static class PublicEndpoints
             {
                 current.Status = SignupStatus.Confirmed;
                 current.ConfirmedAt = DateTime.UtcNow;
+                activity.Log(current.TimeSlot.EventId, ActivityKind.SignupConfirmed,
+                    $"confirmed their spot in “{current.TimeSlot.Label}”",
+                    ActivityActor.Volunteer(current.VolunteerName), current.VolunteerName, current.Id);
                 await db.SaveChangesAsync(ct);
             }
             else if (current.Status == SignupStatus.WaitlistPending)
@@ -463,6 +471,9 @@ public static class PublicEndpoints
                 // Late confirmers join the back of the queue ordered by their new ConfirmedAt — never jumping ahead, even if a spot is free.
                 current.Status = SignupStatus.Waitlisted;
                 current.ConfirmedAt = DateTime.UtcNow;
+                activity.Log(current.TimeSlot.EventId, ActivityKind.SignupConfirmed,
+                    $"confirmed their place on the waitlist for “{current.TimeSlot.Label}”",
+                    ActivityActor.Volunteer(current.VolunteerName), current.VolunteerName, current.Id);
                 await db.SaveChangesAsync(ct);
             }
 
@@ -500,6 +511,7 @@ public static class PublicEndpoints
         string token,
         AppDbContext db,
         EmailOutboxService outbox,
+        ActivityLogService activity,
         IOptions<EmailOptions> emailOptions,
         CancellationToken ct)
     {
@@ -530,7 +542,9 @@ public static class PublicEndpoints
 
             await SlotAdvisoryLock.AcquireAsync(db, slotId, ct);
 
-            var current = await db.Signups.FirstOrDefaultAsync(s => s.Id == signup.Id, ct);
+            var current = await db.Signups
+                .Include(s => s.TimeSlot)
+                .FirstOrDefaultAsync(s => s.Id == signup.Id, ct);
             if (current is null)
                 return Results.NotFound(new { error = "Signup link not found", code = "invalid_manage_link" });
 
@@ -552,6 +566,9 @@ public static class PublicEndpoints
 
             var occupying = WaitlistService.IsActive(current.Status);
             current.Status = SignupStatus.Cancelled;
+            activity.Log(current.TimeSlot.EventId, ActivityKind.SignupCancelled,
+                $"cancelled their signup for “{current.TimeSlot.Label}”",
+                ActivityActor.Volunteer(current.VolunteerName), current.VolunteerName, current.Id);
             // Persist the release first: promotion counts free capacity from the database, so it must see this flip.
             await db.SaveChangesAsync(ct);
 

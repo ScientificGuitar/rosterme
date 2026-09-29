@@ -68,4 +68,10 @@ export type EventWithSlots = NumericFields<
   Schemas["EventWithSlotsResponse"]
 >
 
+export type EventActivity = Schemas["EventActivityResponse"]
+
+export type EventActivityList = NumericFields<
+  Schemas["EventActivityListResponse"]
+>
+
 export type EventSlotSummary = NumericFields<Schemas["TimeSlotResponse"]>
