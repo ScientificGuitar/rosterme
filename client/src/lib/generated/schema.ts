@@ -832,6 +832,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    groupIds?: string[];
+                    eventIds?: string[];
+                    days?: number | string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReportsResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/signups/{id}": {
         parameters: {
             query?: never;
@@ -2163,6 +2209,64 @@ export interface components {
         };
         /** @enum {unknown} */
         RemovalEmailPolicy: "Ask" | "Always" | "Never";
+        ReportEventRow: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            groupId: string;
+            groupName: string;
+            title: string;
+            /** Format: date */
+            date: string;
+            /** Format: int32 */
+            slots: number | string;
+            /** Format: int32 */
+            capacity: number | string;
+            /** Format: int32 */
+            activeSignups: number | string;
+            /** Format: int32 */
+            waitlisted: number | string;
+            /** Format: double */
+            fillRate: number | string;
+        };
+        ReportGroupRow: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: int32 */
+            events: number | string;
+            /** Format: int32 */
+            slots: number | string;
+            /** Format: int32 */
+            capacity: number | string;
+            /** Format: int32 */
+            activeSignups: number | string;
+            /** Format: double */
+            fillRate: number | string;
+        };
+        ReportsResponse: {
+            summary: components["schemas"]["ReportsSummaryResponse"];
+            groups: components["schemas"]["ReportGroupRow"][];
+            events: components["schemas"]["ReportEventRow"][];
+            signupsByStatus: {
+                [key: string]: number | string;
+            };
+            signupsPerDay: components["schemas"]["DayCount"][];
+        };
+        ReportsSummaryResponse: {
+            /** Format: int32 */
+            events: number | string;
+            /** Format: int32 */
+            slots: number | string;
+            /** Format: int32 */
+            capacity: number | string;
+            /** Format: int32 */
+            activeSignups: number | string;
+            /** Format: int32 */
+            waitlisted: number | string;
+            /** Format: double */
+            fillRate: number | string;
+        };
         ResendSignupRequest: {
             /** Format: uuid */
             slotId: string;
