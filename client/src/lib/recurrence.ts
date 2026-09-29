@@ -275,10 +275,12 @@ export function validateRecurrence(
   return null
 }
 
+export type DayOfWeek = (typeof DAY_NAMES)[number]
+
 export interface RecurrencePayload {
   frequency: RecurrenceFrequency
   interval: number
-  daysOfWeek: string[] | null
+  daysOfWeek: DayOfWeek[] | null
   count: number | null
   untilDate: string | null
 }
