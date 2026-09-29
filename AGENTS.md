@@ -21,6 +21,7 @@ Roster signup app: orgs create events with time slots, share invite links, volun
 - **Validation/errors**: use `ValidateDtoFilter` (recursive DataAnnotations) — don't hand-roll. Errors → RFC 9457 ProblemDetails with optional `code` (e.g. `duplicate_pending`) for client branching. `DbConflictDetector`: 23505→409, 23503→400.
 - **Signup invariants**: capacity check with `SELECT ... FOR UPDATE`; unique `(Email, TimeSlotId)` excl. cancelled, case-insensitive email; management tokens stored SHA256-hashed (raw token only in email link); signup + `EmailMessage` outbox row in same transaction (`EmailBackgroundService` sends via Resend).
 - **Frontend API**: use `createAdminApi(getToken)` / `createPublicApi()`, shared error parsing via `ApiError`.
+- **Card content dividers**: a horizontal rule inside padded `DataCardContent` must bleed to the card edges — `border-t` alone stops at the padding and renders inset. Use `-mx-4 px-4 border-t` (or the existing bleed components) so the line reaches the card edges.
 
 ## Git convention
 
