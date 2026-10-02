@@ -6,7 +6,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..")
 const dist = join(root, "dist")
 const templatePath = join(dist, "index.html")
 
-const SITE = "https://rosterme.app"
+const SITE = "https://www.rosterme.app"
 
 // Must stay in sync with useSeo() calls in src/pages/*.
 const ROUTES = [

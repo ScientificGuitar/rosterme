@@ -8,4 +8,4 @@ Disallow: /admin
 Disallow: /invite/
 Disallow: /signup/
 
-Sitemap: https://rosterme.app/sitemap.xml
+Sitemap: https://www.rosterme.app/sitemap.xml

@@ -2,7 +2,7 @@
 
 Volunteer scheduling app: groups create events with time slots, share invite links, and volunteers self-sign up through a public page with no account required.
 
-**Live:** [https://rosterme.app](https://rosterme.app)
+**Live:** [https://www.rosterme.app](https://www.rosterme.app)
 
 ---
 
